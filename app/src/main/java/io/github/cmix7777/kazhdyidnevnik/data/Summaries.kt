@@ -10,13 +10,13 @@ object Summaries {
 
     /**
      * Утренняя сводка. [items] — пары и смены дня или null, если расписание не загружено.
-     * [weather] — погода на этот день, если удалось её узнать.
+     * [forecast] — прогноз погоды, если удалось его получить.
      */
     fun morning(
         date: LocalDate,
         items: List<DayItem>?,
         plan: List<PlanBlock>,
-        weather: DayWeather? = null,
+        forecast: Forecast? = null,
     ): String {
         val lines = mutableListOf<String>()
 
@@ -41,10 +41,7 @@ object Summaries {
             }
         }
 
-        weather?.let {
-            lines += "Погода: ${WeatherText.summary(it)}."
-            WeatherText.advice(it)?.let { advice -> lines += advice }
-        }
+        lines += WeatherAdvice.morningLines(date, items, forecast)
 
         Practice.dayNumber(date)?.let { lines += "Практика: день $it из ${Practice.totalDays}." }
 

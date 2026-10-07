@@ -13,6 +13,7 @@ import io.github.cmix7777.kazhdyidnevnik.data.Reminder
 import io.github.cmix7777.kazhdyidnevnik.data.ReminderKind
 import io.github.cmix7777.kazhdyidnevnik.data.ReminderPlanner
 import io.github.cmix7777.kazhdyidnevnik.data.Summaries
+import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
 import io.github.cmix7777.kazhdyidnevnik.data.WorkSchedule
 import io.github.cmix7777.kazhdyidnevnik.data.buildDay
 import io.github.cmix7777.kazhdyidnevnik.data.weekStartFor
@@ -111,8 +112,8 @@ object ReminderScheduler {
             ReminderKind.MORNING -> {
                 val items = dayItems(context, date)
                 val plan = items?.let { PlanGenerator.planFor(date, it) }.orEmpty()
-                val weather = runCatching { WeatherRepository.forDate(context, date) }.getOrNull()
-                Notifier.morning(context, Summaries.morning(date, items, plan, weather))
+                val forecast = runCatching { WeatherRepository.forecast(context) }.getOrNull()
+                Notifier.morning(context, Summaries.morning(date, items, plan, forecast))
             }
             ReminderKind.BLOCK -> {
                 val block = plan(context, date).firstOrNull { it.kind == reminder.block } ?: return
@@ -120,6 +121,12 @@ object ReminderScheduler {
                 if (block.start != reminder.at.toLocalTime()) return
                 if (block.key(date) in ProgressRepository.current(context.filesDir)) return
                 Notifier.block(context, date, block)
+            }
+            ReminderKind.WEATHER -> {
+                val tomorrow = date.plusDays(1)
+                val forecast = runCatching { WeatherRepository.forecast(context) }.getOrNull()
+                val note = WeatherAdvice.tomorrowNote(tomorrow, dayItems(context, tomorrow), forecast) ?: return
+                Notifier.weather(context, note.title, note.text)
             }
             ReminderKind.EVENING -> {
                 val done = ProgressRepository.current(context.filesDir)

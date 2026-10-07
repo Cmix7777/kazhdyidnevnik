@@ -2,6 +2,8 @@ package io.github.cmix7777.kazhdyidnevnik.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.Practice
+import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
 import io.github.cmix7777.kazhdyidnevnik.data.WorkSchedule
 import io.github.cmix7777.kazhdyidnevnik.data.buildDay
 import io.github.cmix7777.kazhdyidnevnik.data.weekStartFor
@@ -33,9 +36,9 @@ import io.github.cmix7777.kazhdyidnevnik.formatWeekRange
 private const val MIN_OFFSET = -4
 private const val MAX_OFFSET = 8
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun WeekScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
+fun WeekScreen(vm: ScheduleViewModel, extras: ExtrasViewModel, modifier: Modifier = Modifier) {
     val now by rememberNow()
     val today = now.toLocalDate()
     var offset by rememberSaveable { mutableIntStateOf(0) }
@@ -120,6 +123,19 @@ fun WeekScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
                         item(key = "title-$date") {
                             val (dayName, dateText) = formatDayTitle(date).split(", ", limit = 2)
                             SectionTitle(text = dayName, accent = dateText, badge = if (isToday) "сегодня" else null)
+                        }
+                        val forecast = extras.forecast
+                        val dayWeather = forecast?.day(date)
+                        if (forecast != null && dayWeather != null && !date.isBefore(today)) {
+                            item(key = "weather-$date") {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    WeatherPill(dayWeather)
+                                    WeatherAdvice.alerts(dayWeather, forecast.day(date.minusDays(1))).forEach { AlertPill(it) }
+                                }
+                            }
                         }
                         if (dayItems.isEmpty()) {
                             item(key = "empty-$date") {

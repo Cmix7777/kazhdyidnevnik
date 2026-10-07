@@ -5,7 +5,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 
-enum class ReminderKind { CHECK, MORNING, BLOCK, EVENING }
+enum class ReminderKind { CHECK, MORNING, BLOCK, WEATHER, EVENING }
 
 /** Одно напоминание: когда и что. Для блока учёбы [block] — его вид. */
 data class Reminder(val at: LocalDateTime, val kind: ReminderKind, val block: PlanKind? = null)
@@ -18,12 +18,16 @@ data class ReminderSettings(
     val blocks: Boolean = true,
     val evening: Boolean = true,
     val eveningTime: LocalTime = LocalTime.of(22, 15),
+    val weather: Boolean = true,
 )
 
 object ReminderPlanner {
 
     /** Когда проверять сайт расписания: утром до выхода и поздно вечером. */
     val checkTimes: List<LocalTime> = listOf(LocalTime.of(6, 30), LocalTime.of(23, 0))
+
+    /** Когда присылать погоду на завтра. */
+    val weatherTime: LocalTime = LocalTime.of(21, 0)
 
     /** Напоминания на один день. [plan] — план учёбы этого дня. */
     fun forDay(date: LocalDate, plan: List<PlanBlock>, settings: ReminderSettings): List<Reminder> {
@@ -36,6 +40,9 @@ object ReminderPlanner {
         }
         if (settings.blocks) {
             plan.forEach { result += Reminder(date.atTime(it.start), ReminderKind.BLOCK, it.kind) }
+        }
+        if (settings.weather) {
+            result += Reminder(date.atTime(weatherTime), ReminderKind.WEATHER)
         }
         if (settings.evening && plan.isNotEmpty()) {
             // Вечером, но не раньше, чем закончится последний блок.
@@ -50,6 +57,7 @@ object ReminderPlanner {
         ReminderKind.CHECK -> Duration.ofHours(6)
         ReminderKind.MORNING -> Duration.ofHours(2)
         ReminderKind.BLOCK -> Duration.ofMinutes(30)
+        ReminderKind.WEATHER -> Duration.ofHours(2)
         ReminderKind.EVENING -> Duration.ofHours(2)
     }
 }

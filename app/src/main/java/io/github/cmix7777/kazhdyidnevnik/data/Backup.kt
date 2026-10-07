@@ -21,6 +21,7 @@ object Backup {
         val blocks: Boolean,
         val evening: Boolean,
         val eveningTime: String,
+        val weather: Boolean = true,
     )
 
     @Serializable
@@ -50,6 +51,7 @@ object Backup {
                 blocks = settings.blocks,
                 evening = settings.evening,
                 eveningTime = settings.eveningTime.toString(),
+                weather = settings.weather,
             ),
         )
         return json.encodeToString(BackupDto.serializer(), dto)
@@ -68,6 +70,7 @@ object Backup {
                     blocks = s.blocks,
                     evening = s.evening,
                     eveningTime = LocalTime.parse(s.eveningTime),
+                    weather = s.weather,
                 )
             }.getOrNull()
         }

@@ -8,7 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.cmix7777.kazhdyidnevnik.data.DayWeather
+import io.github.cmix7777.kazhdyidnevnik.data.Forecast
 import io.github.cmix7777.kazhdyidnevnik.data.Release
 import io.github.cmix7777.kazhdyidnevnik.data.plural
 import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
@@ -56,8 +56,19 @@ class ExtrasViewModel(private val app: Application) : AndroidViewModel(app) {
     var lastUpdateCheckMillis by mutableLongStateOf(settings.lastUpdateCheckMillis)
         private set
 
-    /** Прогноз на ближайшие дни. */
-    var weather by mutableStateOf<List<DayWeather>>(emptyList())
+    /** Прогноз погоды: сейчас, по часам и на неделю. */
+    var forecast by mutableStateOf<Forecast?>(null)
+        private set
+
+    /** Когда прогноз получен (0 — ещё ни разу). */
+    var weatherUpdatedMillis by mutableLongStateOf(0L)
+        private set
+
+    var weatherLoading by mutableStateOf(false)
+        private set
+
+    /** Почему не удалось обновить погоду (null — всё хорошо). */
+    var weatherError by mutableStateOf<String?>(null)
         private set
 
     var lastBackupMillis by mutableLongStateOf(settings.lastAutoBackupMillis)
@@ -71,7 +82,10 @@ class ExtrasViewModel(private val app: Application) : AndroidViewModel(app) {
         settings.knownRelease?.takeIf { Updates.isNewer(it) }?.let { update = UpdateState.Available(it) }
         if (System.currentTimeMillis() - settings.lastUpdateCheckMillis > AUTO_CHECK_MS) checkUpdate(manual = false)
 
-        WeatherRepository.cached(app)?.let { weather = it.second }
+        WeatherRepository.cached(app)?.let { (time, cached) ->
+            forecast = cached
+            weatherUpdatedMillis = time
+        }
         if (WeatherRepository.isStale(app)) refreshWeather()
 
         viewModelScope.launch {
@@ -137,8 +151,27 @@ class ExtrasViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     fun refreshWeather() {
+        if (weatherLoading) return
+        weatherLoading = true
         viewModelScope.launch {
-            runCatching { WeatherRepository.fetch(app) }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { weather = it }
+            try {
+                val fresh = WeatherRepository.fetch(app)
+                if (fresh.days.isNotEmpty()) {
+                    forecast = fresh
+                    weatherUpdatedMillis = System.currentTimeMillis()
+                    weatherError = null
+                } else {
+                    weatherError = "сервис погоды прислал пустой ответ"
+                }
+            } catch (e: Exception) {
+                weatherError = when (e) {
+                    is HttpStatusException -> "сервис погоды ответил ошибкой ${e.statusCode}"
+                    is IOException -> "нет связи с open-meteo.com"
+                    else -> e.javaClass.simpleName
+                }
+            } finally {
+                weatherLoading = false
+            }
         }
     }
 

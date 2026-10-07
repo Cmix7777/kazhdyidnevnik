@@ -102,7 +102,7 @@ fun AppRoot(vm: ScheduleViewModel = viewModel(), extras: ExtrasViewModel = viewM
             } else {
                 when (current) {
                     Tab.Today -> TodayScreen(vm, extras, onOpenSettings = { settingsOpen = true }, modifier = screenModifier)
-                    Tab.Week -> WeekScreen(vm, screenModifier)
+                    Tab.Week -> WeekScreen(vm, extras, screenModifier)
                     Tab.Progress -> ProgressScreen(vm, screenModifier)
                     Tab.Deadlines -> DeadlinesScreen(screenModifier)
                 }

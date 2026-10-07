@@ -38,6 +38,7 @@ class RemindersTest {
                 ReminderKind.BLOCK,
                 ReminderKind.BLOCK,
                 ReminderKind.BLOCK,
+                ReminderKind.WEATHER,
                 ReminderKind.EVENING,
                 ReminderKind.CHECK,
             ),
@@ -47,6 +48,7 @@ class RemindersTest {
         assertEquals(LocalTime.of(7, 45), reminders[1].at.toLocalTime())
         assertEquals(plan.map { it.start }, reminders.filter { it.kind == ReminderKind.BLOCK }.map { it.at.toLocalTime() })
         assertEquals(LocalTime.of(22, 15), reminders.single { it.kind == ReminderKind.EVENING }.at.toLocalTime())
+        assertEquals(LocalTime.of(21, 0), reminders.single { it.kind == ReminderKind.WEATHER }.at.toLocalTime())
         assertTrue(reminders.all { it.at.toLocalDate() == wednesday })
     }
 
@@ -62,7 +64,7 @@ class RemindersTest {
     @Test
     fun nothingWhenEverythingIsOff() {
         val plan = PlanGenerator.plan(wednesday, day(wednesday))
-        val off = ReminderSettings(changes = false, morning = false, blocks = false, evening = false)
+        val off = ReminderSettings(changes = false, morning = false, blocks = false, evening = false, weather = false)
         assertTrue(ReminderPlanner.forDay(wednesday, plan, off).isEmpty())
     }
 

@@ -30,11 +30,13 @@ object Notifier {
     private const val CHANNEL_MORNING = "morning"
     private const val CHANNEL_STUDY = "study"
     private const val CHANNEL_UPDATES = "updates"
+    private const val CHANNEL_WEATHER = "weather"
 
     private const val ID_MORNING = 10
     private const val ID_EVENING = 11
     private const val ID_TEST = 12
     private const val ID_UPDATE = 13
+    private const val ID_WEATHER = 14
     private const val MAX_LINES = 8
     private const val ACCENT = 0xFFA855F7.toInt()
 
@@ -57,6 +59,11 @@ object Notifier {
                     "Учёба",
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply { description = "Начало блоков учёбы и вечерняя отметка" },
+                NotificationChannel(
+                    CHANNEL_WEATHER,
+                    "Погода на завтра",
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ).apply { description = "Вечером: погода при выходе, что надеть, предупреждения" },
                 NotificationChannel(
                     CHANNEL_UPDATES,
                     "Обновления приложения",
@@ -110,6 +117,10 @@ object Notifier {
 
     fun evening(context: Context, text: String) {
         post(context, ID_EVENING, builder(context, CHANNEL_STUDY, "Как прошёл день?", text).build())
+    }
+
+    fun weather(context: Context, title: String, text: String) {
+        post(context, ID_WEATHER, builder(context, CHANNEL_WEATHER, title, text).build())
     }
 
     fun update(context: Context, release: Release) {

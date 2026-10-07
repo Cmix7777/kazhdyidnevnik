@@ -13,6 +13,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import io.github.cmix7777.kazhdyidnevnik.service.Backups
 import io.github.cmix7777.kazhdyidnevnik.service.Updates
+import io.github.cmix7777.kazhdyidnevnik.service.WeatherRepository
 import java.util.concurrent.TimeUnit
 
 /**
@@ -26,6 +27,7 @@ class ScheduleCheckWorker(context: Context, params: WorkerParameters) : Coroutin
         // Попутно: новая версия приложения (не чаще раза в 12 часов) и ежедневная автокопия.
         runCatching { Updates.checkInBackground(applicationContext) }
         runCatching { Backups.saveAutoIfDue(applicationContext) }
+        runCatching { WeatherRepository.fetch(applicationContext) }
         return when {
             ok -> Result.success()
             runAttemptCount < MAX_ATTEMPTS -> Result.retry()

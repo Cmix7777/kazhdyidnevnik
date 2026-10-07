@@ -25,6 +25,7 @@ import io.github.cmix7777.kazhdyidnevnik.data.DayItem
 import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
 import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
 import io.github.cmix7777.kazhdyidnevnik.data.Practice
+import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherText
 import io.github.cmix7777.kazhdyidnevnik.data.WorkSchedule
 import io.github.cmix7777.kazhdyidnevnik.data.buildDay
@@ -53,7 +54,7 @@ fun TodayScreen(
     val todayItems = buildDay(today, todayWeek?.lessons.orEmpty(), WorkSchedule.default)
     val tomorrowItems = buildDay(tomorrow, tomorrowWeek?.lessons.orEmpty(), WorkSchedule.default)
     val refreshing = vm.isLoading(0)
-    val weather = extras.weather.firstOrNull { it.date == today }
+    val forecast = extras.forecast
 
     PullToRefreshBox(
         isRefreshing = refreshing,
@@ -88,10 +89,6 @@ fun TodayScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Pill(text = daySummary(todayItems))
-                    weather?.let {
-                        Pill(text = "Ижевск " + WeatherText.short(it))
-                        if (WeatherText.advice(it) != null) Pill(text = "возьми зонт", accent = true)
-                    }
                     Practice.dayNumber(today)?.let { day ->
                         Pill(text = "практика: день $day из ${Practice.totalDays}", accent = true)
                     }
@@ -104,6 +101,19 @@ fun TodayScreen(
 
             vm.error?.let { message ->
                 item { InfoNote(message, isError = true) }
+            }
+
+            item {
+                WeatherCard(
+                    forecast = forecast,
+                    updatedMillis = extras.weatherUpdatedMillis,
+                    error = extras.weatherError,
+                    loading = extras.weatherLoading,
+                    date = today,
+                    items = todayItems,
+                    now = now,
+                    onRetry = { extras.refreshWeather() },
+                )
             }
 
             item { SectionTitle("Расписание", accent = scheduleAccent(todayItems)) }
@@ -157,6 +167,28 @@ fun TodayScreen(
                     text = "Завтра",
                     accent = formatDayTitle(tomorrow).substringBefore(',').lowercase(),
                 )
+            }
+            val tomorrowWeather = forecast?.day(tomorrow)
+            if (forecast != null && tomorrowWeather != null) {
+                item {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        WeatherPill(tomorrowWeather)
+                        WeatherAdvice.alerts(tomorrowWeather, forecast.day(today)).forEach { AlertPill(it) }
+                    }
+                }
+                val tomorrowTrips = WeatherAdvice.tripWeather(tomorrow, tomorrowItems, forecast)
+                WeatherAdvice.advice(tomorrowTrips, tomorrowWeather)?.let { advice ->
+                    val leave = tomorrowTrips.first()
+                    item {
+                        InfoNote(
+                            "Завтра выход в ${formatTime(leave.trip.time)}: " +
+                                "${WeatherText.temperature(leave.hour.temperature)}, ${WeatherText.condition(leave.hour.code)}. $advice",
+                        )
+                    }
+                }
             }
             when {
                 tomorrowWeek == null -> item { InfoNote("Расписание на завтра ещё не загружено.") }

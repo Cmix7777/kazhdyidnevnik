@@ -115,6 +115,13 @@ fun SettingsScreen(
                 )
                 GlassDivider()
                 SwitchRow(
+                    title = "Погода на завтра",
+                    subtitle = "В 21:00: погода при выходе и на обратном пути, что надеть, предупреждения",
+                    checked = settings.weather,
+                    onChange = { on -> vm.updateReminders { it.copy(weather = on) } },
+                )
+                GlassDivider()
+                SwitchRow(
                     title = "Начало блоков учёбы",
                     subtitle = "В уведомлении есть кнопка «Сделал»",
                     checked = settings.blocks,

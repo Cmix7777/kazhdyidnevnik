@@ -22,6 +22,7 @@ class AppSettings(context: Context) {
                 blocks = prefs.getBoolean(BLOCKS, defaults.blocks),
                 evening = prefs.getBoolean(EVENING, defaults.evening),
                 eveningTime = timeOf(prefs.getInt(EVENING_TIME, minutesOf(defaults.eveningTime))),
+                weather = prefs.getBoolean(WEATHER, defaults.weather),
             )
         }
         set(value) {
@@ -32,6 +33,7 @@ class AppSettings(context: Context) {
                 putBoolean(BLOCKS, value.blocks)
                 putBoolean(EVENING, value.evening)
                 putInt(EVENING_TIME, minutesOf(value.eveningTime))
+                putBoolean(WEATHER, value.weather)
             }
         }
 
@@ -127,6 +129,7 @@ class AppSettings(context: Context) {
         const val BLOCKS = "blocks"
         const val EVENING = "evening"
         const val EVENING_TIME = "eveningTime"
+        const val WEATHER = "weather"
         const val LAST_FIRED = "lastFired"
         const val NEXT_ALARM = "nextAlarm"
         const val NOTIFICATIONS_ASKED = "notificationsAsked"
