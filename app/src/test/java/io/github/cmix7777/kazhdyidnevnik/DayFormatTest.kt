@@ -38,4 +38,10 @@ class DayFormatTest {
         assertEquals("8:20", formatTime(java.time.LocalTime.of(8, 20)))
         assertEquals("13:05", formatTime(java.time.LocalTime.of(13, 5)))
     }
+
+    @Test
+    fun shortDayForNotifications() {
+        assertEquals("Чт, 8 октября", formatShortDay(LocalDate.of(2026, 10, 8)))
+        assertEquals("Вс, 1 ноября", formatShortDay(LocalDate.of(2026, 11, 1)))
+    }
 }

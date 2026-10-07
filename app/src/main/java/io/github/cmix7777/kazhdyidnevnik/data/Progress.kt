@@ -1,5 +1,8 @@
 package io.github.cmix7777.kazhdyidnevnik.data
 
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -21,6 +24,56 @@ class ProgressStore(private val file: File) {
     fun save(done: Map<String, Int>) {
         file.parentFile?.mkdirs()
         file.writeText(json.encodeToString(ProgressDto.serializer(), ProgressDto(done)))
+    }
+}
+
+/**
+ * Общие на всё приложение отметки «сделал». Ими пользуются и экраны,
+ * и кнопка «Сделал» в уведомлении, поэтому они всегда совпадают.
+ */
+object ProgressRepository {
+
+    private val lock = Any()
+    private var store: ProgressStore? = null
+    private val mutableState = MutableStateFlow<Map<String, Int>>(emptyMap())
+
+    val state: StateFlow<Map<String, Int>> = mutableState.asStateFlow()
+
+    /** Загрузить отметки из файла (один раз за запуск). */
+    fun init(filesDir: File) {
+        synchronized(lock) {
+            if (store == null) {
+                val loaded = ProgressStore(File(filesDir, "progress.json"))
+                store = loaded
+                mutableState.value = loaded.load()
+            }
+        }
+    }
+
+    fun current(filesDir: File): Map<String, Int> {
+        init(filesDir)
+        return mutableState.value
+    }
+
+    /** Поставить или снять отметку. */
+    fun toggle(filesDir: File, key: String, minutes: Int) {
+        update(filesDir) { done ->
+            if (done.remove(key) == null) done[key] = minutes
+        }
+    }
+
+    fun markDone(filesDir: File, key: String, minutes: Int) {
+        update(filesDir) { done -> done[key] = minutes }
+    }
+
+    private fun update(filesDir: File, change: (MutableMap<String, Int>) -> Unit) {
+        init(filesDir)
+        synchronized(lock) {
+            val done = mutableState.value.toMutableMap()
+            change(done)
+            store?.save(done)
+            mutableState.value = done
+        }
     }
 }
 

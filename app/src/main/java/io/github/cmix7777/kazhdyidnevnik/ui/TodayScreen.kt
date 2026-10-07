@@ -3,19 +3,30 @@ package io.github.cmix7777.kazhdyidnevnik.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.BuildConfig
+import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
+import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
 import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
 import io.github.cmix7777.kazhdyidnevnik.data.Practice
 import io.github.cmix7777.kazhdyidnevnik.data.formatMinutes
@@ -23,14 +34,16 @@ import io.github.cmix7777.kazhdyidnevnik.data.WorkSchedule
 import io.github.cmix7777.kazhdyidnevnik.data.buildDay
 import io.github.cmix7777.kazhdyidnevnik.data.pluralLessons
 import io.github.cmix7777.kazhdyidnevnik.data.weekStartFor
+import io.github.cmix7777.kazhdyidnevnik.formatDate
 import io.github.cmix7777.kazhdyidnevnik.formatDayTitle
+import io.github.cmix7777.kazhdyidnevnik.formatTime
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TodayScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
+fun TodayScreen(vm: ScheduleViewModel, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
     val now by rememberNow()
     val today = now.toLocalDate()
     val tomorrow = today.plusDays(1)
@@ -52,13 +65,21 @@ fun TodayScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(text = formatDayTitle(today), style = MaterialTheme.typography.headlineSmall)
-                    Text(
-                        text = daySummary(todayItems),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Row(verticalAlignment = Alignment.Top) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(text = formatDayTitle(today), style = MaterialTheme.typography.headlineSmall)
+                        Text(
+                            text = daySummary(todayItems),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(painterResource(R.drawable.ic_settings), contentDescription = "Настройки")
+                    }
                 }
             }
 
@@ -79,8 +100,16 @@ fun TodayScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
                 else -> items(todayItems) { DayItemCard(it, now.toLocalTime()) }
             }
 
-            if (todayWeek != null) {
-                val plan = PlanGenerator.plan(today, todayItems)
+            if (today.isBefore(PlanGenerator.firstDay)) {
+                val note = if (PlanGenerator.firstDay == tomorrow) {
+                    "План учёбы начинается завтра, он показан ниже."
+                } else {
+                    "План учёбы начинается ${formatDate(PlanGenerator.firstDay)}."
+                }
+                item { SectionTitle("План учёбы") }
+                item { InfoNote(note) }
+            } else if (todayWeek != null) {
+                val plan = PlanGenerator.planFor(today, todayItems)
                 val doneMinutes = plan.filter { it.key(today) in vm.done }.sumOf { it.minutes }
                 val totalMinutes = plan.sumOf { it.minutes }
                 item {
@@ -111,12 +140,39 @@ fun TodayScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
                 tomorrowItems.isEmpty() -> item { InfoNote("Завтра ни пар, ни работы.") }
                 else -> items(tomorrowItems) { DayItemCard(it, now = null) }
             }
+            if (tomorrowWeek != null) {
+                val tomorrowPlan = PlanGenerator.planFor(tomorrow, tomorrowItems)
+                if (tomorrowPlan.isNotEmpty()) item { PlanPreview(tomorrowPlan) }
+            }
 
             item {
                 Text(
                     text = footer(todayWeek?.fetchedAtMillis),
                     modifier = Modifier.fillParentMaxWidth(),
                     style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** Короткий план учёбы на завтра: время и название блоков. */
+@Composable
+private fun PlanPreview(plan: List<PlanBlock>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "Учёба завтра · ${formatMinutes(plan.sumOf { it.minutes })}",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            plan.forEach { block ->
+                Text(
+                    text = "${formatTime(block.start)}–${formatTime(block.end)}  ${block.title}",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }

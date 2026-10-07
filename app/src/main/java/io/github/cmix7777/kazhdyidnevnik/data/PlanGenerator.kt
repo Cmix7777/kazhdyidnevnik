@@ -32,6 +32,13 @@ fun progressKey(date: LocalDate, kind: PlanKind): String = "$date|${kind.name}"
  */
 object PlanGenerator {
 
+    /** С этого дня приложение показывает план учёбы и напоминает о нём. */
+    val firstDay: LocalDate = LocalDate.of(2026, 10, 8)
+
+    /** План на день с учётом [firstDay]: до него план пустой. */
+    fun planFor(date: LocalDate, items: List<DayItem>): List<PlanBlock> =
+        if (date.isBefore(firstDay)) emptyList() else plan(date, items)
+
     private const val DAY_START = 8 * 60 + 30
     private const val DAY_END = 23 * 60
     private const val GAP = 10

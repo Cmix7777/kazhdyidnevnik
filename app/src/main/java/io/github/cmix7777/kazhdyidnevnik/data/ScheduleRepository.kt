@@ -22,22 +22,26 @@ class ScheduleRepository(
         if (skip != 0) append("&skip=").append(skip)
     }
 
-    /** Скачать неделю: 0 — текущая, 1 — следующая, -1 — прошлая. */
-    suspend fun fetch(skip: Int, today: LocalDate = LocalDate.now()): WeekSchedule =
-        withContext(Dispatchers.IO) {
-            val expectedStart = weekStartFor(today).plusWeeks(skip.toLong())
-            val document = Jsoup.connect(url(skip))
-                .userAgent(USER_AGENT)
-                .timeout(20_000)
-                .get()
-            val week = WeekSchedule(
-                weekStart = expectedStart,
-                lessons = TimeoParser.parse(document, expectedStart),
-                fetchedAtMillis = System.currentTimeMillis(),
-            )
-            save(week)
-            week
-        }
+    /**
+     * Скачать неделю с сайта, не сохраняя: 0 — текущая, 1 — следующая, -1 — прошлая.
+     * Сохраняет и сравнивает со старой копией [ScheduleSync].
+     */
+    suspend fun download(
+        skip: Int,
+        today: LocalDate = LocalDate.now(),
+        timeoutMs: Int = 20_000,
+    ): WeekSchedule = withContext(Dispatchers.IO) {
+        val expectedStart = weekStartFor(today).plusWeeks(skip.toLong())
+        val document = Jsoup.connect(url(skip))
+            .userAgent(USER_AGENT)
+            .timeout(timeoutMs)
+            .get()
+        WeekSchedule(
+            weekStart = expectedStart,
+            lessons = TimeoParser.parse(document, expectedStart),
+            fetchedAtMillis = System.currentTimeMillis(),
+        )
+    }
 
     fun loadCached(weekStart: LocalDate): WeekSchedule? {
         val file = fileFor(weekStart)
@@ -45,7 +49,7 @@ class ScheduleRepository(
         return runCatching { ScheduleCodec.decode(file.readText()) }.getOrNull()
     }
 
-    private fun save(week: WeekSchedule) {
+    fun save(week: WeekSchedule) {
         cacheDir.mkdirs()
         fileFor(week.weekStart).writeText(ScheduleCodec.encode(week))
     }
