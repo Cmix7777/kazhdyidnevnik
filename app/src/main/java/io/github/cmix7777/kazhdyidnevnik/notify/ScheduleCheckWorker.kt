@@ -11,13 +11,21 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import io.github.cmix7777.kazhdyidnevnik.service.Backups
+import io.github.cmix7777.kazhdyidnevnik.service.Updates
 import java.util.concurrent.TimeUnit
 
-/** Фоновая проверка расписания: примерно раз в 3 часа и повтор, если в 23:00 или 6:30 не было сети. */
+/**
+ * Фоновая проверка расписания: примерно раз в 3 часа и повтор, если в 23:00 или 6:30 не было сети.
+ * Заодно проверяет обновления приложения и делает автокопию прогресса.
+ */
 class ScheduleCheckWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
         val ok = ScheduleSync.checkAll(applicationContext)
+        // Попутно: новая версия приложения (не чаще раза в 12 часов) и ежедневная автокопия.
+        runCatching { Updates.checkInBackground(applicationContext) }
+        runCatching { Backups.saveAutoIfDue(applicationContext) }
         return when {
             ok -> Result.success()
             runAttemptCount < MAX_ATTEMPTS -> Result.retry()

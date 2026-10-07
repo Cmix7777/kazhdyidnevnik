@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import io.github.cmix7777.kazhdyidnevnik.MainActivity
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
+import io.github.cmix7777.kazhdyidnevnik.data.Release
 import io.github.cmix7777.kazhdyidnevnik.data.ScheduleChange
 import io.github.cmix7777.kazhdyidnevnik.data.ScheduleDiff
 import io.github.cmix7777.kazhdyidnevnik.data.Summaries
@@ -28,10 +29,12 @@ object Notifier {
     private const val CHANNEL_CHANGES = "schedule_changes"
     private const val CHANNEL_MORNING = "morning"
     private const val CHANNEL_STUDY = "study"
+    private const val CHANNEL_UPDATES = "updates"
 
     private const val ID_MORNING = 10
     private const val ID_EVENING = 11
     private const val ID_TEST = 12
+    private const val ID_UPDATE = 13
     private const val MAX_LINES = 8
     private const val ACCENT = 0xFF2F6B4F.toInt()
 
@@ -54,6 +57,11 @@ object Notifier {
                     "Учёба",
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply { description = "Начало блоков учёбы и вечерняя отметка" },
+                NotificationChannel(
+                    CHANNEL_UPDATES,
+                    "Обновления приложения",
+                    NotificationManager.IMPORTANCE_LOW,
+                ).apply { description = "Вышла новая версия Каждыйдневника" },
             ),
         )
     }
@@ -102,6 +110,14 @@ object Notifier {
 
     fun evening(context: Context, text: String) {
         post(context, ID_EVENING, builder(context, CHANNEL_STUDY, "Как прошёл день?", text).build())
+    }
+
+    fun update(context: Context, release: Release) {
+        val text = buildString {
+            append("Открой приложение и нажми «Обновить».")
+            if (release.notes.isNotBlank()) append("\n").append(release.notes)
+        }
+        post(context, ID_UPDATE, builder(context, CHANNEL_UPDATES, "Вышла версия ${release.versionName}", text).build())
     }
 
     fun test(context: Context) {

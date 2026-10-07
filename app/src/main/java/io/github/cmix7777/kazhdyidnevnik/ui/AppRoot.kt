@@ -34,7 +34,7 @@ private enum class Tab(val title: String, @param:DrawableRes val icon: Int) {
 }
 
 @Composable
-fun AppRoot(vm: ScheduleViewModel = viewModel()) {
+fun AppRoot(vm: ScheduleViewModel = viewModel(), extras: ExtrasViewModel = viewModel()) {
     var current by rememberSaveable { mutableStateOf(Tab.Today) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -71,10 +71,10 @@ fun AppRoot(vm: ScheduleViewModel = viewModel()) {
         val screenModifier = Modifier.padding(padding)
         if (settingsOpen) {
             BackHandler { settingsOpen = false }
-            SettingsScreen(vm, onBack = { settingsOpen = false }, modifier = screenModifier)
+            SettingsScreen(vm, extras, onBack = { settingsOpen = false }, modifier = screenModifier)
         } else {
             when (current) {
-                Tab.Today -> TodayScreen(vm, onOpenSettings = { settingsOpen = true }, modifier = screenModifier)
+                Tab.Today -> TodayScreen(vm, extras, onOpenSettings = { settingsOpen = true }, modifier = screenModifier)
                 Tab.Week -> WeekScreen(vm, screenModifier)
                 Tab.Progress -> ProgressScreen(vm, screenModifier)
                 Tab.Deadlines -> DeadlinesScreen(screenModifier)

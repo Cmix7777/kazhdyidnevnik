@@ -121,6 +121,12 @@ class ScheduleViewModel(app: Application) : AndroidViewModel(app) {
         rescheduleReminders()
     }
 
+    /** Перечитать настройки уведомлений (после восстановления из копии). */
+    fun reloadSettings() {
+        reminderSettings = appSettings.reminders
+        rescheduleReminders()
+    }
+
     /** Проверить расписание прямо сейчас (кнопка в настройках). */
     fun checkNow() {
         if (checking) return

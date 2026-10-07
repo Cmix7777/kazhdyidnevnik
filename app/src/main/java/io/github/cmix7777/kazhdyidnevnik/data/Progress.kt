@@ -66,6 +66,18 @@ object ProgressRepository {
         update(filesDir) { done -> done[key] = minutes }
     }
 
+    /** Добавить отметки из резервной копии. Возвращает, сколько отметок было новыми. */
+    fun mergeAll(filesDir: File, incoming: Map<String, Int>): Int {
+        var added = 0
+        update(filesDir) { done ->
+            added = incoming.keys.count { it !in done }
+            val merged = Backup.merge(done, incoming)
+            done.clear()
+            done.putAll(merged)
+        }
+        return added
+    }
+
     private fun update(filesDir: File, change: (MutableMap<String, Int>) -> Unit) {
         init(filesDir)
         synchronized(lock) {

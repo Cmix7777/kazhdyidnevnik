@@ -1,5 +1,7 @@
 package io.github.cmix7777.kazhdyidnevnik.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -33,15 +35,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import io.github.cmix7777.kazhdyidnevnik.BuildConfig
+import io.github.cmix7777.kazhdyidnevnik.formatStamp
 import io.github.cmix7777.kazhdyidnevnik.formatTime
 import io.github.cmix7777.kazhdyidnevnik.notify.Notifier
 import io.github.cmix7777.kazhdyidnevnik.notify.SystemSettings
+import io.github.cmix7777.kazhdyidnevnik.service.Backups
 import java.time.LocalTime
 
 private enum class TimeField { Morning, Evening }
 
 @Composable
-fun SettingsScreen(vm: ScheduleViewModel, onBack: () -> Unit, modifier: Modifier = Modifier) {
+fun SettingsScreen(
+    vm: ScheduleViewModel,
+    extras: ExtrasViewModel,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     var resumeCount by remember { mutableIntStateOf(0) }
     LifecycleResumeEffect(Unit) {
@@ -54,6 +63,9 @@ fun SettingsScreen(vm: ScheduleViewModel, onBack: () -> Unit, modifier: Modifier
     val status = remember(resumeCount, vm.statusVersion) { vm.statusText() }
     val settings = vm.reminderSettings
     var editing by remember { mutableStateOf<TimeField?>(null) }
+    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) extras.restore(uri) { vm.reloadSettings() }
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -132,6 +144,62 @@ fun SettingsScreen(vm: ScheduleViewModel, onBack: () -> Unit, modifier: Modifier
                     Text("Пробное уведомление")
                 }
             }
+        }
+
+        item { SectionTitle("Обновления") }
+        if (extras.update.release != null) {
+            item { UpdateBanner(extras) }
+        }
+        item {
+            val state = extras.update
+            val text = when {
+                state is UpdateState.Checking -> "Проверяю, есть ли новая версия…"
+                state is UpdateState.UpToDate -> "Установлена последняя версия ${BuildConfig.VERSION_NAME}."
+                state is UpdateState.Failed && state.release == null -> "Не получилось проверить: ${state.message}."
+                else -> "Установлена версия ${BuildConfig.VERSION_NAME}."
+            }
+            val checked = extras.lastUpdateCheckMillis.takeIf { it > 0 }
+                ?.let { "\nПоследняя проверка: ${formatStamp(it)}. Приложение само проверяет раз в полдня." }
+                .orEmpty()
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = text + checked,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedButton(
+                    onClick = { extras.checkUpdate() },
+                    enabled = state !is UpdateState.Checking && state !is UpdateState.Downloading,
+                ) {
+                    Text("Проверить обновления")
+                }
+            }
+        }
+
+        item { SectionTitle("Резервная копия") }
+        item {
+            val last = extras.lastBackupMillis.takeIf { it > 0 }
+                ?.let { "Последняя копия: ${formatStamp(it)}." }
+                ?: "Копий пока не было."
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Раз в день отметки и настройки сами сохраняются в файл в папке " +
+                        "«Загрузки/${Backups.FOLDER}». Он останется, даже если удалить приложение. " +
+                        "После переустановки или на новом телефоне нажми «Восстановить» и выбери этот файл.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    text = last,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { extras.saveBackupNow() }) { Text("Сохранить сейчас") }
+                    OutlinedButton(onClick = { restoreLauncher.launch(arrayOf("*/*")) }) { Text("Восстановить") }
+                }
+            }
+        }
+        extras.backupMessage?.let { message ->
+            item { InfoNote(message) }
         }
 
         item { SectionTitle("Чтобы напоминания приходили вовремя") }

@@ -30,6 +30,7 @@ import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
 import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
 import io.github.cmix7777.kazhdyidnevnik.data.Practice
 import io.github.cmix7777.kazhdyidnevnik.data.formatMinutes
+import io.github.cmix7777.kazhdyidnevnik.data.WeatherText
 import io.github.cmix7777.kazhdyidnevnik.data.WorkSchedule
 import io.github.cmix7777.kazhdyidnevnik.data.buildDay
 import io.github.cmix7777.kazhdyidnevnik.data.pluralLessons
@@ -43,7 +44,12 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TodayScreen(vm: ScheduleViewModel, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
+fun TodayScreen(
+    vm: ScheduleViewModel,
+    extras: ExtrasViewModel,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val now by rememberNow()
     val today = now.toLocalDate()
     val tomorrow = today.plusDays(1)
@@ -56,7 +62,11 @@ fun TodayScreen(vm: ScheduleViewModel, onOpenSettings: () -> Unit, modifier: Mod
 
     PullToRefreshBox(
         isRefreshing = refreshing,
-        onRefresh = { vm.refresh(0); vm.refresh(1) },
+        onRefresh = {
+            vm.refresh(0)
+            vm.refresh(1)
+            extras.refreshWeather()
+        },
         modifier = modifier.fillMaxSize(),
     ) {
         LazyColumn(
@@ -76,11 +86,23 @@ fun TodayScreen(vm: ScheduleViewModel, onOpenSettings: () -> Unit, modifier: Mod
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                        extras.weather.firstOrNull { it.date == today }?.let { weather ->
+                            val advice = WeatherText.advice(weather)?.let { " · $it" }.orEmpty()
+                            Text(
+                                text = "Ижевск: ${WeatherText.short(weather)}$advice",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(painterResource(R.drawable.ic_settings), contentDescription = "Настройки")
                     }
                 }
+            }
+
+            if (extras.update.release != null) {
+                item { UpdateBanner(extras) }
             }
 
             Practice.dayNumber(today)?.let { day ->

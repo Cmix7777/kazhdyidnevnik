@@ -16,6 +16,7 @@ import io.github.cmix7777.kazhdyidnevnik.data.Summaries
 import io.github.cmix7777.kazhdyidnevnik.data.WorkSchedule
 import io.github.cmix7777.kazhdyidnevnik.data.buildDay
 import io.github.cmix7777.kazhdyidnevnik.data.weekStartFor
+import io.github.cmix7777.kazhdyidnevnik.service.WeatherRepository
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -94,6 +95,8 @@ object ReminderScheduler {
             // Сначала пробуем сразу. Если сети нет, проверка повторится, когда она появится.
             val ok = runCatching { ScheduleSync.checkAll(context, timeoutMs = 15_000) }.getOrDefault(false)
             if (!ok) ScheduleCheckWorker.runNow(context)
+            // Заодно обновить погоду, чтобы утренняя сводка не ждала сеть.
+            runCatching { WeatherRepository.fetch(context, timeoutMs = 10_000) }
         }
         due.filter { it.kind != ReminderKind.CHECK }.forEach { reminder ->
             runCatching { show(context, reminder) }
@@ -101,14 +104,15 @@ object ReminderScheduler {
         scheduleNext(context)
     }
 
-    private fun show(context: Context, reminder: Reminder) {
+    private suspend fun show(context: Context, reminder: Reminder) {
         val date = reminder.at.toLocalDate()
         when (reminder.kind) {
             ReminderKind.CHECK -> Unit
             ReminderKind.MORNING -> {
                 val items = dayItems(context, date)
                 val plan = items?.let { PlanGenerator.planFor(date, it) }.orEmpty()
-                Notifier.morning(context, Summaries.morning(date, items, plan))
+                val weather = runCatching { WeatherRepository.forDate(context, date) }.getOrNull()
+                Notifier.morning(context, Summaries.morning(date, items, plan, weather))
             }
             ReminderKind.BLOCK -> {
                 val block = plan(context, date).firstOrNull { it.kind == reminder.block } ?: return

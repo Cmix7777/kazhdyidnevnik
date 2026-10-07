@@ -8,8 +8,16 @@ object Summaries {
 
     const val MORNING_TITLE = "Доброе утро, господин Айзат"
 
-    /** Утренняя сводка. [items] — пары и смены дня или null, если расписание не загружено. */
-    fun morning(date: LocalDate, items: List<DayItem>?, plan: List<PlanBlock>): String {
+    /**
+     * Утренняя сводка. [items] — пары и смены дня или null, если расписание не загружено.
+     * [weather] — погода на этот день, если удалось её узнать.
+     */
+    fun morning(
+        date: LocalDate,
+        items: List<DayItem>?,
+        plan: List<PlanBlock>,
+        weather: DayWeather? = null,
+    ): String {
         val lines = mutableListOf<String>()
 
         if (items == null) {
@@ -31,6 +39,11 @@ object Summaries {
             items.filterIsInstance<DayItem.WorkItem>().forEach {
                 lines += "Работа ${formatTime(it.start)}–${formatTime(it.end)}."
             }
+        }
+
+        weather?.let {
+            lines += "Погода: ${WeatherText.summary(it)}."
+            WeatherText.advice(it)?.let { advice -> lines += advice }
         }
 
         Practice.dayNumber(date)?.let { lines += "Практика: день $it из ${Practice.totalDays}." }

@@ -2,6 +2,7 @@ package io.github.cmix7777.kazhdyidnevnik.notify
 
 import android.content.Context
 import androidx.core.content.edit
+import io.github.cmix7777.kazhdyidnevnik.data.Release
 import io.github.cmix7777.kazhdyidnevnik.data.ReminderSettings
 import java.time.LocalDate
 import java.time.LocalTime
@@ -59,6 +60,57 @@ class AppSettings(context: Context) {
         }
     }
 
+    /** Когда последний раз проверялись обновления приложения. */
+    var lastUpdateCheckMillis: Long
+        get() = prefs.getLong(LAST_UPDATE_CHECK, 0L)
+        set(value) = prefs.edit { putLong(LAST_UPDATE_CHECK, value) }
+
+    /** Последняя найденная на GitHub версия (чтобы показать её и без сети). */
+    var knownRelease: Release?
+        get() {
+            val code = prefs.getInt(RELEASE_CODE, 0)
+            val url = prefs.getString(RELEASE_URL, null)
+            if (code == 0 || url == null) return null
+            return Release(
+                versionCode = code,
+                versionName = prefs.getString(RELEASE_NAME, null).orEmpty(),
+                notes = prefs.getString(RELEASE_NOTES, null).orEmpty(),
+                apkUrl = url,
+                sizeBytes = prefs.getLong(RELEASE_SIZE, 0L),
+            )
+        }
+        set(value) {
+            prefs.edit {
+                if (value == null) {
+                    remove(RELEASE_CODE)
+                    remove(RELEASE_NAME)
+                    remove(RELEASE_NOTES)
+                    remove(RELEASE_URL)
+                    remove(RELEASE_SIZE)
+                } else {
+                    putInt(RELEASE_CODE, value.versionCode)
+                    putString(RELEASE_NAME, value.versionName)
+                    putString(RELEASE_NOTES, value.notes)
+                    putString(RELEASE_URL, value.apkUrl)
+                    putLong(RELEASE_SIZE, value.sizeBytes)
+                }
+            }
+        }
+
+    /** О какой версии уже было уведомление. */
+    var updateNotifiedFor: Int
+        get() = prefs.getInt(UPDATE_NOTIFIED, 0)
+        set(value) = prefs.edit { putInt(UPDATE_NOTIFIED, value) }
+
+    /** Файл автокопии в «Загрузках» и время последней автокопии. */
+    var autoBackupUri: String?
+        get() = prefs.getString(AUTO_BACKUP_URI, null)
+        set(value) = prefs.edit { putString(AUTO_BACKUP_URI, value) }
+
+    var lastAutoBackupMillis: Long
+        get() = prefs.getLong(LAST_AUTO_BACKUP, 0L)
+        set(value) = prefs.edit { putLong(LAST_AUTO_BACKUP, value) }
+
     /** Сайт один раз отдал пустую неделю вместо пар — ждём подтверждения следующей проверкой. */
     fun isEmptyPending(weekStart: LocalDate): Boolean = prefs.getBoolean("$EMPTY_PREFIX$weekStart", false)
 
@@ -81,6 +133,15 @@ class AppSettings(context: Context) {
         const val LAST_CHECK = "lastCheck"
         const val LAST_CHECK_RESULT = "lastCheckResult"
         const val EMPTY_PREFIX = "emptyPending-"
+        const val LAST_UPDATE_CHECK = "lastUpdateCheck"
+        const val RELEASE_CODE = "releaseCode"
+        const val RELEASE_NAME = "releaseName"
+        const val RELEASE_NOTES = "releaseNotes"
+        const val RELEASE_URL = "releaseUrl"
+        const val RELEASE_SIZE = "releaseSize"
+        const val UPDATE_NOTIFIED = "updateNotified"
+        const val AUTO_BACKUP_URI = "autoBackupUri"
+        const val LAST_AUTO_BACKUP = "lastAutoBackup"
 
         fun minutesOf(time: LocalTime): Int = time.hour * 60 + time.minute
 
