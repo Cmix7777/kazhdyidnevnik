@@ -25,7 +25,7 @@ import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.formatDayTitle
 import java.time.LocalDate
 
-private enum class Tab(val title: String, @DrawableRes val icon: Int) {
+private enum class Tab(val title: String, @param:DrawableRes val icon: Int) {
     Today("Сегодня", R.drawable.ic_nav_today),
     Week("Неделя", R.drawable.ic_nav_week),
     Progress("Прогресс", R.drawable.ic_nav_progress),
