@@ -40,7 +40,7 @@ jobs:
       - name: Тесты и сборка
         run: |
           set -o pipefail
-          gradle --no-daemon testDebugUnitTest assembleRelease 2>&1 | tee build.log
+          gradle --no-daemon --continue testDebugUnitTest assembleRelease 2>&1 | tee build.log
 
       - name: Выпуск версии
         if: success() && env.SIGNING_KEYSTORE != ''
@@ -67,7 +67,9 @@ jobs:
             echo "signed=$([ -n "$SIGNING_KEYSTORE" ] && echo yes || echo no)"
             echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "---"
-            grep -E "^e: |error:|FAILED|BUILD|What went wrong|tests completed" "$GITHUB_WORKSPACE/build.log" 2>/dev/null | head -n 80 || true
+            grep -E "^e: |error:|FAILED|BUILD|tests completed" "$GITHUB_WORKSPACE/build.log" 2>/dev/null | head -n 60 || true
+            echo "--- what went wrong ---"
+            grep -A 25 "What went wrong" "$GITHUB_WORKSPACE/build.log" 2>/dev/null | head -n 120 || true
             echo "--- tail ---"
             tail -n 60 "$GITHUB_WORKSPACE/build.log" 2>/dev/null || true
           } > status.txt
