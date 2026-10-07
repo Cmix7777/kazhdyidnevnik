@@ -1,0 +1,16 @@
+# Gradle и сборка
+.gradle/
+.kotlin/
+build/
+local.properties
+build.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
+captures/
+
+# Ключи подписи никогда не кладём в репозиторий
+*.jks
+*.keystore
