@@ -8,6 +8,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
+import io.github.cmix7777.kazhdyidnevnik.data.ProgressStore
 import io.github.cmix7777.kazhdyidnevnik.data.ScheduleRepository
 import io.github.cmix7777.kazhdyidnevnik.data.WeekSchedule
 import io.github.cmix7777.kazhdyidnevnik.data.weekStartFor
@@ -20,6 +22,16 @@ import java.time.LocalDate
 class ScheduleViewModel(app: Application) : AndroidViewModel(app) {
 
     private val repository = ScheduleRepository(File(app.filesDir, "schedule"))
+    private val progressStore = ProgressStore(File(app.filesDir, "progress.json"))
+
+    /** Отметки «сделал»: ключ «дата|вид блока» -> минуты. */
+    val done = mutableStateMapOf<String, Int>().apply { putAll(progressStore.load()) }
+
+    fun toggleDone(date: LocalDate, block: PlanBlock) {
+        val key = block.key(date)
+        if (key in done) done.remove(key) else done[key] = block.minutes
+        progressStore.save(done.toMap())
+    }
 
     /** Загруженные недели по дате понедельника. */
     val weeks = mutableStateMapOf<LocalDate, WeekSchedule>()

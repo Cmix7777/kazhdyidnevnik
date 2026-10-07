@@ -16,7 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.BuildConfig
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
+import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
 import io.github.cmix7777.kazhdyidnevnik.data.Practice
+import io.github.cmix7777.kazhdyidnevnik.data.formatMinutes
 import io.github.cmix7777.kazhdyidnevnik.data.WorkSchedule
 import io.github.cmix7777.kazhdyidnevnik.data.buildDay
 import io.github.cmix7777.kazhdyidnevnik.data.pluralLessons
@@ -75,6 +77,32 @@ fun TodayScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
                 }
                 todayItems.isEmpty() -> item { InfoNote("Сегодня ни пар, ни работы. Свободный день.") }
                 else -> items(todayItems) { DayItemCard(it, now.toLocalTime()) }
+            }
+
+            if (todayWeek != null) {
+                val plan = PlanGenerator.plan(today, todayItems)
+                val doneMinutes = plan.filter { it.key(today) in vm.done }.sumOf { it.minutes }
+                val totalMinutes = plan.sumOf { it.minutes }
+                item {
+                    SectionTitle(
+                        "План учёбы · " + if (doneMinutes > 0) {
+                            "${formatMinutes(doneMinutes)} из ${formatMinutes(totalMinutes)}"
+                        } else {
+                            formatMinutes(totalMinutes)
+                        },
+                    )
+                }
+                if (plan.isEmpty()) {
+                    item { InfoNote("Сегодня свободного времени почти нет, отдыхай.") }
+                } else {
+                    items(plan, key = { it.key(today) }) { block ->
+                        PlanBlockCard(
+                            block = block,
+                            done = block.key(today) in vm.done,
+                            onToggle = { vm.toggleDone(today, block) },
+                        )
+                    }
+                }
             }
 
             item { SectionTitle("Завтра: ${formatDayTitle(tomorrow).substringBefore(',')}") }
