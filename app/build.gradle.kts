@@ -66,6 +66,13 @@ kotlin {
     }
 }
 
+// Классы kotlin-stdlib-jdk7/jdk8 давно входят в обычный kotlin-stdlib. Старые версии этих
+// пакетов тянет WorkManager, а Maven Central их не отдаёт, поэтому исключаем.
+configurations.configureEach {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk7")
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk8")
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.06.00")
     implementation(composeBom)
