@@ -10,7 +10,9 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +22,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.core.content.ContextCompat
@@ -51,33 +57,55 @@ fun AppRoot(vm: ScheduleViewModel = viewModel(), extras: ExtrasViewModel = viewM
         }
     }
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar {
-                Tab.entries.forEach { tab ->
-                    NavigationBarItem(
-                        selected = current == tab && !settingsOpen,
-                        onClick = {
-                            current = tab
-                            settingsOpen = false
-                        },
-                        icon = { Icon(painterResource(tab.icon), contentDescription = null) },
-                        label = { Text(tab.title) },
-                    )
+    GlowBackground {
+        Scaffold(
+            containerColor = Color.Transparent,
+            contentColor = Palette.Text,
+            bottomBar = {
+                NavigationBar(
+                    modifier = Modifier.drawBehind {
+                        drawLine(
+                            color = Palette.Border,
+                            start = Offset(0f, 0f),
+                            end = Offset(size.width, 0f),
+                            strokeWidth = 1.dp.toPx(),
+                        )
+                    },
+                    containerColor = Palette.Background.copy(alpha = 0.92f),
+                    tonalElevation = 0.dp,
+                ) {
+                    Tab.entries.forEach { tab ->
+                        NavigationBarItem(
+                            selected = current == tab && !settingsOpen,
+                            onClick = {
+                                current = tab
+                                settingsOpen = false
+                            },
+                            icon = { Icon(painterResource(tab.icon), contentDescription = null) },
+                            label = { Text(tab.title, style = MaterialTheme.typography.labelMedium) },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Color.White,
+                                selectedTextColor = Palette.Lavender,
+                                indicatorColor = Palette.Violet.copy(alpha = 0.3f),
+                                unselectedIconColor = Palette.TextFaint,
+                                unselectedTextColor = Palette.TextFaint,
+                            ),
+                        )
+                    }
                 }
-            }
-        },
-    ) { padding ->
-        val screenModifier = Modifier.padding(padding)
-        if (settingsOpen) {
-            BackHandler { settingsOpen = false }
-            SettingsScreen(vm, extras, onBack = { settingsOpen = false }, modifier = screenModifier)
-        } else {
-            when (current) {
-                Tab.Today -> TodayScreen(vm, extras, onOpenSettings = { settingsOpen = true }, modifier = screenModifier)
-                Tab.Week -> WeekScreen(vm, screenModifier)
-                Tab.Progress -> ProgressScreen(vm, screenModifier)
-                Tab.Deadlines -> DeadlinesScreen(screenModifier)
+            },
+        ) { padding ->
+            val screenModifier = Modifier.padding(padding)
+            if (settingsOpen) {
+                BackHandler { settingsOpen = false }
+                SettingsScreen(vm, extras, onBack = { settingsOpen = false }, modifier = screenModifier)
+            } else {
+                when (current) {
+                    Tab.Today -> TodayScreen(vm, extras, onOpenSettings = { settingsOpen = true }, modifier = screenModifier)
+                    Tab.Week -> WeekScreen(vm, screenModifier)
+                    Tab.Progress -> ProgressScreen(vm, screenModifier)
+                    Tab.Deadlines -> DeadlinesScreen(screenModifier)
+                }
             }
         }
     }

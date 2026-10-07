@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,8 +21,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.Practice
 import io.github.cmix7777.kazhdyidnevnik.data.WorkSchedule
 import io.github.cmix7777.kazhdyidnevnik.data.buildDay
@@ -47,31 +46,44 @@ fun WeekScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
     LaunchedEffect(offset) { vm.ensureWeek(offset) }
 
     Column(modifier = modifier.fillMaxSize()) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            TextButton(onClick = { offset-- }, enabled = offset > MIN_OFFSET) { Text("‹ Назад") }
-            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = formatWeekRange(monday),
-                    style = MaterialTheme.typography.titleMedium,
-                    textAlign = TextAlign.Center,
+            Pill(
+                text = when (offset) {
+                    0 -> "эта неделя"
+                    1 -> "следующая неделя"
+                    -1 -> "прошлая неделя"
+                    else -> if (offset > 0) "через ${offset} нед." else "${-offset} нед. назад"
+                },
+                accent = offset == 0,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TwoToneTitle(
+                    first = "Неделя",
+                    second = formatWeekRange(monday),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.headlineMedium,
                 )
-                Text(
-                    text = when (offset) {
-                        0 -> "эта неделя"
-                        1 -> "следующая неделя"
-                        -1 -> "прошлая неделя"
-                        else -> ""
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GlassIconButton(
+                        icon = R.drawable.ic_arrow_back,
+                        contentDescription = "Прошлая неделя",
+                        onClick = { offset-- },
+                        enabled = offset > MIN_OFFSET,
+                    )
+                    GlassIconButton(
+                        icon = R.drawable.ic_arrow_forward,
+                        contentDescription = "Следующая неделя",
+                        onClick = { offset++ },
+                        enabled = offset < MAX_OFFSET,
+                        accent = true,
+                    )
+                }
             }
-            TextButton(onClick = { offset++ }, enabled = offset < MAX_OFFSET) { Text("Вперёд ›") }
         }
 
         PullToRefreshBox(
@@ -106,14 +118,15 @@ fun WeekScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
                         val dayItems = buildDay(date, week.lessons, WorkSchedule.default)
                         val isToday = date == today
                         item(key = "title-$date") {
-                            SectionTitle(formatDayTitle(date) + if (isToday) " · сегодня" else "")
+                            val (dayName, dateText) = formatDayTitle(date).split(", ", limit = 2)
+                            SectionTitle(text = dayName, accent = dateText, badge = if (isToday) "сегодня" else null)
                         }
                         if (dayItems.isEmpty()) {
                             item(key = "empty-$date") {
                                 Text(
                                     text = "Ни пар, ни работы",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = Palette.TextFaint,
                                 )
                             }
                         } else {

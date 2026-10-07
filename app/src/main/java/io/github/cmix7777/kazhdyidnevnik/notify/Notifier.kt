@@ -36,7 +36,7 @@ object Notifier {
     private const val ID_TEST = 12
     private const val ID_UPDATE = 13
     private const val MAX_LINES = 8
-    private const val ACCENT = 0xFF2F6B4F.toInt()
+    private const val ACCENT = 0xFFA855F7.toInt()
 
     fun createChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return

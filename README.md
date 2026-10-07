@@ -4,7 +4,8 @@
 
 ## Что внутри
 
-- Kotlin + Jetpack Compose (Material 3)
+- Kotlin + Jetpack Compose (Material 3), своя тёмная тема в фиолетовых тонах
+- Шрифт Manrope (SIL Open Font License 1.1, текст лицензии в `licenses/Manrope-OFL.txt`)
 - Расписание берётся с открытого сайта timeo.mveu.ru
 - Данные и прогресс хранятся на телефоне
 - Фоновая проверка расписания (23:00, 6:30 и примерно раз в 3 часа) и уведомление, если пары изменились

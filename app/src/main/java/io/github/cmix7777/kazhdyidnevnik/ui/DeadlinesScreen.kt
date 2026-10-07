@@ -3,19 +3,16 @@ package io.github.cmix7777.kazhdyidnevnik.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.data.Deadline
 import io.github.cmix7777.kazhdyidnevnik.data.Deadlines
@@ -32,54 +29,62 @@ fun DeadlinesScreen(modifier: Modifier = Modifier) {
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item { Text("Дедлайны", style = MaterialTheme.typography.headlineSmall) }
-        items(upcoming) { DeadlineCard(it, today, isPast = false) }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Pill(text = "Дедлайны", accent = true)
+                TwoToneTitle(first = "Что впереди", second = "важные даты")
+            }
+        }
+        itemsIndexed(upcoming) { index, deadline ->
+            DeadlineCard(deadline, today, tone = if (index == 0) CardTone.Highlight else CardTone.Normal)
+        }
         if (past.isNotEmpty()) {
             item { SectionTitle("Уже прошло") }
-            items(past) { DeadlineCard(it, today, isPast = true) }
+            itemsIndexed(past) { _, deadline -> DeadlineCard(deadline, today, tone = CardTone.Dim) }
         }
         item {
             Text(
-                text = "Примерные даты помечены словом «примерно». Когда узнаешь точную дату, напиши Claude, и он поправит.",
+                text = "Примерные даты помечены знаком «≈». Когда узнаешь точную дату, напиши Claude, и он поправит.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Palette.TextFaint,
             )
         }
     }
 }
 
 @Composable
-private fun DeadlineCard(deadline: Deadline, today: LocalDate, isPast: Boolean) {
-    val colors = MaterialTheme.colorScheme
+private fun DeadlineCard(deadline: Deadline, today: LocalDate, tone: CardTone) {
     val days = daysBetween(today, deadline.date)
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isPast) colors.surfaceContainerLowest else colors.surfaceContainerLow,
-        ),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(text = deadline.title, style = MaterialTheme.typography.titleMedium)
+    val past = tone == CardTone.Dim
+    GlassCard(tone = tone) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = (if (deadline.approximate != null) "≈ " else "") + countdownText(days),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = if (isPast) colors.onSurfaceVariant else colors.primary,
+                text = deadline.title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                color = Palette.Text,
             )
-            Text(
-                text = deadline.approximate ?: formatDate(deadline.date),
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceVariant,
-            )
-            deadline.note?.let {
-                Text(text = it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
-            }
+            if (tone == CardTone.Highlight) Pill(text = "ближайший", accent = true)
+        }
+        Text(
+            text = (if (deadline.approximate != null) "≈ " else "") + countdownText(days),
+            style = MaterialTheme.typography.headlineMedium,
+            color = when {
+                past -> Palette.TextMuted
+                tone == CardTone.Highlight -> Palette.Text
+                else -> Palette.Lavender
+            },
+        )
+        Text(
+            text = deadline.approximate ?: formatDate(deadline.date),
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (tone == CardTone.Highlight) Palette.Lavender else Palette.TextMuted,
+        )
+        deadline.note?.let {
+            Text(text = it, style = MaterialTheme.typography.bodySmall, color = Palette.TextFaint)
         }
     }
 }

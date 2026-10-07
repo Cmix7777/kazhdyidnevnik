@@ -1,20 +1,20 @@
 package io.github.cmix7777.kazhdyidnevnik.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,8 +22,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
+import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.Curriculum
 import io.github.cmix7777.kazhdyidnevnik.data.MockExams
 import io.github.cmix7777.kazhdyidnevnik.data.PlanKind
@@ -55,28 +56,49 @@ fun ProgressScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(20.dp),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        item { Text("Прогресс", style = MaterialTheme.typography.headlineSmall) }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Pill(text = "Прогресс", accent = true)
+                TwoToneTitle(first = "Как идёт", second = "учёба и привычки")
+            }
+        }
 
         item {
-            StatCard(title = "Билеты ПДД") {
-                Text(
-                    text = if (streak > 0) "${pluralDays(streak.toLong())} подряд" else "Серии пока нет",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            GlassCard(tone = if (streak > 0) CardTone.Highlight else CardTone.Normal) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    IconBadge(icon = R.drawable.ic_check)
+                    Column {
+                        Text("Билеты ПДД", style = MaterialTheme.typography.labelLarge, color = Palette.TextMuted)
+                        Text(
+                            text = if (streak > 0) "${pluralDays(streak.toLong())} подряд" else "Серии пока нет",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = Palette.Text,
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     history.forEach { solved ->
                         Box(
                             modifier = Modifier
-                                .size(16.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(
-                                    if (solved) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                .weight(1f)
+                                .aspectRatio(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .then(
+                                    if (solved) {
+                                        Modifier.background(Brush.linearGradient(listOf(Palette.Violet, Palette.VioletDeep)))
+                                    } else {
+                                        Modifier
+                                            .background(Palette.Chip)
+                                            .border(1.dp, Palette.Border, RoundedCornerShape(6.dp))
+                                    },
                                 ),
                         )
                     }
@@ -86,47 +108,42 @@ fun ProgressScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
         }
 
         item {
-            StatCard(title = "Учёба на этой неделе") {
-                Text(
-                    text = formatMinutes(thisWeek),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatTile(
+                    title = "Эта неделя",
+                    value = formatMinutes(thisWeek),
+                    caption = "прошлая: ${formatMinutes(lastWeek)}",
+                    modifier = Modifier.weight(1f),
                 )
-                Caption("прошлая неделя: ${formatMinutes(lastWeek)}")
-            }
-        }
-
-        item {
-            StatCard(title = "Пробные демоэкзамены") {
-                Text(
-                    text = "$mocks " + plural(mocks.toLong(), "пробник", "пробника", "пробников"),
-                    style = MaterialTheme.typography.titleLarge,
+                StatTile(
+                    title = "Пробники",
+                    value = mocks.toString(),
+                    caption = nextMock?.let { "следующий ${formatDate(it).substringBeforeLast(' ')}" }
+                        ?: plural(mocks.toLong(), "пробник", "пробника", "пробников"),
+                    modifier = Modifier.weight(1f),
                 )
-                nextMock?.let { Caption("следующий: ${formatDate(it)}") }
             }
         }
 
         if (!today.isAfter(Curriculum.csharpDeadline) || csharp > 0) {
             item {
-                StatCard(title = "Подготовка к сдаче сайта на C#") {
+                GlassCard {
+                    Text("Сдача сайта на C#", style = MaterialTheme.typography.labelLarge, color = Palette.TextMuted)
                     Text(
                         text = "$csharp " + plural(csharp.toLong(), "занятие", "занятия", "занятий"),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Palette.Text,
                     )
+                    Caption("подготовка до ${formatDate(Curriculum.csharpDeadline)}")
                 }
             }
         }
 
-        item { SectionTitle("Тестирование (QA) с нуля") }
-        items(Curriculum.qa, key = { "qa-${it.number}" }) { topic ->
-            TopicRow(topic, ProgressStats.topicSessions(done, PlanKind.QA, topic.number), week)
-        }
+        item { SectionTitle("Тестирование", accent = "с нуля") }
+        item { TopicList(Curriculum.qa, PlanKind.QA, done, week) }
 
-        item { SectionTitle("Laravel к демоэкзамену") }
-        items(Curriculum.laravel, key = { "laravel-${it.number}" }) { topic ->
-            TopicRow(topic, ProgressStats.topicSessions(done, PlanKind.LARAVEL, topic.number), week)
-        }
+        item { SectionTitle("Laravel", accent = "к демоэкзамену") }
+        item { TopicList(Curriculum.laravel, PlanKind.LARAVEL, done, week) }
 
         item {
             Caption(
@@ -138,21 +155,26 @@ fun ProgressScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun StatCard(title: String, content: @Composable () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium)
-            content()
+private fun StatTile(title: String, value: String, caption: String, modifier: Modifier = Modifier) {
+    GlassCard(modifier = modifier) {
+        Text(title, style = MaterialTheme.typography.labelLarge, color = Palette.TextMuted)
+        Text(value, style = MaterialTheme.typography.headlineSmall, color = Palette.Text)
+        Caption(caption)
+    }
+}
+
+@Composable
+private fun TopicList(topics: List<Topic>, kind: PlanKind, done: Map<String, Int>, currentWeek: Int) {
+    GlassCard(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        topics.forEachIndexed { index, topic ->
+            if (index > 0) GlassDivider()
+            TopicRow(topic, ProgressStats.topicSessions(done, kind, topic.number), currentWeek)
         }
     }
 }
 
 @Composable
 private fun TopicRow(topic: Topic, sessions: Int, currentWeek: Int) {
-    val colors = MaterialTheme.colorScheme
     val isCurrent = topic.number == currentWeek
     val isDone = sessions >= SESSIONS_FOR_DONE
     val status = when {
@@ -162,41 +184,47 @@ private fun TopicRow(topic: Topic, sessions: Int, currentWeek: Int) {
         else -> "неделя ${topic.number}"
     }
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(
             modifier = Modifier
                 .size(10.dp)
-                .clip(RoundedCornerShape(5.dp))
-                .background(
+                .clip(CircleShape)
+                .then(
                     when {
-                        isDone -> colors.primary
-                        isCurrent -> colors.tertiary
-                        else -> colors.surfaceVariant
+                        isDone -> Modifier.background(Palette.Violet)
+                        isCurrent -> Modifier.background(Palette.Lavender)
+                        else -> Modifier.border(1.dp, Palette.BorderStrong, CircleShape)
                     },
                 ),
         )
         Text(
             text = "${topic.number}. ${topic.title}",
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+            style = if (isCurrent) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
+            color = when {
+                isCurrent -> Palette.Text
+                isDone -> Palette.TextMuted
+                else -> Palette.TextMuted
+            },
         )
-        Text(
-            text = status,
-            style = MaterialTheme.typography.bodySmall,
-            color = if (isCurrent) colors.tertiary else colors.onSurfaceVariant,
-        )
+        if (isCurrent) {
+            Pill(text = status, accent = true)
+        } else {
+            Text(
+                text = status,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isDone) Palette.Lavender else Palette.TextFaint,
+            )
+        }
     }
 }
 
 @Composable
 private fun Caption(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    Text(text = text, style = MaterialTheme.typography.bodySmall, color = Palette.TextFaint)
 }
