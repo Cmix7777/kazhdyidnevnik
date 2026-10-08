@@ -17,21 +17,32 @@ data class WeatherNote(val title: String, val text: String)
 /** Превращает прогноз в пользу: погода в дорогу, что надеть, о чём предупредить. */
 object WeatherAdvice {
 
-    private const val LEAVE_BEFORE_MIN = 40L
+    /** За сколько минут до первой пары выходит Айзат. У Насти своё время, см. [Profile]. */
+    const val LEAVE_BEFORE_MIN = 40L
     private const val BACK_AFTER_MIN = 10L
 
-    /** Выход перед первым делом вне дома и возвращение после последнего. Онлайн-пары дорогу не требуют. */
-    fun trips(items: List<DayItem>): List<Trip> {
+    /**
+     * Выход перед первым делом вне дома и возвращение после последнего. Онлайн-пары дорогу не требуют.
+     * [leaveBefore] — за сколько минут до начала выходить.
+     */
+    fun trips(items: List<DayItem>, leaveBefore: Long = LEAVE_BEFORE_MIN): List<Trip> {
         val outside = items.filterNot { it is DayItem.LessonItem && it.lesson.online }
         if (outside.isEmpty()) return emptyList()
         return listOf(
-            Trip("Выход", outside.minOf { it.start }.minusMinutes(LEAVE_BEFORE_MIN)),
+            Trip("Выход", outside.minOf { it.start }.minusMinutes(leaveBefore)),
             Trip("Обратно", outside.maxOf { it.end }.plusMinutes(BACK_AFTER_MIN)),
         )
     }
 
-    fun tripWeather(date: LocalDate, items: List<DayItem>, forecast: Forecast): List<TripWeather> =
-        trips(items).mapNotNull { trip -> forecast.hourAt(date.atTime(trip.time))?.let { TripWeather(trip, it) } }
+    fun tripWeather(
+        date: LocalDate,
+        items: List<DayItem>,
+        forecast: Forecast,
+        leaveBefore: Long = LEAVE_BEFORE_MIN,
+    ): List<TripWeather> =
+        trips(items, leaveBefore).mapNotNull { trip ->
+            forecast.hourAt(date.atTime(trip.time))?.let { TripWeather(trip, it) }
+        }
 
     /** Что надеть, по ощущаемой температуре. */
     fun clothing(feels: Double): String = when {
@@ -99,10 +110,15 @@ object WeatherAdvice {
     }
 
     /** Строки погоды для утренней сводки. */
-    fun morningLines(date: LocalDate, items: List<DayItem>?, forecast: Forecast?): List<String> {
+    fun morningLines(
+        date: LocalDate,
+        items: List<DayItem>?,
+        forecast: Forecast?,
+        leaveBefore: Long = LEAVE_BEFORE_MIN,
+    ): List<String> {
         val day = forecast?.day(date) ?: return emptyList()
         val lines = mutableListOf("Погода: ${WeatherText.short(day)}.")
-        val trips = if (items != null) tripWeather(date, items, forecast) else emptyList()
+        val trips = if (items != null) tripWeather(date, items, forecast, leaveBefore) else emptyList()
         trips.forEach { lines += tripLine(it) + "." }
         advice(trips, day)?.let { lines += it }
         val alerts = alerts(day, forecast.day(date.minusDays(1)))
@@ -111,7 +127,12 @@ object WeatherAdvice {
     }
 
     /** Уведомление вечером о погоде на [date] (на завтра). null — прогноза нет. */
-    fun tomorrowNote(date: LocalDate, items: List<DayItem>?, forecast: Forecast?): WeatherNote? {
+    fun tomorrowNote(
+        date: LocalDate,
+        items: List<DayItem>?,
+        forecast: Forecast?,
+        leaveBefore: Long = LEAVE_BEFORE_MIN,
+    ): WeatherNote? {
         val day = forecast?.day(date) ?: return null
         val alerts = alerts(day, forecast.day(date.minusDays(1)))
         val title = if (alerts.isEmpty()) {
@@ -123,7 +144,7 @@ object WeatherAdvice {
             "${WeatherText.short(day).replaceFirstChar { it.uppercase() }}" +
                 (day.precipitationChance?.takeIf { it >= 30 }?.let { ", осадки $it%" }.orEmpty()) + ".",
         )
-        val trips = if (items != null) tripWeather(date, items, forecast) else emptyList()
+        val trips = if (items != null) tripWeather(date, items, forecast, leaveBefore) else emptyList()
         trips.forEach { lines += tripLine(it) + "." }
         if (trips.isEmpty()) {
             lines += "Выходить никуда не нужно."

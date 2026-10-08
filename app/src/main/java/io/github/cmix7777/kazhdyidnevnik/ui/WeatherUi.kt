@@ -48,6 +48,7 @@ import kotlin.math.sin
 
 private val SunColor = Color(0xFFFFC857)
 private val CloudColor = Color(0xFFE6E0F2)
+private val MoonColor = Color(0xFFD9CCFF)
 private val RainCloudColor = Color(0xFFB4AACB)
 private val RainColor = Color(0xFF7DD3FC)
 
@@ -64,6 +65,7 @@ fun WeatherCard(
     now: LocalDateTime,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
+    leaveBefore: Long = WeatherAdvice.LEAVE_BEFORE_MIN,
 ) {
     val day = forecast?.day(date)
     if (forecast == null || day == null) {
@@ -91,7 +93,7 @@ fun WeatherCard(
     val isDay = current?.isDay ?: nowHour?.isDay ?: true
     val wind = current?.wind ?: nowHour?.wind
     val gusts = current?.gusts ?: nowHour?.gusts
-    val trips = WeatherAdvice.tripWeather(date, items, forecast)
+    val trips = WeatherAdvice.tripWeather(date, items, forecast, leaveBefore)
     val advice = WeatherAdvice.advice(trips, day)
     val alerts = WeatherAdvice.alerts(day, forecast.day(date.minusDays(1)))
 
@@ -368,7 +370,7 @@ private fun DrawScope.drawMoon(center: Offset, radius: Float) {
     val outer = Path().apply { addOval(Rect(center, radius)) }
     val inner = Path().apply { addOval(Rect(Offset(center.x + radius * 0.5f, center.y - radius * 0.35f), radius * 0.85f)) }
     val crescent = Path().apply { op(outer, inner, PathOperation.Difference) }
-    drawPath(crescent, Palette.Lavender)
+    drawPath(crescent, MoonColor)
 }
 
 private fun DrawScope.drawCloud(left: Float, top: Float, width: Float, height: Float, color: Color) {

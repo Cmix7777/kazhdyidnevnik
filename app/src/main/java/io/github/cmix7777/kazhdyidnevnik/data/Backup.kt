@@ -22,6 +22,15 @@ object Backup {
         val evening: Boolean,
         val eveningTime: String,
         val weather: Boolean = true,
+        val partner: PartnerDto? = null,
+    )
+
+    @Serializable
+    private data class PartnerDto(
+        val changes: Boolean = false,
+        val morning: Boolean = false,
+        val study: Boolean = false,
+        val weather: Boolean = false,
     )
 
     @Serializable
@@ -52,6 +61,12 @@ object Backup {
                 evening = settings.evening,
                 eveningTime = settings.eveningTime.toString(),
                 weather = settings.weather,
+                partner = PartnerDto(
+                    changes = settings.partner.changes,
+                    morning = settings.partner.morning,
+                    study = settings.partner.study,
+                    weather = settings.partner.weather,
+                ),
             ),
         )
         return json.encodeToString(BackupDto.serializer(), dto)
@@ -71,6 +86,9 @@ object Backup {
                     evening = s.evening,
                     eveningTime = LocalTime.parse(s.eveningTime),
                     weather = s.weather,
+                    partner = s.partner?.let { p ->
+                        PartnerAlerts(changes = p.changes, morning = p.morning, study = p.study, weather = p.weather)
+                    } ?: PartnerAlerts(),
                 )
             }.getOrNull()
         }

@@ -13,6 +13,36 @@ import android.provider.Settings
 /** Переходы в системные настройки, чтобы телефон не мешал напоминаниям. */
 object SystemSettings {
 
+    enum class Maker { Xiaomi, Samsung, Other }
+
+    /** Чей телефон по производителю: от этого зависят шаги, чтобы напоминания не опаздывали. */
+    val maker: Maker
+        get() {
+            val name = (Build.MANUFACTURER + " " + Build.BRAND).lowercase()
+            return when {
+                "samsung" in name -> Maker.Samsung
+                "xiaomi" in name || "redmi" in name || "poco" in name -> Maker.Xiaomi
+                else -> Maker.Other
+            }
+        }
+
+    /**
+     * Samsung (One UI): страница «Аккумулятор» в «Обслуживании устройства», где есть
+     * «Ограничения фонового использования». Если не открылась — общая страница батареи.
+     */
+    fun openSamsungBattery(context: Context) {
+        val candidates = listOf(
+            Intent().setComponent(
+                ComponentName("com.samsung.android.lool", "com.samsung.android.sm.battery.ui.BatteryActivity"),
+            ),
+            Intent().setComponent(
+                ComponentName("com.samsung.android.sm", "com.samsung.android.sm.battery.ui.BatteryActivity"),
+            ),
+            Intent(Intent.ACTION_POWER_USAGE_SUMMARY),
+        )
+        if (candidates.none { start(context, it) }) openAppDetails(context)
+    }
+
     fun isIgnoringBatteryOptimizations(context: Context): Boolean =
         context.getSystemService(PowerManager::class.java)?.isIgnoringBatteryOptimizations(context.packageName) == true
 

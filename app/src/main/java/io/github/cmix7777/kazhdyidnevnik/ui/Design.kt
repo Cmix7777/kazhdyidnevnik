@@ -43,19 +43,20 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.R
 
-/** Фон всех экранов: почти чёрный, с фиолетовым свечением сверху и тонкими кругами, как в референсе. */
+/** Фон всех экранов: почти чёрный, со свечением цвета палитры сверху и тонкими кругами, как в референсе. */
 @Composable
 fun GlowBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+    val accent = LocalAccent.current
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Palette.Background)
+            .background(accent.background)
             .drawBehind {
                 val top = Offset(size.width * 0.5f, -size.width * 0.15f)
                 val topRadius = size.width * 1.05f
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(Palette.Glow.copy(alpha = 0.55f), Palette.Glow.copy(alpha = 0.12f), Color.Transparent),
+                        colors = listOf(accent.glow.copy(alpha = 0.55f), accent.glow.copy(alpha = 0.12f), Color.Transparent),
                         center = top,
                         radius = topRadius,
                     ),
@@ -66,7 +67,7 @@ fun GlowBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.
                 val lowRadius = size.width * 0.95f
                 drawCircle(
                     brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF7E22CE).copy(alpha = 0.22f), Color.Transparent),
+                        colors = listOf(accent.glowLow.copy(alpha = 0.22f), Color.Transparent),
                         center = low,
                         radius = lowRadius,
                     ),
@@ -101,7 +102,7 @@ fun GlassCard(
 ) {
     val fill = when (tone) {
         CardTone.Highlight -> Brush.linearGradient(
-            listOf(Color(0xFF6D28D9).copy(alpha = 0.78f), Color(0xFF3B0F73).copy(alpha = 0.62f)),
+            listOf(LocalAccent.current.highlightTop.copy(alpha = 0.78f), LocalAccent.current.highlightBottom.copy(alpha = 0.62f)),
         )
         CardTone.Danger -> Brush.verticalGradient(listOf(Color(0xFF3A1120), Color(0xFF240A14)))
         CardTone.Dim -> Brush.verticalGradient(

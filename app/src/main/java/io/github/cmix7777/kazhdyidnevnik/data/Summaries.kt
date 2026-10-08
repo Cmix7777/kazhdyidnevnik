@@ -6,17 +6,18 @@ import java.time.LocalDate
 /** Тексты уведомлений: утренняя сводка, блок учёбы, вечерняя проверка. */
 object Summaries {
 
-    const val MORNING_TITLE = "Доброе утро, господин Айзат"
+    val MORNING_TITLE: String get() = Profiles.aizat.morningTitle
 
     /**
      * Утренняя сводка. [items] — пары и смены дня или null, если расписание не загружено.
-     * [forecast] — прогноз погоды, если удалось его получить.
+     * [forecast] — прогноз погоды, если удалось его получить. [profile] — чья это сводка.
      */
     fun morning(
         date: LocalDate,
         items: List<DayItem>?,
         plan: List<PlanBlock>,
         forecast: Forecast? = null,
+        profile: Profile = Profiles.aizat,
     ): String {
         val lines = mutableListOf<String>()
 
@@ -41,9 +42,11 @@ object Summaries {
             }
         }
 
-        lines += WeatherAdvice.morningLines(date, items, forecast)
+        lines += WeatherAdvice.morningLines(date, items, forecast, profile.leaveBeforeMinutes)
 
-        Practice.dayNumber(date)?.let { lines += "Практика: день $it из ${Practice.totalDays}." }
+        if (profile.hasPractice) {
+            Practice.dayNumber(date)?.let { lines += "Практика: день $it из ${Practice.totalDays}." }
+        }
 
         plan.firstOrNull { it.kind == PlanKind.MOCK }?.let {
             lines += "Сегодня пробный демоэкзамен: ${formatTime(it.start)}–${formatTime(it.end)}."
@@ -52,7 +55,7 @@ object Summaries {
             lines += "Учёба: ${formatMinutes(plan.sumOf { it.minutes })}, первый блок в ${formatTime(plan.first().start)}."
         }
 
-        Deadlines.default
+        profile.deadlines
             .map { it to daysBetween(date, it.date) }
             .filter { (_, days) -> days in 0L..7L }
             .forEach { (deadline, days) ->

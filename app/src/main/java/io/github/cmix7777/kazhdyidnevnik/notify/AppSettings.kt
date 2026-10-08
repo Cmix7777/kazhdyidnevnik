@@ -2,6 +2,8 @@ package io.github.cmix7777.kazhdyidnevnik.notify
 
 import android.content.Context
 import androidx.core.content.edit
+import io.github.cmix7777.kazhdyidnevnik.data.PartnerAlerts
+import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.Release
 import io.github.cmix7777.kazhdyidnevnik.data.ReminderSettings
 import java.time.LocalDate
@@ -23,6 +25,12 @@ class AppSettings(context: Context) {
                 evening = prefs.getBoolean(EVENING, defaults.evening),
                 eveningTime = timeOf(prefs.getInt(EVENING_TIME, minutesOf(defaults.eveningTime))),
                 weather = prefs.getBoolean(WEATHER, defaults.weather),
+                partner = PartnerAlerts(
+                    changes = prefs.getBoolean(PARTNER_CHANGES, false),
+                    morning = prefs.getBoolean(PARTNER_MORNING, false),
+                    study = prefs.getBoolean(PARTNER_STUDY, false),
+                    weather = prefs.getBoolean(PARTNER_WEATHER, false),
+                ),
             )
         }
         set(value) {
@@ -34,8 +42,21 @@ class AppSettings(context: Context) {
                 putBoolean(EVENING, value.evening)
                 putInt(EVENING_TIME, minutesOf(value.eveningTime))
                 putBoolean(WEATHER, value.weather)
+                putBoolean(PARTNER_CHANGES, value.partner.changes)
+                putBoolean(PARTNER_MORNING, value.partner.morning)
+                putBoolean(PARTNER_STUDY, value.partner.study)
+                putBoolean(PARTNER_WEATHER, value.partner.weather)
             }
         }
+
+    /**
+     * Чей это телефон. null — ещё не выбрано (приложение спросит при первом запуске).
+     * На телефоне, где приложение стояло до версии на двоих, это Айзат.
+     */
+    var owner: Person?
+        get() = Person.fromId(prefs.getString(OWNER, null))
+            ?: if (prefs.contains(NOTIFICATIONS_ASKED) || prefs.contains(LAST_FIRED)) Person.AIZAT else null
+        set(value) = prefs.edit { putString(OWNER, value?.id) }
 
     /** До какого момента напоминания уже показаны. */
     var lastFiredMillis: Long
@@ -114,13 +135,18 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit { putLong(LAST_AUTO_BACKUP, value) }
 
     /** Сайт один раз отдал пустую неделю вместо пар — ждём подтверждения следующей проверкой. */
-    fun isEmptyPending(weekStart: LocalDate): Boolean = prefs.getBoolean("$EMPTY_PREFIX$weekStart", false)
+    fun isEmptyPending(person: Person, weekStart: LocalDate): Boolean =
+        prefs.getBoolean(emptyKey(person, weekStart), false)
 
-    fun setEmptyPending(weekStart: LocalDate, pending: Boolean) {
+    fun setEmptyPending(person: Person, weekStart: LocalDate, pending: Boolean) {
         prefs.edit {
-            if (pending) putBoolean("$EMPTY_PREFIX$weekStart", true) else remove("$EMPTY_PREFIX$weekStart")
+            if (pending) putBoolean(emptyKey(person, weekStart), true) else remove(emptyKey(person, weekStart))
         }
     }
+
+    // У Айзата ключ прежний, чтобы не потерять отметку после обновления.
+    private fun emptyKey(person: Person, weekStart: LocalDate): String =
+        if (person == Person.AIZAT) "$EMPTY_PREFIX$weekStart" else "$EMPTY_PREFIX${person.id}-$weekStart"
 
     private companion object {
         const val CHANGES = "changes"
@@ -130,6 +156,11 @@ class AppSettings(context: Context) {
         const val EVENING = "evening"
         const val EVENING_TIME = "eveningTime"
         const val WEATHER = "weather"
+        const val PARTNER_CHANGES = "partnerChanges"
+        const val PARTNER_MORNING = "partnerMorning"
+        const val PARTNER_STUDY = "partnerStudy"
+        const val PARTNER_WEATHER = "partnerWeather"
+        const val OWNER = "owner"
         const val LAST_FIRED = "lastFired"
         const val NEXT_ALARM = "nextAlarm"
         const val NOTIFICATIONS_ASKED = "notificationsAsked"

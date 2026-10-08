@@ -9,11 +9,11 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
 
-/** Скачивает расписание с timeo.mveu.ru и хранит копию на телефоне. */
+/** Скачивает расписание Айзата с timeo.mveu.ru и хранит копию на телефоне. */
 class ScheduleRepository(
     private val cacheDir: File,
     private val group: String = DEFAULT_GROUP,
-) {
+) : ScheduleSource {
 
     fun url(skip: Int): String = buildString {
         append(BASE_URL)
@@ -26,10 +26,10 @@ class ScheduleRepository(
      * Скачать неделю с сайта, не сохраняя: 0 — текущая, 1 — следующая, -1 — прошлая.
      * Сохраняет и сравнивает со старой копией [ScheduleSync].
      */
-    suspend fun download(
+    override suspend fun download(
         skip: Int,
-        today: LocalDate = LocalDate.now(),
-        timeoutMs: Int = 20_000,
+        today: LocalDate,
+        timeoutMs: Int,
     ): WeekSchedule = withContext(Dispatchers.IO) {
         val expectedStart = weekStartFor(today).plusWeeks(skip.toLong())
         val document = Jsoup.connect(url(skip))
@@ -43,13 +43,13 @@ class ScheduleRepository(
         )
     }
 
-    fun loadCached(weekStart: LocalDate): WeekSchedule? {
+    override fun loadCached(weekStart: LocalDate): WeekSchedule? {
         val file = fileFor(weekStart)
         if (!file.exists()) return null
         return runCatching { ScheduleCodec.decode(file.readText()) }.getOrNull()
     }
 
-    fun save(week: WeekSchedule) {
+    override fun save(week: WeekSchedule) {
         cacheDir.mkdirs()
         fileFor(week.weekStart).writeText(ScheduleCodec.encode(week))
     }

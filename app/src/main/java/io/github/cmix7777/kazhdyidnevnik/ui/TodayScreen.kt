@@ -22,12 +22,12 @@ import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.BuildConfig
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
+import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
 import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
 import io.github.cmix7777.kazhdyidnevnik.data.Practice
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherText
-import io.github.cmix7777.kazhdyidnevnik.data.WorkSchedule
 import io.github.cmix7777.kazhdyidnevnik.data.buildDay
 import io.github.cmix7777.kazhdyidnevnik.data.formatMinutes
 import io.github.cmix7777.kazhdyidnevnik.data.pluralLessons
@@ -42,25 +42,30 @@ import io.github.cmix7777.kazhdyidnevnik.formatTime
 fun TodayScreen(
     vm: ScheduleViewModel,
     extras: ExtrasViewModel,
-    onOpenSettings: () -> Unit,
+    person: Person,
     modifier: Modifier = Modifier,
 ) {
     val now by rememberNow()
     val today = now.toLocalDate()
     val tomorrow = today.plusDays(1)
+    val profile = person.profile
+    val isOwner = person == vm.owner
+    // План учёбы с галочками — только свой: отметки хранятся на телефоне владельца.
+    val showPlan = isOwner && profile.hasPlan
+    val schedule = vm.schedule(person)
 
-    val todayWeek = vm.weeks[weekStartFor(today)]
-    val tomorrowWeek = vm.weeks[weekStartFor(tomorrow)]
-    val todayItems = buildDay(today, todayWeek?.lessons.orEmpty(), WorkSchedule.default)
-    val tomorrowItems = buildDay(tomorrow, tomorrowWeek?.lessons.orEmpty(), WorkSchedule.default)
-    val refreshing = vm.isLoading(0)
+    val todayWeek = schedule.weeks[weekStartFor(today)]
+    val tomorrowWeek = schedule.weeks[weekStartFor(tomorrow)]
+    val todayItems = buildDay(today, todayWeek?.lessons.orEmpty(), profile.shifts)
+    val tomorrowItems = buildDay(tomorrow, tomorrowWeek?.lessons.orEmpty(), profile.shifts)
+    val refreshing = vm.isLoading(person, 0)
     val forecast = extras.forecast
 
     PullToRefreshBox(
         isRefreshing = refreshing,
         onRefresh = {
-            vm.refresh(0)
-            vm.refresh(1)
+            vm.refresh(person, 0)
+            vm.refresh(person, 1)
             extras.refreshWeather()
         },
         modifier = modifier.fillMaxSize(),
@@ -70,15 +75,12 @@ fun TodayScreen(
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            // Шапка: день крупно в две строки и кнопка настроек.
+            // Шапка: чей день и дата крупно в две строки.
             item {
                 val (dayName, dateText) = formatDayTitle(today).split(", ", limit = 2)
-                Row(verticalAlignment = Alignment.Top) {
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Pill(text = "Сегодня", accent = true)
-                        TwoToneTitle(first = dayName, second = dateText)
-                    }
-                    GlassIconButton(icon = R.drawable.ic_settings, contentDescription = "Настройки", onClick = onOpenSettings)
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Pill(text = if (isOwner) "Сегодня" else "Сегодня у ${person.genitive}", accent = true)
+                    TwoToneTitle(first = dayName, second = dateText)
                 }
             }
 
@@ -89,17 +91,19 @@ fun TodayScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Pill(text = daySummary(todayItems))
-                    Practice.dayNumber(today)?.let { day ->
-                        Pill(text = "практика: день $day из ${Practice.totalDays}", accent = true)
+                    if (profile.hasPractice) {
+                        Practice.dayNumber(today)?.let { day ->
+                            Pill(text = "практика: день $day из ${Practice.totalDays}", accent = true)
+                        }
                     }
                 }
             }
 
-            if (extras.update.release != null) {
+            if (isOwner && extras.update.release != null) {
                 item { UpdateBanner(extras) }
             }
 
-            vm.error?.let { message ->
+            schedule.error?.let { message ->
                 item { InfoNote(message, isError = true) }
             }
 
@@ -113,6 +117,7 @@ fun TodayScreen(
                     items = todayItems,
                     now = now,
                     onRetry = { extras.refreshWeather() },
+                    leaveBefore = profile.leaveBeforeMinutes,
                 )
             }
 
@@ -126,7 +131,8 @@ fun TodayScreen(
                 else -> items(todayItems) { DayItemCard(it, now.toLocalTime()) }
             }
 
-            if (today.isBefore(PlanGenerator.firstDay)) {
+            // План учёбы: только у владельца телефона и только если план есть.
+            if (showPlan && today.isBefore(PlanGenerator.firstDay)) {
                 val note = if (PlanGenerator.firstDay == tomorrow) {
                     "План учёбы начинается завтра, он показан ниже."
                 } else {
@@ -134,7 +140,7 @@ fun TodayScreen(
                 }
                 item { SectionTitle("План учёбы") }
                 item { InfoNote(note) }
-            } else if (todayWeek != null) {
+            } else if (showPlan && todayWeek != null) {
                 val plan = PlanGenerator.planFor(today, todayItems)
                 val doneMinutes = plan.filter { it.key(today) in vm.done }.sumOf { it.minutes }
                 val totalMinutes = plan.sumOf { it.minutes }
@@ -179,7 +185,7 @@ fun TodayScreen(
                         WeatherAdvice.alerts(tomorrowWeather, forecast.day(today)).forEach { AlertPill(it) }
                     }
                 }
-                val tomorrowTrips = WeatherAdvice.tripWeather(tomorrow, tomorrowItems, forecast)
+                val tomorrowTrips = WeatherAdvice.tripWeather(tomorrow, tomorrowItems, forecast, profile.leaveBeforeMinutes)
                 WeatherAdvice.advice(tomorrowTrips, tomorrowWeather)?.let { advice ->
                     val leave = tomorrowTrips.first()
                     item {
@@ -195,14 +201,14 @@ fun TodayScreen(
                 tomorrowItems.isEmpty() -> item { InfoNote("Завтра ни пар, ни работы.") }
                 else -> items(tomorrowItems) { DayItemCard(it, now = null, dim = true) }
             }
-            if (tomorrowWeek != null) {
+            if (showPlan && tomorrowWeek != null) {
                 val tomorrowPlan = PlanGenerator.planFor(tomorrow, tomorrowItems)
                 if (tomorrowPlan.isNotEmpty()) item { PlanPreview(tomorrowPlan) }
             }
 
             item {
                 Text(
-                    text = footer(todayWeek?.fetchedAtMillis),
+                    text = footer(todayWeek?.fetchedAtMillis, profile.scheduleSource),
                     modifier = Modifier.fillParentMaxWidth(),
                     style = MaterialTheme.typography.bodySmall,
                     color = Palette.TextFaint,
@@ -259,7 +265,7 @@ private fun scheduleAccent(items: List<DayItem>): String? {
     return "${formatTime(items.first().start)}–${formatTime(items.maxOf { it.end })}"
 }
 
-private fun footer(fetchedAt: Long?): String {
+private fun footer(fetchedAt: Long?, source: String): String {
     val updated = fetchedAt?.let { "расписание обновлено ${formatStamp(it)}" } ?: "расписание ещё не обновлялось"
-    return "Версия ${BuildConfig.VERSION_NAME} · $updated"
+    return "Версия ${BuildConfig.VERSION_NAME} · $updated · $source"
 }

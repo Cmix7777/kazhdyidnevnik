@@ -25,9 +25,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.R
+import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.Practice
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
-import io.github.cmix7777.kazhdyidnevnik.data.WorkSchedule
 import io.github.cmix7777.kazhdyidnevnik.data.buildDay
 import io.github.cmix7777.kazhdyidnevnik.data.weekStartFor
 import io.github.cmix7777.kazhdyidnevnik.formatDayTitle
@@ -38,15 +38,17 @@ private const val MAX_OFFSET = 8
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun WeekScreen(vm: ScheduleViewModel, extras: ExtrasViewModel, modifier: Modifier = Modifier) {
+fun WeekScreen(vm: ScheduleViewModel, extras: ExtrasViewModel, person: Person, modifier: Modifier = Modifier) {
     val now by rememberNow()
     val today = now.toLocalDate()
     var offset by rememberSaveable { mutableIntStateOf(0) }
     val monday = weekStartFor(today).plusWeeks(offset.toLong())
-    val week = vm.weeks[monday]
-    val refreshing = vm.isLoading(offset)
+    val profile = person.profile
+    val schedule = vm.schedule(person)
+    val week = schedule.weeks[monday]
+    val refreshing = vm.isLoading(person, offset)
 
-    LaunchedEffect(offset) { vm.ensureWeek(offset) }
+    LaunchedEffect(offset, person) { vm.ensureWeek(person, offset) }
 
     Column(modifier = modifier.fillMaxSize()) {
         Column(
@@ -91,7 +93,7 @@ fun WeekScreen(vm: ScheduleViewModel, extras: ExtrasViewModel, modifier: Modifie
 
         PullToRefreshBox(
             isRefreshing = refreshing,
-            onRefresh = { vm.refresh(offset) },
+            onRefresh = { vm.refresh(person, offset) },
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyColumn(
@@ -110,7 +112,9 @@ fun WeekScreen(vm: ScheduleViewModel, extras: ExtrasViewModel, modifier: Modifie
                     if (week.lessons.isEmpty()) {
                         item {
                             InfoNote(
-                                if (Practice.dayNumber(monday) != null || Practice.dayNumber(monday.plusDays(6)) != null)
+                                if (profile.hasPractice &&
+                                    (Practice.dayNumber(monday) != null || Practice.dayNumber(monday.plusDays(6)) != null)
+                                )
                                     "На этой неделе пар нет: практика."
                                 else "На этой неделе пар в расписании нет.",
                             )
@@ -118,7 +122,7 @@ fun WeekScreen(vm: ScheduleViewModel, extras: ExtrasViewModel, modifier: Modifie
                     }
                     for (dayIndex in 0..6) {
                         val date = monday.plusDays(dayIndex.toLong())
-                        val dayItems = buildDay(date, week.lessons, WorkSchedule.default)
+                        val dayItems = buildDay(date, week.lessons, profile.shifts)
                         val isToday = date == today
                         item(key = "title-$date") {
                             val (dayName, dateText) = formatDayTitle(date).split(", ", limit = 2)

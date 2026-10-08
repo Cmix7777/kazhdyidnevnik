@@ -14,6 +14,8 @@ data class Lesson(
     val teacher: String,
     val room: String,
     val online: Boolean,
+    /** Пометка из расписания: «до 15.00», «по числителю» и т. п. */
+    val note: String = "",
 )
 
 /** Расписание одной недели (с понедельника) и время, когда его скачали. */

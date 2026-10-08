@@ -15,17 +15,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.data.Deadline
-import io.github.cmix7777.kazhdyidnevnik.data.Deadlines
+import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.countdownText
 import io.github.cmix7777.kazhdyidnevnik.data.daysBetween
 import io.github.cmix7777.kazhdyidnevnik.formatDate
 import java.time.LocalDate
 
 @Composable
-fun DeadlinesScreen(modifier: Modifier = Modifier) {
+fun DeadlinesScreen(person: Person, modifier: Modifier = Modifier) {
     val now by rememberNow()
     val today = now.toLocalDate()
-    val (upcoming, past) = Deadlines.default.sortedBy { it.date.toEpochDay() }.partition { !it.date.isBefore(today) }
+    val deadlines = person.profile.deadlines
+    val (upcoming, past) = deadlines.sortedBy { it.date.toEpochDay() }.partition { !it.date.isBefore(today) }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -38,6 +39,14 @@ fun DeadlinesScreen(modifier: Modifier = Modifier) {
                 TwoToneTitle(first = "Что впереди", second = "важные даты")
             }
         }
+        if (deadlines.isEmpty()) {
+            item {
+                InfoNote(
+                    "Здесь будут важные даты ${person.genitive}: зачёты, экзамены, сдача работ и практика. " +
+                        "Пока их нет — скоро их можно будет добавлять и менять прямо в приложении.",
+                )
+            }
+        }
         itemsIndexed(upcoming) { index, deadline ->
             DeadlineCard(deadline, today, tone = if (index == 0) CardTone.Highlight else CardTone.Normal)
         }
@@ -45,7 +54,7 @@ fun DeadlinesScreen(modifier: Modifier = Modifier) {
             item { SectionTitle("Уже прошло") }
             itemsIndexed(past) { _, deadline -> DeadlineCard(deadline, today, tone = CardTone.Dim) }
         }
-        item {
+        if (deadlines.isNotEmpty()) item {
             Text(
                 text = "Примерные даты помечены знаком «≈». Когда узнаешь точную дату, напиши Claude, и он поправит.",
                 style = MaterialTheme.typography.bodySmall,

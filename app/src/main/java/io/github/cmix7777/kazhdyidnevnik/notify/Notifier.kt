@@ -15,6 +15,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import io.github.cmix7777.kazhdyidnevnik.MainActivity
 import io.github.cmix7777.kazhdyidnevnik.R
+import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
 import io.github.cmix7777.kazhdyidnevnik.data.Release
 import io.github.cmix7777.kazhdyidnevnik.data.ScheduleChange
@@ -38,7 +39,11 @@ object Notifier {
     private const val ID_UPDATE = 13
     private const val ID_WEATHER = 14
     private const val MAX_LINES = 8
-    private const val ACCENT = 0xFFA855F7.toInt()
+
+    /** Уведомления про второго человека получают свои номера, чтобы не заменять свои. */
+    private const val PARTNER_OFFSET = 1000
+    private const val ACCENT_AIZAT = 0xFFA855F7.toInt()
+    private const val ACCENT_NASTYA = 0xFFA77BEA.toInt()
 
     fun createChannels(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
@@ -80,23 +85,42 @@ object Notifier {
         return permitted && NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
 
-    fun scheduleChanged(context: Context, weekStart: LocalDate, changes: List<ScheduleChange>) {
+    /** Расписание [person] изменилось. [owner] — чей телефон: про второго человека заголовок с именем. */
+    fun scheduleChanged(
+        context: Context,
+        person: Person,
+        owner: Person?,
+        weekStart: LocalDate,
+        changes: List<ScheduleChange>,
+    ) {
+        val own = person == owner
         val lines = changes.take(MAX_LINES).map(ScheduleDiff::describe).toMutableList()
         if (changes.size > MAX_LINES) lines += "и ещё ${changes.size - MAX_LINES}"
-        val notification = builder(context, CHANNEL_CHANGES, "Расписание изменилось", lines.joinToString("\n"))
+        val title = if (own) "Расписание изменилось" else "Расписание ${person.genitive} изменилось"
+        val notification = builder(context, CHANNEL_CHANGES, title, lines.joinToString("\n"))
             .setSubText(formatWeekRange(weekStart))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_EVENT)
             .build()
-        post(context, 2000 + (weekStart.toEpochDay() % 1000).toInt(), notification)
+        post(context, (if (own) 2000 else 3000) + (weekStart.toEpochDay() % 1000).toInt(), notification)
     }
 
-    fun morning(context: Context, text: String) {
-        post(context, ID_MORNING, builder(context, CHANNEL_MORNING, Summaries.MORNING_TITLE, text).build())
+    fun morning(context: Context, title: String, text: String, partner: Boolean = false) {
+        val id = ID_MORNING + if (partner) PARTNER_OFFSET else 0
+        post(context, id, builder(context, CHANNEL_MORNING, title, text).build())
     }
 
-    fun block(context: Context, date: LocalDate, block: PlanBlock) {
-        val id = 100 + block.kind.ordinal
+    /** Начало блока учёбы. Для своего — кнопка «Сделал», про второго человека — просто напоминание. */
+    fun block(context: Context, date: LocalDate, block: PlanBlock, partner: Person? = null) {
+        val id = 100 + block.kind.ordinal + if (partner != null) PARTNER_OFFSET else 0
+        val text = Summaries.block(block)
+        if (partner != null) {
+            val notification = builder(context, CHANNEL_STUDY, "${partner.shortName}: ${block.title}", text)
+                .setTimeoutAfter((block.minutes + 30) * 60_000L)
+                .build()
+            post(context, id, notification)
+            return
+        }
         val done = Intent(context, ActionReceiver::class.java)
             .setAction(ActionReceiver.ACTION_DONE)
             .putExtra(ActionReceiver.EXTRA_KEY, block.key(date))
@@ -108,7 +132,7 @@ object Notifier {
             done,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val notification = builder(context, CHANNEL_STUDY, block.title, Summaries.block(block))
+        val notification = builder(context, CHANNEL_STUDY, block.title, text)
             .addAction(0, "Сделал", donePending)
             .setTimeoutAfter((block.minutes + 30) * 60_000L)
             .build()
@@ -119,8 +143,9 @@ object Notifier {
         post(context, ID_EVENING, builder(context, CHANNEL_STUDY, "Как прошёл день?", text).build())
     }
 
-    fun weather(context: Context, title: String, text: String) {
-        post(context, ID_WEATHER, builder(context, CHANNEL_WEATHER, title, text).build())
+    fun weather(context: Context, title: String, text: String, partner: Boolean = false) {
+        val id = ID_WEATHER + if (partner) PARTNER_OFFSET else 0
+        post(context, id, builder(context, CHANNEL_WEATHER, title, text).build())
     }
 
     fun update(context: Context, release: Release) {
@@ -139,7 +164,7 @@ object Notifier {
     private fun builder(context: Context, channel: String, title: String, text: String): NotificationCompat.Builder =
         NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_notification)
-            .setColor(ACCENT)
+            .setColor(if (AppSettings(context).owner == Person.NASTYA) ACCENT_NASTYA else ACCENT_AIZAT)
             .setContentTitle(title)
             .setContentText(text.lineSequence().first())
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))

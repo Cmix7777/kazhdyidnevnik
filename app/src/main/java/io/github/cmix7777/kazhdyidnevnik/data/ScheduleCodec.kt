@@ -21,6 +21,7 @@ object ScheduleCodec {
         val teacher: String = "",
         val room: String = "",
         val online: Boolean = false,
+        val note: String = "",
     )
 
     @Serializable
@@ -46,6 +47,7 @@ object ScheduleCodec {
                     teacher = it.teacher,
                     room = it.room,
                     online = it.online,
+                    note = it.note,
                 )
             },
         ),
@@ -67,6 +69,7 @@ object ScheduleCodec {
                     teacher = it.teacher,
                     room = it.room,
                     online = it.online,
+                    note = it.note,
                 )
             },
         )

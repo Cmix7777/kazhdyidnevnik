@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.Curriculum
 import io.github.cmix7777.kazhdyidnevnik.data.MockExams
+import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.PlanKind
 import io.github.cmix7777.kazhdyidnevnik.data.ProgressStats
 import io.github.cmix7777.kazhdyidnevnik.data.Topic
@@ -39,7 +40,11 @@ import io.github.cmix7777.kazhdyidnevnik.formatDate
 private const val SESSIONS_FOR_DONE = 3
 
 @Composable
-fun ProgressScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
+fun ProgressScreen(vm: ScheduleViewModel, person: Person, modifier: Modifier = Modifier) {
+    if (person != vm.owner || !person.profile.hasPlan) {
+        NoProgress(person, isOwner = person == vm.owner, modifier = modifier)
+        return
+    }
     val now by rememberNow()
     val today = now.toLocalDate()
     val done = vm.done.toMap()
@@ -149,6 +154,35 @@ fun ProgressScreen(vm: ScheduleViewModel, modifier: Modifier = Modifier) {
             Caption(
                 "Тема считается пройденной, когда по ней отмечено $SESSIONS_FOR_DONE занятия. " +
                     "После последней темы программа идёт по второму кругу как повторение.",
+            )
+        }
+    }
+}
+
+/** Прогресса нет: у человека нет плана учёбы или отметки хранятся на другом телефоне. */
+@Composable
+private fun NoProgress(person: Person, isOwner: Boolean, modifier: Modifier = Modifier) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Pill(text = "Прогресс", accent = true)
+                TwoToneTitle(first = "Как идёт", second = "учёба и привычки")
+            }
+        }
+        item {
+            InfoNote(
+                when {
+                    person.profile.hasPlan ->
+                        "Отметки ${person.genitive} хранятся на его телефоне, поэтому прогресс виден только там."
+                    isOwner ->
+                        "Плана учёбы пока нет. Когда станет понятно, что и сколько учить, здесь появятся серии и часы."
+                    else ->
+                        "У ${person.genitive} пока нет плана учёбы. Когда он появится, прогресс будет виден на её телефоне."
+                },
             )
         }
     }

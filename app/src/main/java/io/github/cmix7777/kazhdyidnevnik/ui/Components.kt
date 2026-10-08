@@ -102,6 +102,13 @@ fun DayItemCard(item: DayItem, now: LocalTime?, modifier: Modifier = Modifier, d
                                 color = if (active) Palette.TextMuted else Palette.TextFaint,
                             )
                         }
+                        if (lesson.note.isNotBlank()) {
+                            Text(
+                                text = lesson.note.replaceFirstChar { it.uppercase() },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Palette.Lavender,
+                            )
+                        }
                     }
                     is DayItem.WorkItem -> {
                         val hours = Duration.between(item.start, item.end).toMinutes() / 60.0

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
+import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
 import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
 import io.github.cmix7777.kazhdyidnevnik.data.ProgressRepository
@@ -14,7 +15,6 @@ import io.github.cmix7777.kazhdyidnevnik.data.ReminderKind
 import io.github.cmix7777.kazhdyidnevnik.data.ReminderPlanner
 import io.github.cmix7777.kazhdyidnevnik.data.Summaries
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
-import io.github.cmix7777.kazhdyidnevnik.data.WorkSchedule
 import io.github.cmix7777.kazhdyidnevnik.data.buildDay
 import io.github.cmix7777.kazhdyidnevnik.data.weekStartFor
 import io.github.cmix7777.kazhdyidnevnik.service.WeatherRepository
@@ -32,21 +32,28 @@ object ReminderScheduler {
 
     const val ACTION_ALARM = "io.github.cmix7777.kazhdyidnevnik.ALARM"
 
-    /** Пары и смены дня из сохранённого расписания или null, если неделя не загружена. */
-    fun dayItems(context: Context, date: LocalDate): List<DayItem>? =
-        ScheduleSync.repository(context).loadCached(weekStartFor(date))
-            ?.let { buildDay(date, it.lessons, WorkSchedule.default) }
+    /** Пары и смены дня человека из сохранённого расписания или null, если неделя не загружена. */
+    fun dayItems(context: Context, person: Person, date: LocalDate): List<DayItem>? =
+        ScheduleSync.repository(context, person).loadOrBuild(weekStartFor(date))
+            ?.let { buildDay(date, it.lessons, person.profile.shifts) }
 
-    fun plan(context: Context, date: LocalDate): List<PlanBlock> =
-        dayItems(context, date)?.let { PlanGenerator.planFor(date, it) }.orEmpty()
+    /** План учёбы человека на день (у кого плана нет — пусто). */
+    fun plan(context: Context, person: Person, date: LocalDate): List<PlanBlock> {
+        if (!person.profile.hasPlan) return emptyList()
+        return dayItems(context, person, date)?.let { PlanGenerator.planFor(date, it) }.orEmpty()
+    }
 
-    /** Напоминания в промежутке (from, until]. */
+    /** Напоминания в промежутке (from, until]: свои и, если включены, про второго человека. */
     private fun reminders(context: Context, from: LocalDateTime, until: LocalDateTime): List<Reminder> {
-        val settings = AppSettings(context).reminders
+        val appSettings = AppSettings(context)
+        val owner = appSettings.owner ?: return emptyList()
+        val settings = appSettings.reminders
         val result = mutableListOf<Reminder>()
         var date = from.toLocalDate()
         while (!date.isAfter(until.toLocalDate())) {
-            result += ReminderPlanner.forDay(date, plan(context, date), settings)
+            result += ReminderPlanner.forDay(date, plan(context, owner, date), settings)
+            val partnerPlan = if (settings.partner.study) plan(context, owner.partner, date) else emptyList()
+            result += ReminderPlanner.forPartnerDay(date, partnerPlan, settings)
             date = date.plusDays(1)
         }
         return result.filter { it.at.isAfter(from) && !it.at.isAfter(until) }
@@ -107,30 +114,46 @@ object ReminderScheduler {
 
     private suspend fun show(context: Context, reminder: Reminder) {
         val date = reminder.at.toLocalDate()
+        val owner = AppSettings(context).owner ?: return
+        val person = if (reminder.partner) owner.partner else owner
         when (reminder.kind) {
             ReminderKind.CHECK -> Unit
             ReminderKind.MORNING -> {
-                val items = dayItems(context, date)
-                val plan = items?.let { PlanGenerator.planFor(date, it) }.orEmpty()
+                val items = dayItems(context, person, date)
+                // План учёбы — только свой: отметки второго человека хранятся на его телефоне.
+                val plan = if (reminder.partner) emptyList() else plan(context, person, date)
                 val forecast = runCatching { WeatherRepository.forecast(context) }.getOrNull()
-                Notifier.morning(context, Summaries.morning(date, items, plan, forecast))
+                val text = Summaries.morning(date, items, plan, forecast, person.profile)
+                val title = if (reminder.partner) "Сегодня у ${person.genitive}" else person.profile.morningTitle
+                Notifier.morning(context, title, text, reminder.partner)
             }
             ReminderKind.BLOCK -> {
-                val block = plan(context, date).firstOrNull { it.kind == reminder.block } ?: return
+                val block = plan(context, person, date).firstOrNull { it.kind == reminder.block } ?: return
                 // План мог сдвинуться после обновления расписания — тогда напомним в новое время.
                 if (block.start != reminder.at.toLocalTime()) return
+                if (reminder.partner) {
+                    Notifier.block(context, date, block, partner = person)
+                    return
+                }
                 if (block.key(date) in ProgressRepository.current(context.filesDir)) return
                 Notifier.block(context, date, block)
             }
             ReminderKind.WEATHER -> {
                 val tomorrow = date.plusDays(1)
                 val forecast = runCatching { WeatherRepository.forecast(context) }.getOrNull()
-                val note = WeatherAdvice.tomorrowNote(tomorrow, dayItems(context, tomorrow), forecast) ?: return
-                Notifier.weather(context, note.title, note.text)
+                val note = WeatherAdvice.tomorrowNote(
+                    tomorrow,
+                    dayItems(context, person, tomorrow),
+                    forecast,
+                    person.profile.leaveBeforeMinutes,
+                ) ?: return
+                val title = if (reminder.partner) "${person.shortName} · ${note.title}" else note.title
+                Notifier.weather(context, title, note.text, reminder.partner)
             }
             ReminderKind.EVENING -> {
+                if (reminder.partner) return
                 val done = ProgressRepository.current(context.filesDir)
-                val text = Summaries.evening(date, plan(context, date), done) ?: return
+                val text = Summaries.evening(date, plan(context, person, date), done) ?: return
                 Notifier.evening(context, text)
             }
         }

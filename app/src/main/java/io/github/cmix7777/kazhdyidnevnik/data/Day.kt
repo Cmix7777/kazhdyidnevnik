@@ -4,8 +4,20 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 
-/** Смена на работе. */
-data class WorkShift(val day: DayOfWeek, val start: LocalTime, val end: LocalTime)
+/** Смена на работе: каждую неделю в день [day] или один раз в дату [date]. */
+data class WorkShift(
+    val day: DayOfWeek,
+    val start: LocalTime,
+    val end: LocalTime,
+    val date: LocalDate? = null,
+) {
+    fun appliesTo(target: LocalDate): Boolean = if (date != null) date == target else day == target.dayOfWeek
+
+    companion object {
+        /** Разовая смена в конкретный день. */
+        fun on(date: LocalDate, start: LocalTime, end: LocalTime) = WorkShift(date.dayOfWeek, start, end, date)
+    }
+}
 
 /** График работы Айзата (не в IT). */
 object WorkSchedule {
@@ -53,6 +65,6 @@ sealed interface DayItem {
 /** Пары и смены за день, по времени начала. */
 fun buildDay(date: LocalDate, lessons: List<Lesson>, shifts: List<WorkShift>): List<DayItem> {
     val lessonItems = lessons.filter { it.date == date }.map { DayItem.LessonItem(it) }
-    val workItems = shifts.filter { it.day == date.dayOfWeek }.map { DayItem.WorkItem(it) }
+    val workItems = shifts.filter { it.appliesTo(date) }.map { DayItem.WorkItem(it) }
     return (lessonItems + workItems).sortedBy { it.start }
 }
