@@ -1,6 +1,7 @@
 package io.github.cmix7777.kazhdyidnevnik.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
+import io.github.cmix7777.kazhdyidnevnik.data.EventKind
+import io.github.cmix7777.kazhdyidnevnik.data.UserEvent
 import io.github.cmix7777.kazhdyidnevnik.formatTime
 import kotlinx.coroutines.delay
 import java.time.Duration
@@ -39,9 +42,25 @@ fun rememberNow(): State<LocalDateTime> = produceState(LocalDateTime.now()) {
     }
 }
 
-/** Карточка пары или смены. [now] — текущее время, если карточка за сегодня. */
+/** Длительность смены словами: «смена 5 ч», «смена 3,5 ч». */
+private fun shiftText(item: DayItem): String {
+    val hours = Duration.between(item.start, item.end).toMinutes() / 60.0
+    val value = if (hours % 1.0 == 0.0) "${hours.toInt()}" else "%.1f".format(hours).replace('.', ',')
+    return "смена $value ч"
+}
+
+/**
+ * Карточка пары, смены или своего дела. [now] — текущее время, если карточка за сегодня.
+ * [onClick] — для своих дел: открыть редактор.
+ */
 @Composable
-fun DayItemCard(item: DayItem, now: LocalTime?, modifier: Modifier = Modifier, dim: Boolean = false) {
+fun DayItemCard(
+    item: DayItem,
+    now: LocalTime?,
+    modifier: Modifier = Modifier,
+    dim: Boolean = false,
+    onClick: (() -> Unit)? = null,
+) {
     val active = now != null && now >= item.start && now < item.end
     val finished = now != null && now >= item.end
     val tone = when {
@@ -49,7 +68,14 @@ fun DayItemCard(item: DayItem, now: LocalTime?, modifier: Modifier = Modifier, d
         dim || finished -> CardTone.Dim
         else -> CardTone.Normal
     }
-    GlassCard(modifier = modifier, tone = tone, verticalArrangement = Arrangement.spacedBy(0.dp)) {
+    val cardModifier = if (onClick != null) {
+        modifier
+            .clip(RoundedCornerShape(22.dp))
+            .clickable(onClick = onClick)
+    } else {
+        modifier
+    }
+    GlassCard(modifier = cardModifier, tone = tone, verticalArrangement = Arrangement.spacedBy(0.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
             Column(modifier = Modifier.width(50.dp)) {
                 Text(
@@ -111,13 +137,28 @@ fun DayItemCard(item: DayItem, now: LocalTime?, modifier: Modifier = Modifier, d
                         }
                     }
                     is DayItem.WorkItem -> {
-                        val hours = Duration.between(item.start, item.end).toMinutes() / 60.0
                         Text(text = "Работа", style = MaterialTheme.typography.titleMedium, color = Palette.Text)
-                        Text(
-                            text = "смена " + if (hours % 1.0 == 0.0) "${hours.toInt()} ч" else "%.1f ч".format(hours),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Palette.TextMuted,
-                        )
+                        Text(text = shiftText(item), style = MaterialTheme.typography.bodyMedium, color = Palette.TextMuted)
+                    }
+                    is DayItem.EventItem -> {
+                        val event = item.event
+                        Text(text = event.displayTitle, style = MaterialTheme.typography.titleMedium, color = Palette.Text)
+                        val details = listOfNotNull(
+                            event.kind.title.takeIf { event.title.isNotBlank() },
+                            shiftText(item).takeIf { event.kind == EventKind.WORK },
+                            "каждую неделю".takeIf { event.weekly },
+                            event.remindBefore?.let { "напомнит ${UserEvent.reminderText(it).lowercase()}" },
+                        ).joinToString(" · ")
+                        if (details.isNotEmpty()) {
+                            Text(
+                                text = details,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (active) Palette.Lavender else Palette.TextMuted,
+                            )
+                        }
+                        if (event.note.isNotBlank()) {
+                            Text(text = event.note, style = MaterialTheme.typography.bodySmall, color = Palette.TextFaint)
+                        }
                     }
                 }
             }

@@ -16,6 +16,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -28,7 +31,8 @@ import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
 import io.github.cmix7777.kazhdyidnevnik.data.Practice
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherText
-import io.github.cmix7777.kazhdyidnevnik.data.buildDay
+import io.github.cmix7777.kazhdyidnevnik.data.dayItems
+import io.github.cmix7777.kazhdyidnevnik.data.isWork
 import io.github.cmix7777.kazhdyidnevnik.data.formatMinutes
 import io.github.cmix7777.kazhdyidnevnik.data.pluralLessons
 import io.github.cmix7777.kazhdyidnevnik.data.weekStartFor
@@ -42,6 +46,7 @@ import io.github.cmix7777.kazhdyidnevnik.formatTime
 fun TodayScreen(
     vm: ScheduleViewModel,
     extras: ExtrasViewModel,
+    diary: DiaryViewModel,
     person: Person,
     modifier: Modifier = Modifier,
 ) {
@@ -56,8 +61,13 @@ fun TodayScreen(
 
     val todayWeek = schedule.weeks[weekStartFor(today)]
     val tomorrowWeek = schedule.weeks[weekStartFor(tomorrow)]
-    val todayItems = buildDay(today, todayWeek?.lessons.orEmpty(), profile.shifts)
-    val tomorrowItems = buildDay(tomorrow, tomorrowWeek?.lessons.orEmpty(), profile.shifts)
+    val events = diary.diary.events
+    val todayItems = person.dayItems(today, todayWeek?.lessons.orEmpty(), isOwner, events)
+    val tomorrowItems = person.dayItems(tomorrow, tomorrowWeek?.lessons.orEmpty(), isOwner, events)
+    var editing by remember { mutableStateOf<EventEdit?>(null) }
+    val openEvent: (DayItem) -> (() -> Unit)? = { item ->
+        (item as? DayItem.EventItem)?.let { event -> { editing = EventEdit(event.event, event.date) } }
+    }
     val refreshing = vm.isLoading(person, 0)
     val forecast = extras.forecast
 
@@ -125,10 +135,19 @@ fun TodayScreen(
             when {
                 todayWeek == null && refreshing -> item { InfoNote("Загружаю расписание…") }
                 todayWeek == null -> item {
-                    InfoNote("Расписание ещё не загружено. Потяни экран вниз, чтобы обновить.")
+                    InfoNote("Расписание пар ещё не загружено. Потяни экран вниз, чтобы обновить.")
                 }
                 todayItems.isEmpty() -> item { InfoNote("Сегодня ни пар, ни работы. Свободный день.") }
-                else -> items(todayItems) { DayItemCard(it, now.toLocalTime()) }
+            }
+            items(todayItems) { DayItemCard(it, now.toLocalTime(), onClick = openEvent(it)) }
+            if (isOwner) {
+                item {
+                    GhostButton(
+                        text = "+ Добавить дело",
+                        onClick = { editing = EventEdit(null, today) },
+                        small = true,
+                    )
+                }
             }
 
             // План учёбы: только у владельца телефона и только если план есть.
@@ -197,10 +216,10 @@ fun TodayScreen(
                 }
             }
             when {
-                tomorrowWeek == null -> item { InfoNote("Расписание на завтра ещё не загружено.") }
+                tomorrowWeek == null -> item { InfoNote("Расписание пар на завтра ещё не загружено.") }
                 tomorrowItems.isEmpty() -> item { InfoNote("Завтра ни пар, ни работы.") }
-                else -> items(tomorrowItems) { DayItemCard(it, now = null, dim = true) }
             }
+            items(tomorrowItems) { DayItemCard(it, now = null, dim = true, onClick = openEvent(it)) }
             if (showPlan && tomorrowWeek != null) {
                 val tomorrowPlan = PlanGenerator.planFor(tomorrow, tomorrowItems)
                 if (tomorrowPlan.isNotEmpty()) item { PlanPreview(tomorrowPlan) }
@@ -216,6 +235,8 @@ fun TodayScreen(
             }
         }
     }
+
+    editing?.let { edit -> EventEditorHost(edit, diary, onClose = { editing = null }) }
 }
 
 /** Короткий план учёбы на завтра: время и название блоков. */
@@ -250,13 +271,17 @@ private fun PlanPreview(plan: List<PlanBlock>) {
 
 private fun daySummary(items: List<DayItem>): String {
     val lessons = items.count { it is DayItem.LessonItem }
-    val work = items.any { it is DayItem.WorkItem }
-    return when {
-        lessons == 0 && !work -> "свободный день"
-        lessons == 0 -> "пар нет, есть смена"
-        work -> "${pluralLessons(lessons)} и смена"
-        else -> pluralLessons(lessons)
+    val work = items.any { it.isWork }
+    val other = items.filterIsInstance<DayItem.EventItem>()
+        .filter { !it.isWork }
+        .map { it.event.displayTitle.lowercase() }
+        .distinct()
+    val parts = buildList {
+        if (lessons > 0) add(pluralLessons(lessons))
+        if (work) add("смена")
+        addAll(other)
     }
+    return if (parts.isEmpty()) "свободный день" else parts.joinToString(", ")
 }
 
 /** Подпись к разделу «Расписание»: когда начинается и заканчивается день. */

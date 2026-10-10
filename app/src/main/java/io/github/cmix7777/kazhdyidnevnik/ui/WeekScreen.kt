@@ -19,6 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -28,7 +30,8 @@ import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.Practice
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
-import io.github.cmix7777.kazhdyidnevnik.data.buildDay
+import io.github.cmix7777.kazhdyidnevnik.data.DayItem
+import io.github.cmix7777.kazhdyidnevnik.data.dayItems
 import io.github.cmix7777.kazhdyidnevnik.data.weekStartFor
 import io.github.cmix7777.kazhdyidnevnik.formatDayTitle
 import io.github.cmix7777.kazhdyidnevnik.formatWeekRange
@@ -38,7 +41,13 @@ private const val MAX_OFFSET = 8
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun WeekScreen(vm: ScheduleViewModel, extras: ExtrasViewModel, person: Person, modifier: Modifier = Modifier) {
+fun WeekScreen(
+    vm: ScheduleViewModel,
+    extras: ExtrasViewModel,
+    diary: DiaryViewModel,
+    person: Person,
+    modifier: Modifier = Modifier,
+) {
     val now by rememberNow()
     val today = now.toLocalDate()
     var offset by rememberSaveable { mutableIntStateOf(0) }
@@ -47,6 +56,8 @@ fun WeekScreen(vm: ScheduleViewModel, extras: ExtrasViewModel, person: Person, m
     val schedule = vm.schedule(person)
     val week = schedule.weeks[monday]
     val refreshing = vm.isLoading(person, offset)
+    val isOwner = person == vm.owner
+    var editing by remember { mutableStateOf<EventEdit?>(null) }
 
     LaunchedEffect(offset, person) { vm.ensureWeek(person, offset) }
 
@@ -74,6 +85,16 @@ fun WeekScreen(vm: ScheduleViewModel, extras: ExtrasViewModel, person: Person, m
                     style = MaterialTheme.typography.headlineMedium,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (isOwner) {
+                        GlassIconButton(
+                            icon = R.drawable.ic_add,
+                            contentDescription = "Добавить дело",
+                            onClick = {
+                                val day = if (offset == 0) today else monday
+                                editing = EventEdit(null, day)
+                            },
+                        )
+                    }
                     GlassIconButton(
                         icon = R.drawable.ic_arrow_back,
                         contentDescription = "Прошлая неделя",
@@ -122,7 +143,7 @@ fun WeekScreen(vm: ScheduleViewModel, extras: ExtrasViewModel, person: Person, m
                     }
                     for (dayIndex in 0..6) {
                         val date = monday.plusDays(dayIndex.toLong())
-                        val dayItems = buildDay(date, week.lessons, profile.shifts)
+                        val dayItems = person.dayItems(date, week.lessons, isOwner, diary.diary.events)
                         val isToday = date == today
                         item(key = "title-$date") {
                             val (dayName, dateText) = formatDayTitle(date).split(", ", limit = 2)
@@ -150,11 +171,21 @@ fun WeekScreen(vm: ScheduleViewModel, extras: ExtrasViewModel, person: Person, m
                                 )
                             }
                         } else {
-                            items(dayItems) { DayItemCard(it, now = if (isToday) now.toLocalTime() else null) }
+                            items(dayItems) { item ->
+                                DayItemCard(
+                                    item,
+                                    now = if (isToday) now.toLocalTime() else null,
+                                    onClick = (item as? DayItem.EventItem)?.let { event ->
+                                        { editing = EventEdit(event.event, event.date) }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
             }
         }
     }
+
+    editing?.let { edit -> EventEditorHost(edit, diary, onClose = { editing = null }) }
 }

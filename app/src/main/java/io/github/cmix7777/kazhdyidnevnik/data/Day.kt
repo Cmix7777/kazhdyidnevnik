@@ -46,7 +46,7 @@ object Practice {
         }
 }
 
-/** Элемент дня: пара или смена. */
+/** Элемент дня: пара, смена или своё дело. */
 sealed interface DayItem {
     val start: LocalTime
     val end: LocalTime
@@ -60,11 +60,26 @@ sealed interface DayItem {
         override val start: LocalTime get() = shift.start
         override val end: LocalTime get() = shift.end
     }
+
+    data class EventItem(val event: UserEvent, val date: LocalDate) : DayItem {
+        override val start: LocalTime get() = event.start
+        override val end: LocalTime get() = event.end
+    }
 }
 
-/** Пары и смены за день, по времени начала. */
-fun buildDay(date: LocalDate, lessons: List<Lesson>, shifts: List<WorkShift>): List<DayItem> {
+/** Работа: смена из графика или своё дело «Работа». */
+val DayItem.isWork: Boolean
+    get() = this is DayItem.WorkItem || (this is DayItem.EventItem && event.kind == EventKind.WORK)
+
+/** Пары, смены и свои дела за день, по времени начала. */
+fun buildDay(
+    date: LocalDate,
+    lessons: List<Lesson>,
+    shifts: List<WorkShift>,
+    events: List<UserEvent> = emptyList(),
+): List<DayItem> {
     val lessonItems = lessons.filter { it.date == date }.map { DayItem.LessonItem(it) }
     val workItems = shifts.filter { it.appliesTo(date) }.map { DayItem.WorkItem(it) }
-    return (lessonItems + workItems).sortedBy { it.start }
+    val eventItems = events.filter { it.occursOn(date) }.map { DayItem.EventItem(it, date) }
+    return (lessonItems + workItems + eventItems).sortedBy { it.start }
 }

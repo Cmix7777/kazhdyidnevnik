@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
 import io.github.cmix7777.kazhdyidnevnik.data.Backup
+import io.github.cmix7777.kazhdyidnevnik.data.DiaryRepository
 import io.github.cmix7777.kazhdyidnevnik.data.ProgressRepository
 import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
 import io.github.cmix7777.kazhdyidnevnik.notify.ReminderScheduler
@@ -20,6 +21,7 @@ object Backups {
     const val FOLDER = "Каждыйдневник"
     private const val FILE_NAME = "kazhdyidnevnik-backup.json"
     private const val AUTO_EVERY_MS = 20 * 60 * 60 * 1000L
+    private const val AFTER_CHANGE_MS = 10 * 60 * 1000L
 
     sealed interface RestoreResult {
         data class Done(val added: Int, val total: Int, val settingsRestored: Boolean) : RestoreResult
@@ -31,6 +33,7 @@ object Backups {
         done = ProgressRepository.current(context.filesDir),
         settings = AppSettings(context).reminders,
         createdAt = LocalDateTime.now(),
+        diary = DiaryRepository.current(context.filesDir),
     )
 
     /** Сохранить копию в «Загрузки/Каждыйдневник» (перезаписывает прошлую копию этого приложения). */
@@ -64,6 +67,12 @@ object Backups {
         if (System.currentTimeMillis() - last > AUTO_EVERY_MS) saveAuto(context)
     }
 
+    /** После изменений в делах или бюджете: копия не чаще раза в 10 минут. */
+    fun saveAfterChange(context: Context) {
+        val last = AppSettings(context).lastAutoBackupMillis
+        if (System.currentTimeMillis() - last > AFTER_CHANGE_MS) saveAuto(context)
+    }
+
     /** Восстановить из файла, выбранного пользователем. Отметки объединяются, ничего не стирается. */
     fun restore(context: Context, uri: Uri): RestoreResult {
         val text: String? = try {
@@ -75,9 +84,14 @@ object Backups {
 
         val backup = Backup.decode(text) ?: return RestoreResult.NotABackup
         val added = ProgressRepository.mergeAll(context.filesDir, backup.done)
+        val diaryAdded = backup.diary?.let { DiaryRepository.merge(context.filesDir, it) } ?: 0
         backup.settings?.let { AppSettings(context).reminders = it }
         ReminderScheduler.scheduleNext(context)
-        return RestoreResult.Done(added = added, total = backup.done.size, settingsRestored = backup.settings != null)
+        return RestoreResult.Done(
+            added = added + diaryAdded,
+            total = backup.done.size + (backup.diary?.size ?: 0),
+            settingsRestored = backup.settings != null,
+        )
     }
 
     private fun write(context: Context, uri: Uri, text: String): Boolean = try {

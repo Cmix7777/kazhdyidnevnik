@@ -5,7 +5,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 
-enum class ReminderKind { CHECK, MORNING, BLOCK, WEATHER, EVENING }
+enum class ReminderKind { CHECK, MORNING, BLOCK, WEATHER, EVENING, EVENT }
 
 /**
  * Одно напоминание: когда и что. Для блока учёбы [block] — его вид.
@@ -16,6 +16,8 @@ data class Reminder(
     val kind: ReminderKind,
     val block: PlanKind? = null,
     val partner: Boolean = false,
+    /** Для напоминания о своём деле — его номер. */
+    val eventId: String? = null,
 )
 
 /** Какие уведомления приходят про второго человека. По умолчанию — никакие. */
@@ -88,6 +90,19 @@ object ReminderPlanner {
         return result.sortedBy { it.at.toLocalTime() }
     }
 
+    /** Напоминания о своих делах, которые начинаются в [date] (само напоминание может быть накануне). */
+    fun forEvents(date: LocalDate, events: List<UserEvent>): List<Reminder> =
+        events
+            .filter { it.remindBefore != null && it.occursOn(date) }
+            .map { event ->
+                Reminder(
+                    at = date.atTime(event.start).minusMinutes((event.remindBefore ?: 0).toLong()),
+                    kind = ReminderKind.EVENT,
+                    eventId = event.id,
+                )
+            }
+            .sortedBy { it.at.toLocalTime() }
+
     /** Насколько напоминание может опоздать (телефон спал), чтобы его ещё стоило показать. */
     fun maxDelay(kind: ReminderKind): Duration = when (kind) {
         ReminderKind.CHECK -> Duration.ofHours(6)
@@ -95,5 +110,6 @@ object ReminderPlanner {
         ReminderKind.BLOCK -> Duration.ofMinutes(30)
         ReminderKind.WEATHER -> Duration.ofHours(2)
         ReminderKind.EVENING -> Duration.ofHours(2)
+        ReminderKind.EVENT -> Duration.ofMinutes(30)
     }
 }

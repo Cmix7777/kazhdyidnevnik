@@ -12,6 +12,8 @@ data class Deadline(
     val date: LocalDate,
     val approximate: String? = null,
     val note: String? = null,
+    /** Есть у дат, добавленных в приложении: по нему их меняют и удаляют. */
+    val id: String? = null,
 )
 
 object Deadlines {

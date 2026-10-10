@@ -14,6 +14,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
 import io.github.cmix7777.kazhdyidnevnik.data.Deadline
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.countdownText
@@ -22,11 +28,17 @@ import io.github.cmix7777.kazhdyidnevnik.formatDate
 import java.time.LocalDate
 
 @Composable
-fun DeadlinesScreen(person: Person, modifier: Modifier = Modifier) {
+fun DeadlinesScreen(diary: DiaryViewModel, person: Person, isOwner: Boolean, modifier: Modifier = Modifier) {
     val now by rememberNow()
     val today = now.toLocalDate()
-    val deadlines = person.profile.deadlines
+    // Свои даты есть только на телефоне владельца.
+    val deadlines = person.profile.deadlines + if (isOwner) diary.diary.deadlines else emptyList()
     val (upcoming, past) = deadlines.sortedBy { it.date.toEpochDay() }.partition { !it.date.isBefore(today) }
+    var editing by remember { mutableStateOf<Deadline?>(null) }
+    var adding by remember { mutableStateOf(false) }
+    val open: (Deadline) -> (() -> Unit)? = { deadline ->
+        if (isOwner && deadline.id != null) ({ editing = deadline }) else null
+    }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -37,24 +49,36 @@ fun DeadlinesScreen(person: Person, modifier: Modifier = Modifier) {
             Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Pill(text = "Дедлайны", accent = true)
                 TwoToneTitle(first = "Что впереди", second = "важные даты")
+                if (isOwner) {
+                    GhostButton(text = "+ Добавить дату", onClick = { adding = true }, small = true)
+                }
             }
         }
         if (deadlines.isEmpty()) {
             item {
                 InfoNote(
-                    "Здесь будут важные даты ${person.genitive}: зачёты, экзамены, сдача работ и практика. " +
-                        "Пока их нет — скоро их можно будет добавлять и менять прямо в приложении.",
+                    if (isOwner) {
+                        "Здесь будут важные даты: зачёты, экзамены, сдача работ, практика. " +
+                            "Добавь первую кнопкой выше, приложение будет считать дни до неё."
+                    } else {
+                        "Важные даты ${person.genitive} хранятся на её телефоне."
+                    },
                 )
             }
         }
         itemsIndexed(upcoming) { index, deadline ->
-            DeadlineCard(deadline, today, tone = if (index == 0) CardTone.Highlight else CardTone.Normal)
+            DeadlineCard(
+                deadline,
+                today,
+                tone = if (index == 0) CardTone.Highlight else CardTone.Normal,
+                onClick = open(deadline),
+            )
         }
         if (past.isNotEmpty()) {
             item { SectionTitle("Уже прошло") }
-            itemsIndexed(past) { _, deadline -> DeadlineCard(deadline, today, tone = CardTone.Dim) }
+            itemsIndexed(past) { _, deadline -> DeadlineCard(deadline, today, tone = CardTone.Dim, onClick = open(deadline)) }
         }
-        if (deadlines.isNotEmpty()) item {
+        if (person.profile.deadlines.isNotEmpty()) item {
             Text(
                 text = "Примерные даты помечены знаком «≈». Когда узнаешь точную дату, напиши Claude, и он поправит.",
                 style = MaterialTheme.typography.bodySmall,
@@ -62,13 +86,46 @@ fun DeadlinesScreen(person: Person, modifier: Modifier = Modifier) {
             )
         }
     }
+
+    if (adding) {
+        DeadlineEditor(
+            initial = null,
+            onDismiss = { adding = false },
+            onSave = {
+                diary.saveDeadline(it)
+                adding = false
+            },
+            onDelete = { adding = false },
+        )
+    }
+    editing?.let { deadline ->
+        DeadlineEditor(
+            initial = deadline,
+            onDismiss = { editing = null },
+            onSave = {
+                diary.saveDeadline(it)
+                editing = null
+            },
+            onDelete = {
+                deadline.id?.let { id -> diary.deleteDeadline(id) }
+                editing = null
+            },
+        )
+    }
 }
 
 @Composable
-private fun DeadlineCard(deadline: Deadline, today: LocalDate, tone: CardTone) {
+private fun DeadlineCard(deadline: Deadline, today: LocalDate, tone: CardTone, onClick: (() -> Unit)? = null) {
     val days = daysBetween(today, deadline.date)
     val past = tone == CardTone.Dim
-    GlassCard(tone = tone) {
+    val modifier = if (onClick != null) {
+        Modifier
+            .clip(RoundedCornerShape(22.dp))
+            .clickable(onClick = onClick)
+    } else {
+        Modifier
+    }
+    GlassCard(modifier = modifier, tone = tone) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = deadline.title,

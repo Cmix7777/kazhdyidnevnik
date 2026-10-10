@@ -21,6 +21,9 @@ import io.github.cmix7777.kazhdyidnevnik.data.Release
 import io.github.cmix7777.kazhdyidnevnik.data.ScheduleChange
 import io.github.cmix7777.kazhdyidnevnik.data.ScheduleDiff
 import io.github.cmix7777.kazhdyidnevnik.data.Summaries
+import io.github.cmix7777.kazhdyidnevnik.data.UserEvent
+import io.github.cmix7777.kazhdyidnevnik.formatShortDay
+import io.github.cmix7777.kazhdyidnevnik.formatTime
 import io.github.cmix7777.kazhdyidnevnik.formatWeekRange
 import java.time.LocalDate
 
@@ -32,6 +35,7 @@ object Notifier {
     private const val CHANNEL_STUDY = "study"
     private const val CHANNEL_UPDATES = "updates"
     private const val CHANNEL_WEATHER = "weather"
+    private const val CHANNEL_EVENTS = "events"
 
     private const val ID_MORNING = 10
     private const val ID_EVENING = 11
@@ -69,6 +73,11 @@ object Notifier {
                     "Погода на завтра",
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply { description = "Вечером: погода при выходе, что надеть, предупреждения" },
+                NotificationChannel(
+                    CHANNEL_EVENTS,
+                    "Свои дела",
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply { description = "Напоминания о делах, которые добавлены в приложении: работа, вождение и другое" },
                 NotificationChannel(
                     CHANNEL_UPDATES,
                     "Обновления приложения",
@@ -141,6 +150,26 @@ object Notifier {
 
     fun evening(context: Context, text: String) {
         post(context, ID_EVENING, builder(context, CHANNEL_STUDY, "Как прошёл день?", text).build())
+    }
+
+    /** Скоро начнётся своё дело. */
+    fun event(context: Context, event: UserEvent, date: LocalDate) {
+        val before = event.remindBefore ?: 0
+        val soon = when {
+            before >= 60 && before % 60 == 0 -> "Через ${if (before == 60) "час" else "${before / 60} ч"}"
+            else -> "Через $before мин"
+        }
+        val text = buildString {
+            append("$soon, ${formatTime(event.start)}–${formatTime(event.end)}.")
+            if (event.note.isNotBlank()) append("\n").append(event.note.trim())
+        }
+        val id = 4000 + ((event.id.hashCode() and 0x7FFFFFFF) % 1000)
+        val notification = builder(context, CHANNEL_EVENTS, "${event.displayTitle} в ${formatTime(event.start)}", text)
+            .setSubText(formatShortDay(date))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .build()
+        post(context, id, notification)
     }
 
     fun weather(context: Context, title: String, text: String, partner: Boolean = false) {

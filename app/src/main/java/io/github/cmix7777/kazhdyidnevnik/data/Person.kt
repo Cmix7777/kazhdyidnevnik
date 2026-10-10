@@ -31,6 +31,11 @@ data class Profile(
     val hasPractice: Boolean,
     /** Откуда берётся расписание (для подписей). */
     val scheduleSource: String,
+    /**
+     * Смены из [shifts] на телефоне владельца превращаются в свои дела, и дальше он сам их меняет.
+     * На телефоне второго человека по-прежнему видны [shifts].
+     */
+    val shiftsAreEditable: Boolean = false,
 )
 
 object Profiles {
@@ -53,6 +58,7 @@ object Profiles {
         hasPlan = false,
         hasPractice = false,
         scheduleSource = "сайт колледжа УдГУ",
+        shiftsAreEditable = true,
     )
 }
 
@@ -64,4 +70,18 @@ object NastyaWork {
         WorkShift.on(LocalDate.of(2026, 10, 10), LocalTime.of(18, 0), LocalTime.of(21, 30)),
         WorkShift.on(LocalDate.of(2026, 10, 11), LocalTime.of(9, 0), LocalTime.of(21, 0)),
     )
+}
+
+/**
+ * Пары, смены и дела человека за день. Свои дела есть только на телефоне владельца,
+ * поэтому [events] учитываются, только если [isOwner].
+ */
+fun Person.dayItems(
+    date: LocalDate,
+    lessons: List<Lesson>,
+    isOwner: Boolean,
+    events: List<UserEvent> = emptyList(),
+): List<DayItem> {
+    val shifts = if (isOwner && profile.shiftsAreEditable) emptyList() else profile.shifts
+    return buildDay(date, lessons, shifts, if (isOwner) events else emptyList())
 }

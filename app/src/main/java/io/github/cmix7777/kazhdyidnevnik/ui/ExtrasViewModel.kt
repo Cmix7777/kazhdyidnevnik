@@ -194,7 +194,7 @@ class ExtrasViewModel(private val app: Application) : AndroidViewModel(app) {
             backupMessage = when (result) {
                 is Backups.RestoreResult.Done -> {
                     if (result.settingsRestored) onSettingsRestored()
-                    val marks = plural(result.total.toLong(), "отметка", "отметки", "отметок")
+                    val marks = plural(result.total.toLong(), "запись", "записи", "записей")
                     "Готово: в копии ${result.total} $marks, новых из них ${result.added}." +
                         if (result.settingsRestored) " Настройки уведомлений тоже восстановлены." else ""
                 }

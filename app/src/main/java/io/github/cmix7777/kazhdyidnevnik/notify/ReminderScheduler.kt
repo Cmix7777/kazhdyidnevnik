@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
+import io.github.cmix7777.kazhdyidnevnik.data.DiaryRepository
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
 import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
@@ -15,7 +16,7 @@ import io.github.cmix7777.kazhdyidnevnik.data.ReminderKind
 import io.github.cmix7777.kazhdyidnevnik.data.ReminderPlanner
 import io.github.cmix7777.kazhdyidnevnik.data.Summaries
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
-import io.github.cmix7777.kazhdyidnevnik.data.buildDay
+import io.github.cmix7777.kazhdyidnevnik.data.dayItems
 import io.github.cmix7777.kazhdyidnevnik.data.weekStartFor
 import io.github.cmix7777.kazhdyidnevnik.service.WeatherRepository
 import java.time.Duration
@@ -32,10 +33,16 @@ object ReminderScheduler {
 
     const val ACTION_ALARM = "io.github.cmix7777.kazhdyidnevnik.ALARM"
 
-    /** Пары и смены дня человека из сохранённого расписания или null, если неделя не загружена. */
-    fun dayItems(context: Context, person: Person, date: LocalDate): List<DayItem>? =
-        ScheduleSync.repository(context, person).loadOrBuild(weekStartFor(date))
-            ?.let { buildDay(date, it.lessons, person.profile.shifts) }
+    /**
+     * Пары, смены и свои дела человека за день из сохранённого расписания
+     * или null, если неделя не загружена. Свои дела — только у владельца телефона.
+     */
+    fun dayItems(context: Context, person: Person, date: LocalDate): List<DayItem>? {
+        val week = ScheduleSync.repository(context, person).loadOrBuild(weekStartFor(date)) ?: return null
+        val isOwner = AppSettings(context).owner == person
+        val events = if (isOwner) DiaryRepository.current(context.filesDir).events else emptyList()
+        return person.dayItems(date, week.lessons, isOwner, events)
+    }
 
     /** План учёбы человека на день (у кого плана нет — пусто). */
     fun plan(context: Context, person: Person, date: LocalDate): List<PlanBlock> {
@@ -48,12 +55,19 @@ object ReminderScheduler {
         val appSettings = AppSettings(context)
         val owner = appSettings.owner ?: return emptyList()
         val settings = appSettings.reminders
+        val events = DiaryRepository.current(context.filesDir).events
         val result = mutableListOf<Reminder>()
         var date = from.toLocalDate()
         while (!date.isAfter(until.toLocalDate())) {
             result += ReminderPlanner.forDay(date, plan(context, owner, date), settings)
             val partnerPlan = if (settings.partner.study) plan(context, owner.partner, date) else emptyList()
             result += ReminderPlanner.forPartnerDay(date, partnerPlan, settings)
+            date = date.plusDays(1)
+        }
+        // Напоминание о деле утром может прийти ещё накануне вечером, поэтому смотрим на день дальше.
+        date = from.toLocalDate()
+        while (!date.isAfter(until.toLocalDate().plusDays(1))) {
+            result += ReminderPlanner.forEvents(date, events)
             date = date.plusDays(1)
         }
         return result.filter { it.at.isAfter(from) && !it.at.isAfter(until) }
@@ -149,6 +163,14 @@ object ReminderScheduler {
                 ) ?: return
                 val title = if (reminder.partner) "${person.shortName} · ${note.title}" else note.title
                 Notifier.weather(context, title, note.text, reminder.partner)
+            }
+            ReminderKind.EVENT -> {
+                val event = DiaryRepository.current(context.filesDir).events.firstOrNull { it.id == reminder.eventId } ?: return
+                val before = event.remindBefore ?: return
+                val startsAt = reminder.at.plusMinutes(before.toLong())
+                // Дело могли перенести или убрать — тогда напомним по новому времени.
+                if (!event.occursOn(startsAt.toLocalDate()) || event.start != startsAt.toLocalTime()) return
+                Notifier.event(context, event, startsAt.toLocalDate())
             }
             ReminderKind.EVENING -> {
                 if (reminder.partner) return

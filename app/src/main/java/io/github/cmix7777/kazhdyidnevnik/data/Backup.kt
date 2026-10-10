@@ -11,7 +11,7 @@ object Backup {
     const val APP = "kazhdyidnevnik"
     private const val FORMAT = 1
 
-    data class Content(val done: Map<String, Int>, val settings: ReminderSettings?)
+    data class Content(val done: Map<String, Int>, val settings: ReminderSettings?, val diary: Diary? = null)
 
     @Serializable
     private data class SettingsDto(
@@ -40,6 +40,7 @@ object Backup {
         val createdAt: String,
         val done: Map<String, Int>,
         val settings: SettingsDto? = null,
+        val diary: DiaryDto? = null,
     )
 
     private val json = Json {
@@ -47,7 +48,12 @@ object Backup {
         ignoreUnknownKeys = true
     }
 
-    fun encode(done: Map<String, Int>, settings: ReminderSettings, createdAt: LocalDateTime): String {
+    fun encode(
+        done: Map<String, Int>,
+        settings: ReminderSettings,
+        createdAt: LocalDateTime,
+        diary: Diary = Diary(),
+    ): String {
         val dto = BackupDto(
             app = APP,
             format = FORMAT,
@@ -68,6 +74,7 @@ object Backup {
                     weather = settings.partner.weather,
                 ),
             ),
+            diary = DiaryCodec.toDto(diary),
         )
         return json.encodeToString(BackupDto.serializer(), dto)
     }
@@ -92,7 +99,8 @@ object Backup {
                 )
             }.getOrNull()
         }
-        return Content(dto.done.filterValues { it >= 0 }, settings)
+        val diary = dto.diary?.let { runCatching { DiaryCodec.fromDto(it) }.getOrNull() }
+        return Content(dto.done.filterValues { it >= 0 }, settings, diary)
     }
 
     /** Объединить отметки: ничего не теряется, при совпадении берётся большее число минут. */

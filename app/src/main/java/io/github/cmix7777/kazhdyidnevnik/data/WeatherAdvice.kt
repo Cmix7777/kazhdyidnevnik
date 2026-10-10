@@ -26,7 +26,8 @@ object WeatherAdvice {
      * [leaveBefore] — за сколько минут до начала выходить.
      */
     fun trips(items: List<DayItem>, leaveBefore: Long = LEAVE_BEFORE_MIN): List<Trip> {
-        val outside = items.filterNot { it is DayItem.LessonItem && it.lesson.online }
+        // Дорога — к очным парам и на работу. Онлайн-пары и прочие свои дела её не меняют.
+        val outside = items.filter { (it is DayItem.LessonItem && !it.lesson.online) || it.isWork }
         if (outside.isEmpty()) return emptyList()
         return listOf(
             Trip("Выход", outside.minOf { it.start }.minusMinutes(leaveBefore)),

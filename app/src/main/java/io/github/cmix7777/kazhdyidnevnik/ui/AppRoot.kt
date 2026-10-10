@@ -67,12 +67,17 @@ import kotlin.math.abs
 private enum class Tab(val title: String, @param:DrawableRes val icon: Int) {
     Today("Сегодня", R.drawable.ic_nav_today),
     Week("Неделя", R.drawable.ic_nav_week),
+    Budget("Бюджет", R.drawable.ic_nav_budget),
+    Deadlines("Даты", R.drawable.ic_nav_deadlines),
     Progress("Прогресс", R.drawable.ic_nav_progress),
-    Deadlines("Дедлайны", R.drawable.ic_nav_deadlines),
 }
 
 @Composable
-fun AppRoot(vm: ScheduleViewModel = viewModel(), extras: ExtrasViewModel = viewModel()) {
+fun AppRoot(
+    vm: ScheduleViewModel = viewModel(),
+    extras: ExtrasViewModel = viewModel(),
+    diary: DiaryViewModel = viewModel(),
+) {
     // При первом запуске один раз спрашиваем разрешение на уведомления (Android 13+).
     val context = LocalContext.current
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -87,18 +92,20 @@ fun AppRoot(vm: ScheduleViewModel = viewModel(), extras: ExtrasViewModel = viewM
     }
 
     val owner = vm.owner
+    // Смены владельца из профиля один раз переносятся в его дела, дальше он меняет их сам.
+    LaunchedEffect(owner) { owner?.let { diary.seedFor(it) } }
     if (owner == null) {
         AccentTheme(Accents.blend(Accents.Aizat, Accents.Nastya, 0.5f)) {
             OwnerPicker(onPick = { vm.chooseOwner(it) })
         }
     } else {
-        MainPager(vm, extras, owner)
+        MainPager(vm, extras, diary, owner)
     }
 }
 
 /** Две страницы: Айзат слева, Настя справа. Открывается страница владельца телефона. */
 @Composable
-private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, owner: Person) {
+private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: DiaryViewModel, owner: Person) {
     var current by rememberSaveable { mutableStateOf(Tab.Today) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = owner.ordinal) { Person.entries.size }
@@ -173,11 +180,13 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, owner: Per
                     ) { page ->
                         val person = Person.entries[page]
                         PersonTheme(person) {
+                            val isOwner = person == owner
                             when (current) {
-                                Tab.Today -> TodayScreen(vm, extras, person)
-                                Tab.Week -> WeekScreen(vm, extras, person)
+                                Tab.Today -> TodayScreen(vm, extras, diary, person)
+                                Tab.Week -> WeekScreen(vm, extras, diary, person)
+                                Tab.Budget -> BudgetScreen(diary, person, isOwner)
+                                Tab.Deadlines -> DeadlinesScreen(diary, person, isOwner)
                                 Tab.Progress -> ProgressScreen(vm, person)
-                                Tab.Deadlines -> DeadlinesScreen(person)
                             }
                         }
                     }

@@ -37,8 +37,11 @@ object Summaries {
                 }
                 "${pluralLessons(lessons.size)}, первая в ${formatTime(first.start)}$where."
             }
-            items.filterIsInstance<DayItem.WorkItem>().forEach {
+            items.filter { it.isWork }.forEach {
                 lines += "Работа ${formatTime(it.start)}–${formatTime(it.end)}."
+            }
+            items.filterIsInstance<DayItem.EventItem>().filter { !it.isWork }.forEach {
+                lines += "${it.event.displayTitle} ${formatTime(it.start)}–${formatTime(it.end)}."
             }
         }
 

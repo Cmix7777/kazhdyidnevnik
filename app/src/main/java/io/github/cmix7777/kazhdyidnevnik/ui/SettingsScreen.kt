@@ -13,15 +13,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -230,7 +225,7 @@ fun SettingsScreen(
                 ?: "Копий пока не было."
             GlassCard(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Раз в день отметки и настройки сами сохраняются в файл в папке " +
+                    text = "Отметки, свои дела, даты, бюджет и настройки сами сохраняются в файл в папке " +
                         "«Загрузки/${Backups.FOLDER}». Он останется, даже если удалить приложение. " +
                         "После переустановки или на новом телефоне нажми «Восстановить» и выбери этот файл.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -463,22 +458,4 @@ private fun ActionCard(text: String, button: String, onClick: () -> Unit, danger
         )
         PillButton(text = button, onClick = onClick)
     }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TimeDialog(title: String, initial: LocalTime, onDismiss: () -> Unit, onConfirm: (LocalTime) -> Unit) {
-    val state = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute, is24Hour = true)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = { TimePicker(state = state) },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(LocalTime.of(state.hour, state.minute)) }) { Text("Готово") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Отмена") }
-        },
-        containerColor = Palette.CardTop,
-    )
 }
