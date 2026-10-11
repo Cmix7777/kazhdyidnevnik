@@ -10,7 +10,13 @@ import io.github.cmix7777.kazhdyidnevnik.data.Deadline
 import io.github.cmix7777.kazhdyidnevnik.data.Diary
 import io.github.cmix7777.kazhdyidnevnik.data.DiaryRepository
 import io.github.cmix7777.kazhdyidnevnik.data.MoneyEntry
+import io.github.cmix7777.kazhdyidnevnik.data.PartnerEventsRepository
+import io.github.cmix7777.kazhdyidnevnik.data.PartnerShare
 import io.github.cmix7777.kazhdyidnevnik.data.Person
+import io.github.cmix7777.kazhdyidnevnik.data.SharedEvents
+import io.github.cmix7777.kazhdyidnevnik.data.dayItems
+import io.github.cmix7777.kazhdyidnevnik.data.DayItem
+import io.github.cmix7777.kazhdyidnevnik.data.Lesson
 import io.github.cmix7777.kazhdyidnevnik.data.UserEvent
 import io.github.cmix7777.kazhdyidnevnik.notify.ReminderScheduler
 import io.github.cmix7777.kazhdyidnevnik.service.Backups
@@ -25,15 +31,51 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
     var diary by mutableStateOf(Diary())
         private set
 
+    /** Дела второго человека, которыми он поделился (null — ещё нет). */
+    var partnerShare by mutableStateOf<SharedEvents?>(null)
+        private set
+
     init {
         DiaryRepository.init(app.filesDir)
+        PartnerEventsRepository.init(app.filesDir)
         viewModelScope.launch {
             DiaryRepository.state.collect { diary = it }
         }
+        viewModelScope.launch {
+            PartnerEventsRepository.state.collect { partnerShare = it }
+        }
     }
 
-    /** Перенести смены владельца из профиля в его дела (один раз). */
-    fun seedFor(owner: Person) = change { it.seededWithShifts(owner) }
+    /** Пары, смены и дела [person] за день: свои дела — из дневника, чужие — если ими поделились. */
+    fun dayItems(person: Person, isOwner: Boolean, date: LocalDate, lessons: List<Lesson>): List<DayItem> {
+        val shared = partnerShare?.takeIf { it.from == person }
+        val events = if (isOwner) diary.events else shared?.events.orEmpty()
+        return person.dayItems(date, lessons, isOwner, events, eventsKnown = isOwner || shared != null)
+    }
+
+    /** Сообщение с моими делами, чтобы отправить второму человеку. */
+    fun shareMessage(owner: Person): String {
+        val shared = SharedEvents(owner, System.currentTimeMillis(), PartnerShare.relevant(diary.events, LocalDate.now()))
+        return PartnerShare.message(owner, shared)
+    }
+
+    /** Результат вставки чужих дел. */
+    enum class ImportResult { Done, NoCode, OwnCode }
+
+    /** Вставить дела второго человека из скопированного сообщения. */
+    fun importPartner(text: String, owner: Person): ImportResult {
+        val shared = PartnerShare.decode(text) ?: return ImportResult.NoCode
+        if (shared.from == owner) return ImportResult.OwnCode
+        val app = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) {
+            PartnerEventsRepository.save(app.filesDir, shared)
+            ReminderScheduler.scheduleNext(app)
+        }
+        return ImportResult.Done
+    }
+
+    /** Перенести смены и постоянные дела владельца из профиля в его дела (один раз). */
+    fun seedFor(owner: Person) = change { it.withSeeds(owner) }
 
     fun saveEvent(event: UserEvent) = change { it.withEvent(event) }
 

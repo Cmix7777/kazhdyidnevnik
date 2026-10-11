@@ -48,7 +48,8 @@ class WeatherTest {
     fun tripsSkipOnlineLessons() {
         val thursdayTrips = WeatherAdvice.trips(items(thursdayDate))
         assertEquals(listOf("Выход", "Обратно"), thursdayTrips.map { it.label })
-        assertEquals(LocalTime.of(7, 20), thursdayTrips[0].time)
+        // Работа с 8:00: до работы Айзат выходит за 10 минут.
+        assertEquals(LocalTime.of(7, 50), thursdayTrips[0].time)
         assertEquals(LocalTime.of(18, 50), thursdayTrips[1].time)
         // В пятницу последняя пара онлайн, поэтому домой — после смены.
         assertEquals(LocalTime.of(15, 10), WeatherAdvice.trips(items(fridayDate))[1].time)
@@ -68,7 +69,7 @@ class WeatherTest {
         val trips = WeatherAdvice.tripWeather(thursdayDate, items(thursdayDate), forecast)
         assertEquals(2, trips.size)
         assertEquals("Тёплая куртка и шапка.", WeatherAdvice.advice(trips, thursday))
-        assertEquals("Выход в 7:20: +1°, ощущается −4°, пасмурно", WeatherAdvice.tripLine(trips[0]))
+        assertEquals("Выход в 7:50: +2°, ощущается −3°, пасмурно", WeatherAdvice.tripLine(trips[0]))
     }
 
     @Test
@@ -92,7 +93,7 @@ class WeatherTest {
     fun tomorrowNotification() {
         val note = WeatherAdvice.tomorrowNote(fridayDate, items(fridayDate), forecast)!!
         assertEquals("Завтра: сильный снег, гололёд, ветер до 16 м/с", note.title)
-        assertTrue(note.text, note.text.contains("Выход в 7:20: −1°, ощущается −7°, снег, осадки 80%."))
+        assertTrue(note.text, note.text.contains("Выход в 7:50: −1°, ощущается −7°, снег, осадки 80%."))
         assertTrue(note.text, note.text.contains("нужен капюшон"))
         assertNull(WeatherAdvice.tomorrowNote(LocalDate.of(2026, 10, 20), emptyList(), forecast))
     }
@@ -102,7 +103,7 @@ class WeatherTest {
         val dayItems = items(thursdayDate)
         val text = Summaries.morning(thursdayDate, dayItems, PlanGenerator.planFor(thursdayDate, dayItems), forecast)
         assertTrue(text, text.contains("Погода: −1°…+5°, пасмурно."))
-        assertTrue(text, text.contains("Выход в 7:20: +1°, ощущается −4°, пасмурно."))
+        assertTrue(text, text.contains("Выход в 7:50: +2°, ощущается −3°, пасмурно."))
         assertTrue(text, text.contains("Тёплая куртка и шапка."))
         assertTrue(text, text.contains("Внимание: резкое похолодание."))
     }

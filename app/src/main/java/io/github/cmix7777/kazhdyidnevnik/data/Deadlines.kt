@@ -19,6 +19,11 @@ data class Deadline(
 object Deadlines {
     val default: List<Deadline> = listOf(
         Deadline(
+            title = "Проверка по тестированию",
+            date = LocalDate.of(2026, 10, 12),
+            note = "пары в 10:00 и 12:10, онлайн",
+        ),
+        Deadline(
             title = "Сдача сайта на C#",
             date = LocalDate.of(2026, 10, 31),
             approximate = "примерно конец октября",

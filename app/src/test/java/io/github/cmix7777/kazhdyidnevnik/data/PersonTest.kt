@@ -18,8 +18,8 @@ class PersonTest {
     fun profiles() {
         assertEquals("Доброе утро, господин Айзат", Person.AIZAT.profile.morningTitle)
         assertEquals("Доброе утро, Анастасия", nastya.morningTitle)
-        assertEquals(WeatherAdvice.LEAVE_BEFORE_MIN, Person.AIZAT.profile.leaveBeforeMinutes)
-        assertEquals(50L, nastya.leaveBeforeMinutes)
+        assertEquals(LeaveTimes(college = 40, work = 10), Person.AIZAT.profile.leave)
+        assertEquals(LeaveTimes(college = 50, work = 18), nastya.leave)
         assertFalse(nastya.hasPlan)
         assertTrue(nastya.deadlines.isEmpty())
         assertEquals(Person.NASTYA, Person.AIZAT.partner)
@@ -39,9 +39,9 @@ class PersonTest {
     }
 
     @Test
-    fun nastyaLeavesFiftyMinutesEarly() {
-        val trips = WeatherAdvice.trips(buildDay(friday, emptyList(), nastya.shifts), nastya.leaveBeforeMinutes)
-        assertEquals(LocalTime.of(15, 40), trips[0].time)
+    fun nastyaLeavesEighteenMinutesBeforeWork() {
+        val trips = WeatherAdvice.trips(buildDay(friday, emptyList(), nastya.shifts), nastya.leave)
+        assertEquals(LocalTime.of(16, 12), trips[0].time)
         assertEquals(LocalTime.of(21, 40), trips[1].time)
     }
 

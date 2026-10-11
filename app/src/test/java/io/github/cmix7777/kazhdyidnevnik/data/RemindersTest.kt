@@ -17,13 +17,24 @@ class RemindersTest {
 
     private fun day(date: LocalDate) = buildDay(date, lessons, WorkSchedule.default)
 
+    private val nextWeekLessons = TimeoParser.parse(
+        requireNotNull(javaClass.getResource("/timeo/week-2026-10-12.html")).readText(),
+        LocalDate.of(2026, 10, 12),
+    )
+
     private val wednesday = LocalDate.of(2026, 10, 7)
-    private val thursday = LocalDate.of(2026, 10, 8)
+    // Четверг следующей недели: полный план учёбы уже идёт.
+    private val thursday = LocalDate.of(2026, 10, 15)
+
+    private fun thursdayItems() = buildDay(thursday, nextWeekLessons, WorkSchedule.default)
 
     @Test
     fun planStartsOnFirstDay() {
         assertTrue(PlanGenerator.planFor(wednesday, day(wednesday)).isEmpty())
-        assertFalse(PlanGenerator.planFor(thursday, day(thursday)).isEmpty())
+        assertTrue(PlanGenerator.planFor(LocalDate.of(2026, 10, 8), day(LocalDate.of(2026, 10, 8))).isEmpty())
+        val monday = LocalDate.of(2026, 10, 12)
+        assertFalse(PlanGenerator.planFor(monday, buildDay(monday, nextWeekLessons, WorkSchedule.default)).isEmpty())
+        assertFalse(PlanGenerator.planFor(thursday, thursdayItems()).isEmpty())
     }
 
     @Test
@@ -76,7 +87,7 @@ class RemindersTest {
 
     @Test
     fun morningSummaryMentionsWorkAndStudy() {
-        val items = day(thursday)
+        val items = thursdayItems()
         val text = Summaries.morning(thursday, items, PlanGenerator.planFor(thursday, items))
         assertTrue(text, text.contains("Работа 8:00–13:00."))
         assertTrue(text, text.contains("Учёба: "))
@@ -99,7 +110,7 @@ class RemindersTest {
 
     @Test
     fun eveningListsWhatIsLeft() {
-        val plan = PlanGenerator.planFor(thursday, day(thursday))
+        val plan = PlanGenerator.planFor(thursday, thursdayItems())
         val text = Summaries.evening(thursday, plan, emptyMap())
         assertTrue(text.orEmpty(), text.orEmpty().startsWith("Отмечено 0 из ${plan.size}."))
         assertTrue(text.orEmpty(), text.orEmpty().contains("Билеты ПДД сегодня ещё не решены."))
@@ -110,7 +121,7 @@ class RemindersTest {
 
     @Test
     fun eveningMentionsStreak() {
-        val plan = PlanGenerator.planFor(thursday, day(thursday))
+        val plan = PlanGenerator.planFor(thursday, thursdayItems())
         val done = mapOf(
             progressKey(thursday.minusDays(1), PlanKind.PDD) to 25,
             progressKey(thursday.minusDays(2), PlanKind.PDD) to 25,

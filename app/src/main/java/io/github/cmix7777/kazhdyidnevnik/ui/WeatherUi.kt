@@ -36,6 +36,7 @@ import io.github.cmix7777.kazhdyidnevnik.data.DayItem
 import io.github.cmix7777.kazhdyidnevnik.data.DayWeather
 import io.github.cmix7777.kazhdyidnevnik.data.Forecast
 import io.github.cmix7777.kazhdyidnevnik.data.HourWeather
+import io.github.cmix7777.kazhdyidnevnik.data.LeaveTimes
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherText
 import io.github.cmix7777.kazhdyidnevnik.formatStamp
@@ -46,11 +47,33 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-private val SunColor = Color(0xFFFFC857)
-private val CloudColor = Color(0xFFE6E0F2)
-private val MoonColor = Color(0xFFD9CCFF)
-private val RainCloudColor = Color(0xFFB4AACB)
-private val RainColor = Color(0xFF7DD3FC)
+/** Цвета значка погоды: ночью светлые облака на тёмном, днём — серо-голубые на светлом. */
+private class WeatherColors(
+    val sun: Color,
+    val cloud: Color,
+    val moon: Color,
+    val rainCloud: Color,
+    val rain: Color,
+    val snow: Color,
+)
+
+private val DarkWeatherColors = WeatherColors(
+    sun = Color(0xFFFFC857),
+    cloud = Color(0xFFE6E0F2),
+    moon = Color(0xFFD9CCFF),
+    rainCloud = Color(0xFFB4AACB),
+    rain = Color(0xFF7DD3FC),
+    snow = Color.White,
+)
+
+private val LightWeatherColors = WeatherColors(
+    sun = Color(0xFFF5A623),
+    cloud = Color(0xFFA9B6D3),
+    moon = Color(0xFF8E7BD8),
+    rainCloud = Color(0xFF7D8BAA),
+    rain = Color(0xFF3B9BE0),
+    snow = Color(0xFF8FB8E8),
+)
 
 /** Карточка погоды на «Сегодня»: сейчас, по часам, погода в дорогу и что надеть. */
 @OptIn(ExperimentalLayoutApi::class)
@@ -65,7 +88,7 @@ fun WeatherCard(
     now: LocalDateTime,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
-    leaveBefore: Long = WeatherAdvice.LEAVE_BEFORE_MIN,
+    leave: LeaveTimes = LeaveTimes.Aizat,
 ) {
     val day = forecast?.day(date)
     if (forecast == null || day == null) {
@@ -93,7 +116,7 @@ fun WeatherCard(
     val isDay = current?.isDay ?: nowHour?.isDay ?: true
     val wind = current?.wind ?: nowHour?.wind
     val gusts = current?.gusts ?: nowHour?.gusts
-    val trips = WeatherAdvice.tripWeather(date, items, forecast, leaveBefore)
+    val trips = WeatherAdvice.tripWeather(date, items, forecast, leave)
     val advice = WeatherAdvice.advice(trips, day)
     val alerts = WeatherAdvice.alerts(day, forecast.day(date.minusDays(1)))
 
@@ -249,7 +272,7 @@ private fun HourlyStrip(hours: List<HourWeather>) {
                 Text(
                     text = if (chance >= 10) "$chance%" else " ",
                     style = MaterialTheme.typography.labelSmall,
-                    color = RainColor,
+                    color = if (LocalDark.current) DarkWeatherColors.rain else LightWeatherColors.rain,
                 )
             }
         }
@@ -267,7 +290,7 @@ fun AlertPill(text: String, modifier: Modifier = Modifier) {
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text = text, style = MaterialTheme.typography.labelMedium, color = Color(0xFFFFB3C0))
+        Text(text = text, style = MaterialTheme.typography.labelMedium, color = Palette.DangerText)
     }
 }
 
@@ -296,31 +319,32 @@ fun WeatherPill(day: DayWeather, modifier: Modifier = Modifier) {
 /** Значок погоды, нарисованный кодом (без картинок): солнце, луна, облака, дождь, снег, гроза, туман. */
 @Composable
 fun WeatherIcon(code: Int, isDay: Boolean, modifier: Modifier = Modifier) {
+    val colors = if (LocalDark.current) DarkWeatherColors else LightWeatherColors
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
         when (code) {
-            0 -> if (isDay) drawSun(Offset(w * 0.5f, h * 0.5f), w * 0.2f) else drawMoon(Offset(w * 0.5f, h * 0.5f), w * 0.3f)
+            0 -> if (isDay) drawSun(colors, Offset(w * 0.5f, h * 0.5f), w * 0.2f) else drawMoon(colors, Offset(w * 0.5f, h * 0.5f), w * 0.3f)
             1, 2 -> {
-                if (isDay) drawSun(Offset(w * 0.36f, h * 0.36f), w * 0.15f) else drawMoon(Offset(w * 0.38f, h * 0.36f), w * 0.22f)
-                drawCloud(w * 0.2f, h * 0.38f, w * 0.72f, h * 0.44f, CloudColor)
+                if (isDay) drawSun(colors, Offset(w * 0.36f, h * 0.36f), w * 0.15f) else drawMoon(colors, Offset(w * 0.38f, h * 0.36f), w * 0.22f)
+                drawCloud(w * 0.2f, h * 0.38f, w * 0.72f, h * 0.44f, colors.cloud)
             }
-            3 -> drawCloud(w * 0.1f, h * 0.24f, w * 0.8f, h * 0.5f, CloudColor)
+            3 -> drawCloud(w * 0.1f, h * 0.24f, w * 0.8f, h * 0.5f, colors.cloud)
             45, 48 -> {
-                drawCloud(w * 0.12f, h * 0.12f, w * 0.76f, h * 0.42f, CloudColor.copy(alpha = 0.85f))
+                drawCloud(w * 0.12f, h * 0.12f, w * 0.76f, h * 0.42f, colors.cloud.copy(alpha = 0.85f))
                 for (i in 0..1) {
                     val y = h * (0.66f + i * 0.16f)
-                    drawLine(CloudColor, Offset(w * 0.16f, y), Offset(w * 0.84f, y), strokeWidth = h * 0.07f, cap = StrokeCap.Round)
+                    drawLine(colors.cloud, Offset(w * 0.16f, y), Offset(w * 0.84f, y), strokeWidth = h * 0.07f, cap = StrokeCap.Round)
                 }
             }
             in 71..77, 85, 86 -> {
-                drawCloud(w * 0.1f, h * 0.08f, w * 0.8f, h * 0.48f, CloudColor)
+                drawCloud(w * 0.1f, h * 0.08f, w * 0.8f, h * 0.48f, colors.cloud)
                 listOf(0.3f, 0.5f, 0.7f).forEachIndexed { i, x ->
-                    drawCircle(Color.White, radius = w * 0.055f, center = Offset(w * x, h * (0.72f + (i % 2) * 0.12f)))
+                    drawCircle(colors.snow, radius = w * 0.055f, center = Offset(w * x, h * (0.72f + (i % 2) * 0.12f)))
                 }
             }
             in 95..99 -> {
-                drawCloud(w * 0.1f, h * 0.08f, w * 0.8f, h * 0.48f, RainCloudColor)
+                drawCloud(w * 0.1f, h * 0.08f, w * 0.8f, h * 0.48f, colors.rainCloud)
                 val bolt = Path().apply {
                     moveTo(w * 0.52f, h * 0.5f)
                     lineTo(w * 0.38f, h * 0.74f)
@@ -331,13 +355,13 @@ fun WeatherIcon(code: Int, isDay: Boolean, modifier: Modifier = Modifier) {
                     lineTo(w * 0.6f, h * 0.5f)
                     close()
                 }
-                drawPath(bolt, SunColor)
+                drawPath(bolt, colors.sun)
             }
             in 51..67, in 80..82 -> {
-                drawCloud(w * 0.1f, h * 0.08f, w * 0.8f, h * 0.48f, RainCloudColor)
+                drawCloud(w * 0.1f, h * 0.08f, w * 0.8f, h * 0.48f, colors.rainCloud)
                 listOf(0.32f, 0.52f, 0.72f).forEach { x ->
                     drawLine(
-                        RainColor,
+                        colors.rain,
                         Offset(w * x, h * 0.68f),
                         Offset(w * (x - 0.08f), h * 0.9f),
                         strokeWidth = w * 0.07f,
@@ -345,19 +369,19 @@ fun WeatherIcon(code: Int, isDay: Boolean, modifier: Modifier = Modifier) {
                     )
                 }
             }
-            else -> drawCloud(w * 0.1f, h * 0.24f, w * 0.8f, h * 0.5f, CloudColor)
+            else -> drawCloud(w * 0.1f, h * 0.24f, w * 0.8f, h * 0.5f, colors.cloud)
         }
     }
 }
 
-private fun DrawScope.drawSun(center: Offset, radius: Float) {
-    drawCircle(SunColor, radius = radius, center = center)
+private fun DrawScope.drawSun(colors: WeatherColors, center: Offset, radius: Float) {
+    drawCircle(colors.sun, radius = radius, center = center)
     for (i in 0 until 8) {
         val angle = Math.toRadians(i * 45.0)
         val dx = cos(angle).toFloat()
         val dy = sin(angle).toFloat()
         drawLine(
-            SunColor,
+            colors.sun,
             Offset(center.x + dx * radius * 1.45f, center.y + dy * radius * 1.45f),
             Offset(center.x + dx * radius * 1.95f, center.y + dy * radius * 1.95f),
             strokeWidth = radius * 0.3f,
@@ -366,11 +390,11 @@ private fun DrawScope.drawSun(center: Offset, radius: Float) {
     }
 }
 
-private fun DrawScope.drawMoon(center: Offset, radius: Float) {
+private fun DrawScope.drawMoon(colors: WeatherColors, center: Offset, radius: Float) {
     val outer = Path().apply { addOval(Rect(center, radius)) }
     val inner = Path().apply { addOval(Rect(Offset(center.x + radius * 0.5f, center.y - radius * 0.35f), radius * 0.85f)) }
     val crescent = Path().apply { op(outer, inner, PathOperation.Difference) }
-    drawPath(crescent, MoonColor)
+    drawPath(crescent, colors.moon)
 }
 
 private fun DrawScope.drawCloud(left: Float, top: Float, width: Float, height: Float, color: Color) {

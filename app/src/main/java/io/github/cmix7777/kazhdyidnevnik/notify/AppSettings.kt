@@ -6,6 +6,7 @@ import io.github.cmix7777.kazhdyidnevnik.data.PartnerAlerts
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.Release
 import io.github.cmix7777.kazhdyidnevnik.data.ReminderSettings
+import io.github.cmix7777.kazhdyidnevnik.data.ThemeMode
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -57,6 +58,11 @@ class AppSettings(context: Context) {
         get() = Person.fromId(prefs.getString(OWNER, null))
             ?: if (prefs.contains(NOTIFICATIONS_ASKED) || prefs.contains(LAST_FIRED)) Person.AIZAT else null
         set(value) = prefs.edit { putString(OWNER, value?.id) }
+
+    /** Светлая, тёмная или как в системе. Это настройка телефона, в резервную копию не входит. */
+    var themeMode: ThemeMode
+        get() = ThemeMode.fromId(prefs.getString(THEME, null))
+        set(value) = prefs.edit { putString(THEME, value.id) }
 
     /** До какого момента напоминания уже показаны. */
     var lastFiredMillis: Long
@@ -161,6 +167,7 @@ class AppSettings(context: Context) {
         const val PARTNER_STUDY = "partnerStudy"
         const val PARTNER_WEATHER = "partnerWeather"
         const val OWNER = "owner"
+        const val THEME = "theme"
         const val LAST_FIRED = "lastFired"
         const val NEXT_ALARM = "nextAlarm"
         const val NOTIFICATIONS_ASKED = "notificationsAsked"

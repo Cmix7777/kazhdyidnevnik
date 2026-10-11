@@ -91,11 +91,12 @@ fun AppRoot(
         }
     }
 
+    val dark = LocalDark.current
     val owner = vm.owner
     // Смены владельца из профиля один раз переносятся в его дела, дальше он меняет их сам.
     LaunchedEffect(owner) { owner?.let { diary.seedFor(it) } }
     if (owner == null) {
-        AccentTheme(Accents.blend(Accents.Aizat, Accents.Nastya, 0.5f)) {
+        AccentTheme(Accents.blend(Accents.of(Person.AIZAT, dark), Accents.of(Person.NASTYA, dark), 0.5f)) {
             OwnerPicker(onPick = { vm.chooseOwner(it) })
         }
     } else {
@@ -106,6 +107,7 @@ fun AppRoot(
 /** Две страницы: Айзат слева, Настя справа. Открывается страница владельца телефона. */
 @Composable
 private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: DiaryViewModel, owner: Person) {
+    val dark = LocalDark.current
     var current by rememberSaveable { mutableStateOf(Tab.Today) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     val pagerState = rememberPagerState(initialPage = owner.ordinal) { Person.entries.size }
@@ -114,7 +116,11 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
         derivedStateOf { (pagerState.currentPage + pagerState.currentPageOffsetFraction).coerceIn(0f, 1f) }
     }
     // Рамка (фон, верх и низ) плавно перетекает из палитры Айзата в палитру Насти при свайпе.
-    val chrome = if (settingsOpen) Accents.of(owner) else Accents.blend(Accents.Aizat, Accents.Nastya, position)
+    val chrome = if (settingsOpen) {
+        Accents.of(owner, dark)
+    } else {
+        Accents.blend(Accents.of(Person.AIZAT, dark), Accents.of(Person.NASTYA, dark), position)
+    }
 
     AccentTheme(chrome) {
         GlowBackground {
@@ -131,10 +137,11 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                     }
                 },
                 bottomBar = {
+                    val navLine = Palette.Border
                     NavigationBar(
                         modifier = Modifier.drawBehind {
                             drawLine(
-                                color = Color(0x17FFFFFF),
+                                color = navLine,
                                 start = Offset(0f, 0f),
                                 end = Offset(size.width, 0f),
                                 strokeWidth = 1.dp.toPx(),
@@ -153,7 +160,7 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                                 icon = { Icon(painterResource(tab.icon), contentDescription = null) },
                                 label = { Text(tab.title, style = MaterialTheme.typography.labelMedium) },
                                 colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = Color.White,
+                                    selectedIconColor = Palette.NavSelected,
                                     selectedTextColor = Palette.Lavender,
                                     indicatorColor = Palette.Violet.copy(alpha = 0.3f),
                                     unselectedIconColor = Palette.TextFaint,

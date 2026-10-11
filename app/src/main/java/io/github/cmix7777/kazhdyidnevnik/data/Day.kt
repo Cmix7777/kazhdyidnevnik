@@ -61,15 +61,34 @@ sealed interface DayItem {
         override val end: LocalTime get() = shift.end
     }
 
-    data class EventItem(val event: UserEvent, val date: LocalDate) : DayItem {
-        override val start: LocalTime get() = event.start
-        override val end: LocalTime get() = event.end
+    /**
+     * Своё дело в день [date]. Дело через полночь попадает в два дня: вечером до конца суток
+     * и утром следующего дня ([continued]) с 00:00 до конца дела.
+     */
+    data class EventItem(val event: UserEvent, val date: LocalDate, val continued: Boolean = false) : DayItem {
+        /** День, в который дело началось: у продолжения это вчера. */
+        val startDate: LocalDate get() = if (continued) date.minusDays(1) else date
+
+        override val start: LocalTime get() = if (continued) LocalTime.MIDNIGHT else event.start
+        override val end: LocalTime get() = if (event.crossesMidnight && !continued) LAST_MINUTE else event.end
+
+        companion object {
+            private val LAST_MINUTE: LocalTime = LocalTime.of(23, 59)
+        }
     }
 }
 
 /** Работа: смена из графика или своё дело «Работа». */
 val DayItem.isWork: Boolean
     get() = this is DayItem.WorkItem || (this is DayItem.EventItem && event.kind == EventKind.WORK)
+
+/** Это продолжение вчерашнего дела через полночь. */
+val DayItem.isContinuation: Boolean
+    get() = this is DayItem.EventItem && continued
+
+/** Конец, как его показывать людям: у дела через полночь это настоящее время конца, например 02:00. */
+val DayItem.shownEnd: java.time.LocalTime
+    get() = if (this is DayItem.EventItem) event.end else end
 
 /** Пары, смены и свои дела за день, по времени начала. */
 fun buildDay(
@@ -80,6 +99,13 @@ fun buildDay(
 ): List<DayItem> {
     val lessonItems = lessons.filter { it.date == date }.map { DayItem.LessonItem(it) }
     val workItems = shifts.filter { it.appliesTo(date) }.map { DayItem.WorkItem(it) }
-    val eventItems = events.filter { it.occursOn(date) }.map { DayItem.EventItem(it, date) }
+    val eventItems = events.flatMap { event ->
+        buildList {
+            if (event.occursOn(date)) add(DayItem.EventItem(event, date))
+            if (event.crossesMidnight && event.occursOn(date.minusDays(1))) {
+                add(DayItem.EventItem(event, date, continued = true))
+            }
+        }
+    }
     return (lessonItems + workItems + eventItems).sortedBy { it.start }
 }

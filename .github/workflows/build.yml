@@ -49,9 +49,11 @@ jobs:
           NOTES: ${{ github.event.head_commit.message }}
         run: |
           cp app/build/outputs/apk/release/app-release.apk kazhdyidnevnik.apk
+          # В описание версии не попадают служебные строки об авторстве коммита.
+          CLEAN=$(printf '%s\n' "$NOTES" | grep -v -e '^Co-Authored-By:' -e '^Claude-Session:' || true)
           gh release create "v1.0.${VERSION_CODE}" kazhdyidnevnik.apk \
             --title "Версия 1.0.${VERSION_CODE}" \
-            --notes "${NOTES:-Новая версия}"
+            --notes "${CLEAN:-Новая версия}"
 
       - name: Отчёт о сборке
         if: always()

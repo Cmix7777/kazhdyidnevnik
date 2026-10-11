@@ -227,7 +227,9 @@ fun EventEditor(
     var remind by remember { mutableStateOf(initial?.remindBefore) }
     var note by remember { mutableStateOf(initial?.note.orEmpty()) }
     var picking by remember { mutableStateOf<Pick?>(null) }
-    val valid = end.isAfter(start)
+    // Конец раньше начала — дело через полночь (например, с 23:00 до 02:00): закончится на следующий день.
+    val valid = end != start
+    val overnight = end.isBefore(start)
 
     EditorDialog(title = if (initial == null) "Новое дело" else "Дело", onDismiss = onDismiss) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -244,7 +246,13 @@ fun EventEditor(
             GhostButton(text = "до ${formatTime(end)}", onClick = { picking = Pick.End }, small = true)
         }
         if (!valid) {
-            Text(text = "Конец должен быть позже начала.", style = MaterialTheme.typography.bodySmall, color = Palette.Danger)
+            Text(text = "Начало и конец не могут совпадать.", style = MaterialTheme.typography.bodySmall, color = Palette.Danger)
+        } else if (overnight) {
+            Text(
+                text = "Закончится на следующий день, в ${formatTime(end)}.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Palette.TextMuted,
+            )
         }
 
         EditorSwitch(
@@ -301,10 +309,9 @@ fun EventEditor(
         })
         Pick.Start -> TimeDialog(title = "Начало", initial = start, onDismiss = { picking = null }, onConfirm = { time ->
             // Длительность сохраняется: сдвигаем и конец.
-            val minutes = Duration.between(start, end).toMinutes().coerceAtLeast(30)
-            val newEnd = time.plusMinutes(minutes)
+            val minutes = Duration.between(start, end).toMinutes().let { if (it <= 0) it + 24 * 60 else it }.coerceAtLeast(30)
             start = time
-            end = if (newEnd.isAfter(time)) newEnd else LocalTime.of(23, 59)
+            end = time.plusMinutes(minutes)
             picking = null
         })
         Pick.End -> TimeDialog(title = "Конец", initial = end, onDismiss = { picking = null }, onConfirm = {

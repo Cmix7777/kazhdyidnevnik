@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.BuildConfig
 import io.github.cmix7777.kazhdyidnevnik.R
@@ -31,7 +32,6 @@ import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
 import io.github.cmix7777.kazhdyidnevnik.data.Practice
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherText
-import io.github.cmix7777.kazhdyidnevnik.data.dayItems
 import io.github.cmix7777.kazhdyidnevnik.data.isWork
 import io.github.cmix7777.kazhdyidnevnik.data.formatMinutes
 import io.github.cmix7777.kazhdyidnevnik.data.pluralLessons
@@ -40,6 +40,9 @@ import io.github.cmix7777.kazhdyidnevnik.formatDate
 import io.github.cmix7777.kazhdyidnevnik.formatDayTitle
 import io.github.cmix7777.kazhdyidnevnik.formatStamp
 import io.github.cmix7777.kazhdyidnevnik.formatTime
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -61,12 +64,12 @@ fun TodayScreen(
 
     val todayWeek = schedule.weeks[weekStartFor(today)]
     val tomorrowWeek = schedule.weeks[weekStartFor(tomorrow)]
-    val events = diary.diary.events
-    val todayItems = person.dayItems(today, todayWeek?.lessons.orEmpty(), isOwner, events)
-    val tomorrowItems = person.dayItems(tomorrow, tomorrowWeek?.lessons.orEmpty(), isOwner, events)
+    val todayItems = diary.dayItems(person, isOwner, today, todayWeek?.lessons.orEmpty())
+    val tomorrowItems = diary.dayItems(person, isOwner, tomorrow, tomorrowWeek?.lessons.orEmpty())
     var editing by remember { mutableStateOf<EventEdit?>(null) }
     val openEvent: (DayItem) -> (() -> Unit)? = { item ->
-        (item as? DayItem.EventItem)?.let { event -> { editing = EventEdit(event.event, event.date) } }
+        // Редактировать можно только свои дела; чужие, которыми поделились, только видны.
+        (item as? DayItem.EventItem)?.takeIf { isOwner }?.let { event -> { editing = EventEdit(event.event, event.startDate) } }
     }
     val refreshing = vm.isLoading(person, 0)
     val forecast = extras.forecast
@@ -127,7 +130,7 @@ fun TodayScreen(
                     items = todayItems,
                     now = now,
                     onRetry = { extras.refreshWeather() },
-                    leaveBefore = profile.leaveBeforeMinutes,
+                    leave = profile.leave,
                 )
             }
 
@@ -142,16 +145,34 @@ fun TodayScreen(
             items(todayItems) { DayItemCard(it, now.toLocalTime(), onClick = openEvent(it)) }
             if (isOwner) {
                 item {
-                    GhostButton(
-                        text = "+ Добавить дело",
-                        onClick = { editing = EventEdit(null, today) },
-                        small = true,
-                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        GhostButton(
+                            text = "+ Добавить дело",
+                            onClick = { editing = EventEdit(null, today) },
+                            small = true,
+                        )
+                        val context = LocalContext.current
+                        GhostButton(
+                            text = "Поделиться делами с ${person.partner.shortName}",
+                            onClick = { shareText(context, diary.shareMessage(person)) },
+                            small = true,
+                        )
+                    }
                 }
+            } else {
+                item { PartnerEventsCard(person = person, owner = vm.owner, diary = diary) }
             }
 
             // План учёбы: только у владельца телефона и только если план есть.
-            if (showPlan && today.isBefore(PlanGenerator.firstDay)) {
+            val earlyPlan = if (showPlan && todayWeek != null && today.isBefore(PlanGenerator.firstDay)) {
+                PlanGenerator.planFor(today, todayItems)
+            } else {
+                emptyList()
+            }
+            if (showPlan && today.isBefore(PlanGenerator.firstDay) && earlyPlan.isEmpty()) {
                 val note = if (PlanGenerator.firstDay == tomorrow) {
                     "План учёбы начинается завтра, он показан ниже."
                 } else {
@@ -173,6 +194,11 @@ fun TodayScreen(
                         },
                         badge = if (plan.isNotEmpty() && doneMinutes == totalMinutes) "всё сделано" else null,
                     )
+                }
+                if (today.isBefore(PlanGenerator.firstDay)) {
+                    item {
+                        InfoNote("Завтра проверка по тестированию, поэтому сегодня только срочная подготовка к ней. Полный план начнётся завтра.")
+                    }
                 }
                 if (plan.isEmpty()) {
                     item { InfoNote("Сегодня свободного времени почти нет, отдыхай.") }
@@ -204,7 +230,7 @@ fun TodayScreen(
                         WeatherAdvice.alerts(tomorrowWeather, forecast.day(today)).forEach { AlertPill(it) }
                     }
                 }
-                val tomorrowTrips = WeatherAdvice.tripWeather(tomorrow, tomorrowItems, forecast, profile.leaveBeforeMinutes)
+                val tomorrowTrips = WeatherAdvice.tripWeather(tomorrow, tomorrowItems, forecast, profile.leave)
                 WeatherAdvice.advice(tomorrowTrips, tomorrowWeather)?.let { advice ->
                     val leave = tomorrowTrips.first()
                     item {
@@ -293,4 +319,56 @@ private fun scheduleAccent(items: List<DayItem>): String? {
 private fun footer(fetchedAt: Long?, source: String): String {
     val updated = fetchedAt?.let { "расписание обновлено ${formatStamp(it)}" } ?: "расписание ещё не обновлялось"
     return "Версия ${BuildConfig.VERSION_NAME} · $updated · $source"
+}
+
+/** Отправить текст в любой мессенджер через системное окно «Поделиться». */
+private fun shareText(context: Context, text: String) {
+    val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+    context.startActivity(Intent.createChooser(send, "Поделиться делами").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+}
+
+/** Текст из буфера обмена или пустая строка. */
+private fun clipboardText(context: Context): String {
+    val manager = context.getSystemService(ClipboardManager::class.java) ?: return ""
+    return manager.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
+}
+
+/**
+ * Дела второго человека на странице, которая не его: они приходят только если он сам ими поделился
+ * (сообщением, которое здесь вставляют). Сервера нет, поэтому это снимок на момент отправки.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PartnerEventsCard(person: Person, owner: Person?, diary: DiaryViewModel) {
+    val context = LocalContext.current
+    var message by remember { mutableStateOf<String?>(null) }
+    val shared = diary.partnerShare?.takeIf { it.from == person }
+    GlassCard(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = if (shared == null) {
+                "Дела ${person.genitive} здесь появятся, когда ${person.shortName} ими поделится: " +
+                    "пусть нажмёт «Поделиться делами» на своей странице и отправит сообщение тебе. " +
+                    "Потом скопируй его и нажми «Вставить дела»."
+            } else {
+                "Дела ${person.genitive} от ${formatStamp(shared.at)}. Это снимок: чтобы обновить, " +
+                    "пусть ${person.shortName} поделится ещё раз."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = Palette.TextMuted,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            GhostButton(
+                text = "Вставить дела",
+                onClick = {
+                    message = when (diary.importPartner(clipboardText(context), owner ?: person.partner)) {
+                        DiaryViewModel.ImportResult.Done -> "Готово, дела ${person.genitive} обновлены."
+                        DiaryViewModel.ImportResult.NoCode -> "В буфере нет дел. Скопируй всё сообщение целиком."
+                        DiaryViewModel.ImportResult.OwnCode -> "Это твои собственные дела, нужны дела ${person.genitive}."
+                    }
+                },
+                small = true,
+            )
+        }
+        message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall, color = Palette.Lavender) }
+    }
 }

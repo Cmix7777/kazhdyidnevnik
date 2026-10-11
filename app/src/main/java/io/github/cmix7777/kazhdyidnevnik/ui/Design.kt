@@ -47,6 +47,7 @@ import io.github.cmix7777.kazhdyidnevnik.R
 @Composable
 fun GlowBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
     val accent = LocalAccent.current
+    val ring = Palette.Ring
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -77,7 +78,7 @@ fun GlowBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.
                 val rings = Offset(size.width * 0.5f, size.height * 0.42f)
                 for (i in 1..5) {
                     drawCircle(
-                        color = Color.White.copy(alpha = 0.022f),
+                        color = ring,
                         radius = size.width * 0.22f * i,
                         center = rings,
                         style = Stroke(width = 1.dp.toPx()),
@@ -104,7 +105,7 @@ fun GlassCard(
         CardTone.Highlight -> Brush.linearGradient(
             listOf(LocalAccent.current.highlightTop.copy(alpha = 0.78f), LocalAccent.current.highlightBottom.copy(alpha = 0.62f)),
         )
-        CardTone.Danger -> Brush.verticalGradient(listOf(Color(0xFF3A1120), Color(0xFF240A14)))
+        CardTone.Danger -> Brush.verticalGradient(listOf(Palette.DangerCardTop, Palette.DangerCardBottom))
         CardTone.Dim -> Brush.verticalGradient(
             listOf(Palette.CardTop.copy(alpha = 0.5f), Palette.CardBottom.copy(alpha = 0.45f)),
         )
@@ -117,7 +118,7 @@ fun GlassCard(
             listOf(Palette.Violet.copy(alpha = 0.9f), Palette.Violet.copy(alpha = 0.2f)),
         )
         CardTone.Danger -> SolidColor(Palette.Danger.copy(alpha = 0.4f))
-        else -> Brush.verticalGradient(listOf(Palette.BorderStrong, Color.White.copy(alpha = 0.03f)))
+        else -> Brush.verticalGradient(listOf(Palette.BorderStrong, Palette.BorderFade))
     }
     Column(
         modifier = modifier
@@ -175,13 +176,13 @@ fun PillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
                 spotColor = Palette.Violet,
             )
             .clip(CircleShape)
-            .background(if (enabled) Color.White else Color.White.copy(alpha = 0.35f))
+            .background(if (enabled) Palette.Solid else Palette.Solid.copy(alpha = 0.35f))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(start = 18.dp, end = 5.dp, top = 5.dp, bottom = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(text = text, style = MaterialTheme.typography.labelLarge, color = Palette.Ink)
+        Text(text = text, style = MaterialTheme.typography.labelLarge, color = Palette.OnSolid)
         Box(
             modifier = Modifier
                 .size(32.dp)

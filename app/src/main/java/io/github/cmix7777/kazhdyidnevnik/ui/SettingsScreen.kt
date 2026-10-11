@@ -33,8 +33,10 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import io.github.cmix7777.kazhdyidnevnik.BuildConfig
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.Person
+import io.github.cmix7777.kazhdyidnevnik.data.ThemeMode
 import io.github.cmix7777.kazhdyidnevnik.formatStamp
 import io.github.cmix7777.kazhdyidnevnik.formatTime
+import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
 import io.github.cmix7777.kazhdyidnevnik.notify.Notifier
 import io.github.cmix7777.kazhdyidnevnik.notify.SystemSettings
 import io.github.cmix7777.kazhdyidnevnik.service.Backups
@@ -61,6 +63,7 @@ fun SettingsScreen(
     val exactAlarms = remember(resumeCount) { SystemSettings.canScheduleExact(context) }
     val status = remember(resumeCount, vm.statusVersion) { vm.statusText() }
     val settings = vm.reminderSettings
+    val appSettings = remember { AppSettings(context) }
     val owner = vm.owner ?: Person.AIZAT
     val partner = owner.partner
     var editing by remember { mutableStateOf<TimeField?>(null) }
@@ -112,6 +115,29 @@ fun SettingsScreen(
                         } else {
                             GhostButton(text = person.shortName, onClick = { vm.chooseOwner(person) }, small = true)
                         }
+                    }
+                }
+            }
+        }
+
+        item { SectionTitle("Оформление") }
+        item {
+            GlassCard(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Тема приложения. «Как в системе» следует за темой телефона.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Palette.TextMuted,
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    ThemeMode.entries.forEach { option ->
+                        SelectPill(
+                            text = option.title,
+                            selected = ThemeSettings.mode == option,
+                            onClick = { ThemeSettings.choose(appSettings, option) },
+                        )
                     }
                 }
             }

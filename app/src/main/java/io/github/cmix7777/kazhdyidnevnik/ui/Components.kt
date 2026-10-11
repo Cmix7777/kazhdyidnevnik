@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
 import io.github.cmix7777.kazhdyidnevnik.data.EventKind
 import io.github.cmix7777.kazhdyidnevnik.data.UserEvent
+import io.github.cmix7777.kazhdyidnevnik.data.shownEnd
 import io.github.cmix7777.kazhdyidnevnik.formatTime
 import kotlinx.coroutines.delay
 import java.time.Duration
@@ -44,7 +45,8 @@ fun rememberNow(): State<LocalDateTime> = produceState(LocalDateTime.now()) {
 
 /** Длительность смены словами: «смена 5 ч», «смена 3,5 ч». */
 private fun shiftText(item: DayItem): String {
-    val hours = Duration.between(item.start, item.end).toMinutes() / 60.0
+    val minutes = if (item is DayItem.EventItem) item.event.minutes.toLong() else Duration.between(item.start, item.end).toMinutes()
+    val hours = minutes / 60.0
     val value = if (hours % 1.0 == 0.0) "${hours.toInt()}" else "%.1f".format(hours).replace('.', ',')
     return "смена $value ч"
 }
@@ -84,7 +86,7 @@ fun DayItemCard(
                     color = Palette.Text,
                 )
                 Text(
-                    text = formatTime(item.end),
+                    text = formatTime(item.shownEnd),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (active) Palette.Lavender else Palette.TextMuted,
                 )
@@ -144,6 +146,8 @@ fun DayItemCard(
                         val event = item.event
                         Text(text = event.displayTitle, style = MaterialTheme.typography.titleMedium, color = Palette.Text)
                         val details = listOfNotNull(
+                            "продолжается со вчерашнего вечера".takeIf { item.continued },
+                            "до ${formatTime(event.end)} следующего дня".takeIf { event.crossesMidnight && !item.continued },
                             event.kind.title.takeIf { event.title.isNotBlank() },
                             shiftText(item).takeIf { event.kind == EventKind.WORK },
                             "каждую неделю".takeIf { event.weekly },

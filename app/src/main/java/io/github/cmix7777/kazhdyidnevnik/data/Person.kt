@@ -22,7 +22,7 @@ data class Profile(
     /** Заголовок утренней сводки. */
     val morningTitle: String,
     /** За сколько минут до первой пары или смены выходить из дома. */
-    val leaveBeforeMinutes: Long,
+    val leave: LeaveTimes,
     val shifts: List<WorkShift>,
     val deadlines: List<Deadline>,
     /** Есть ли план учёбы с галочками. */
@@ -36,29 +36,50 @@ data class Profile(
      * На телефоне второго человека по-прежнему видны [shifts].
      */
     val shiftsAreEditable: Boolean = false,
+    /**
+     * Постоянные дела, которые один раз попадают в «свои дела» владельца (например, занятия в автошколе).
+     * Дальше он меняет и удаляет их сам, обратно они не возвращаются.
+     */
+    val regularEvents: List<UserEvent> = emptyList(),
 )
 
 object Profiles {
 
     val aizat = Profile(
         morningTitle = "Доброе утро, господин Айзат",
-        leaveBeforeMinutes = 40,
+        leave = LeaveTimes.Aizat,
         shifts = WorkSchedule.default,
         deadlines = Deadlines.default,
         hasPlan = true,
         hasPractice = true,
         scheduleSource = "timeo.mveu.ru",
+        regularEvents = listOf(AizatRegular.drivingTheory),
     )
 
     val nastya = Profile(
         morningTitle = "Доброе утро, Анастасия",
-        leaveBeforeMinutes = 50,
+        leave = LeaveTimes.Nastya,
         shifts = NastyaWork.shifts,
         deadlines = emptyList(),
         hasPlan = false,
         hasPractice = false,
         scheduleSource = "сайт колледжа УдГУ",
         shiftsAreEditable = true,
+    )
+}
+
+/** Постоянные дела Айзата вне колледжа и работы. */
+object AizatRegular {
+    /** Теория по вождению: каждое воскресенье с 15 до 19. */
+    val drivingTheory = UserEvent(
+        id = "seed-aizat-driving-theory",
+        kind = EventKind.DRIVING,
+        title = "Теория по вождению",
+        date = LocalDate.of(2026, 10, 11),
+        start = LocalTime.of(15, 0),
+        end = LocalTime.of(19, 0),
+        weekly = true,
+        remindBefore = 60,
     )
 }
 
@@ -73,15 +94,17 @@ object NastyaWork {
 }
 
 /**
- * Пары, смены и дела человека за день. Свои дела есть только на телефоне владельца,
- * поэтому [events] учитываются, только если [isOwner].
+ * Пары, смены и дела человека за день. Свои дела есть только на телефоне владельца;
+ * дела второго человека учитываются, только если он ими поделился ([eventsKnown]).
  */
 fun Person.dayItems(
     date: LocalDate,
     lessons: List<Lesson>,
     isOwner: Boolean,
     events: List<UserEvent> = emptyList(),
+    eventsKnown: Boolean = isOwner,
 ): List<DayItem> {
-    val shifts = if (isOwner && profile.shiftsAreEditable) emptyList() else profile.shifts
-    return buildDay(date, lessons, shifts, if (isOwner) events else emptyList())
+    // Дела второго человека известны, только если он ими поделился: тогда его смены уже среди них.
+    val shifts = if (eventsKnown && profile.shiftsAreEditable) emptyList() else profile.shifts
+    return buildDay(date, lessons, shifts, if (eventsKnown) events else emptyList())
 }

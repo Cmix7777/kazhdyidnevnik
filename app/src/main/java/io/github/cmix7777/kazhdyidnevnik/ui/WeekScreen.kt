@@ -31,7 +31,6 @@ import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.Practice
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
-import io.github.cmix7777.kazhdyidnevnik.data.dayItems
 import io.github.cmix7777.kazhdyidnevnik.data.weekStartFor
 import io.github.cmix7777.kazhdyidnevnik.formatDayTitle
 import io.github.cmix7777.kazhdyidnevnik.formatWeekRange
@@ -143,7 +142,7 @@ fun WeekScreen(
                     }
                     for (dayIndex in 0..6) {
                         val date = monday.plusDays(dayIndex.toLong())
-                        val dayItems = person.dayItems(date, week.lessons, isOwner, diary.diary.events)
+                        val dayItems = diary.dayItems(person, isOwner, date, week.lessons)
                         val isToday = date == today
                         item(key = "title-$date") {
                             val (dayName, dateText) = formatDayTitle(date).split(", ", limit = 2)
@@ -175,8 +174,8 @@ fun WeekScreen(
                                 DayItemCard(
                                     item,
                                     now = if (isToday) now.toLocalTime() else null,
-                                    onClick = (item as? DayItem.EventItem)?.let { event ->
-                                        { editing = EventEdit(event.event, event.date) }
+                                    onClick = (item as? DayItem.EventItem)?.takeIf { isOwner }?.let { event ->
+                                        { editing = EventEdit(event.event, event.startDate) }
                                     },
                                 )
                             }

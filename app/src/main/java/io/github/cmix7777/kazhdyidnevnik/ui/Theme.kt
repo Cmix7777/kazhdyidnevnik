@@ -3,11 +3,16 @@ package io.github.cmix7777.kazhdyidnevnik.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextStyle
@@ -18,6 +23,8 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.Person
+import io.github.cmix7777.kazhdyidnevnik.data.ThemeMode
+import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
 
 /**
  * Цвета одного человека. У Айзата — тёмный фиолетовый, у Насти — сиреневый, небесно-голубой и белый.
@@ -67,7 +74,42 @@ object Accents {
         highlightBottom = Color(0xFF24508F),
     )
 
-    fun of(person: Person): Accent = if (person == Person.AIZAT) Aizat else Nastya
+    /** Светлая палитра Айзата: сиреневый туман, фиолетовые акценты. */
+    val AizatLight = Accent(
+        background = Color(0xFFF6F2FC),
+        cardTop = Color(0xFFFFFFFF),
+        cardBottom = Color(0xFFF1EAFB),
+        primary = Color(0xFF8B46EE),
+        deep = Color(0xFF6D28D9),
+        dark = Color(0xFFE6DAFB),
+        glow = Color(0xFFB892F7),
+        glowLow = Color(0xFFD9B8FD),
+        light = Color(0xFF6D28D9),
+        highlightTop = Color(0xFFE2D2FF),
+        highlightBottom = Color(0xFFCDB4FA),
+    )
+
+    /** Светлая палитра Насти: белый, небесно-голубой и сиреневый. */
+    val NastyaLight = Accent(
+        background = Color(0xFFF3F8FF),
+        cardTop = Color(0xFFFFFFFF),
+        cardBottom = Color(0xFFEAF2FF),
+        primary = Color(0xFF8460DC),
+        deep = Color(0xFF2F86D6),
+        dark = Color(0xFFDCEAFF),
+        glow = Color(0xFFBBA3F5),
+        glowLow = Color(0xFF93C8F5),
+        light = Color(0xFF5B3FB8),
+        highlightTop = Color(0xFFE6DCFF),
+        highlightBottom = Color(0xFFD0E6FF),
+    )
+
+    fun of(person: Person, dark: Boolean = true): Accent = when {
+        person == Person.AIZAT && dark -> Aizat
+        person == Person.AIZAT -> AizatLight
+        dark -> Nastya
+        else -> NastyaLight
+    }
 
     /** Плавный переход между палитрами при свайпе: 0 — [from], 1 — [to]. */
     fun blend(from: Accent, to: Accent, fraction: Float): Accent {
@@ -90,6 +132,9 @@ object Accents {
 
 /** Палитра того, чья страница сейчас рисуется. */
 val LocalAccent = compositionLocalOf { Accents.Aizat }
+
+/** Тёмная ли сейчас тема. От неё зависят нейтральные цвета: текст, рамки, подложки. */
+val LocalDark = compositionLocalOf { true }
 
 /**
  * Цвета приложения. Нейтральные (текст, рамки) общие, акцентные берутся из палитры человека,
@@ -128,14 +173,108 @@ object Palette {
         @Composable
         @ReadOnlyComposable
         get() = LocalAccent.current.light
-    val Border = Color(0x17FFFFFF)
-    val BorderStrong = Color(0x2BFFFFFF)
-    val Chip = Color(0x0FFFFFFF)
-    val Text = Color(0xFFF5F3FA)
-    val TextMuted = Color(0xFFA79DBA)
-    val TextFaint = Color(0xFF6F6582)
-    val Danger = Color(0xFFFF6B81)
-    val Ink = Color(0xFF14101C)
+    val Border: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0x17FFFFFF) else Color(0x1F241A3A)
+    val BorderStrong: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0x2BFFFFFF) else Color(0x33241A3A)
+    val Chip: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0x0FFFFFFF) else Color(0x0F241A3A)
+    val Text: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0xFFF5F3FA) else Color(0xFF1B1530)
+    val TextMuted: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0xFFA79DBA) else Color(0xFF5E5575)
+    val TextFaint: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0xFF6F6582) else Color(0xFF7C7390)
+    val Danger: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0xFFFF6B81) else Color(0xFFD12D4A)
+
+    /** Текст на розовой подложке предупреждений. */
+    val DangerText: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0xFFFFB3C0) else Color(0xFFB3122D)
+    val DangerCardTop: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0xFF3A1120) else Color(0xFFFFE6EB)
+    val DangerCardBottom: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0xFF240A14) else Color(0xFFFFD6DE)
+
+    /** Заливка главной кнопки-таблетки и цвет текста на ней: белая с тёмным текстом ночью, тёмная с белым днём. */
+    val Solid: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color.White else Color(0xFF1B1530)
+    val OnSolid: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0xFF14101C) else Color.White
+
+    /** Конец градиента рамки карточки. */
+    val BorderFade: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0x08FFFFFF) else Color(0x08241A3A)
+
+    /** Тонкие круги на фоне экрана. */
+    val Ring: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0x06FFFFFF) else Color(0x0F6D28D9)
+
+    /** Линии сетки на графиках. */
+    val Grid: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0x12FFFFFF) else Color(0x18241A3A)
+    val GridStrong: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color(0x40FFFFFF) else Color(0x4D241A3A)
+
+    /** Значок выбранной вкладки внизу: белый на тёмной теме, цвет палитры на светлой. */
+    val NavSelected: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = if (LocalDark.current) Color.White else LocalAccent.current.deep
+}
+
+/**
+ * Какая тема включена. Хранится в настройках телефона, а здесь — как состояние,
+ * чтобы приложение перекрашивалось сразу, без перезапуска.
+ */
+object ThemeSettings {
+    var mode by mutableStateOf(ThemeMode.DARK)
+        private set
+
+    fun load(settings: AppSettings) {
+        mode = settings.themeMode
+    }
+
+    fun choose(settings: AppSettings, value: ThemeMode) {
+        settings.themeMode = value
+        mode = value
+    }
+
+    /** Тёмная ли тема с учётом режима «как в системе». */
+    @Composable
+    fun isDark(): Boolean = mode.isDark(isSystemInDarkTheme())
 }
 
 /** Manrope: геометрический шрифт с кириллицей, один файл на все начертания. */
@@ -173,60 +312,111 @@ private val AppTypography = Typography(
     labelSmall = style(11, FontWeight.Medium, 15),
 )
 
-private fun appColors(accent: Accent) = darkColorScheme(
-    primary = accent.primary,
-    onPrimary = Color.White,
-    primaryContainer = Color(0xFF3B1767),
-    onPrimaryContainer = Color(0xFFEBDDFF),
-    inversePrimary = Color(0xFF6D28D9),
-    secondary = accent.light,
-    onSecondary = Color(0xFF1E1037),
-    secondaryContainer = Color(0xFF2A1E44),
-    onSecondaryContainer = Color(0xFFE6DEFF),
-    tertiary = Color(0xFFF0ABFC),
-    onTertiary = Color(0xFF3B0A45),
-    tertiaryContainer = Color(0xFF3A1840),
-    onTertiaryContainer = Color(0xFFFCD9FF),
-    background = accent.background,
-    onBackground = Palette.Text,
-    surface = accent.background,
-    onSurface = Palette.Text,
-    surfaceVariant = Color(0xFF241B33),
-    onSurfaceVariant = Palette.TextMuted,
-    surfaceTint = accent.primary,
-    inverseSurface = Color(0xFFEDE7F6),
-    inverseOnSurface = Color(0xFF1A1326),
-    error = Palette.Danger,
-    onError = Color(0xFF3D0A14),
-    errorContainer = Color(0xFF3D1220),
-    onErrorContainer = Color(0xFFFFD6DD),
-    outline = Color(0xFF4A3F5E),
-    outlineVariant = Color(0xFF2C2340),
-    scrim = Color.Black,
-    surfaceBright = Color(0xFF2E2540),
-    surfaceContainer = Color(0xFF1A1326),
-    surfaceContainerHigh = Color(0xFF211930),
-    surfaceContainerHighest = Color(0xFF2A2139),
-    surfaceContainerLow = Color(0xFF151020),
-    surfaceContainerLowest = Color(0xFF0E0915),
-    surfaceDim = accent.background,
-)
+/** Цвета Material для тёмной или светлой темы; нейтральные берутся из [Palette]. */
+@Composable
+private fun appColors(accent: Accent, dark: Boolean) = if (dark) {
+    darkColorScheme(
+        primary = accent.primary,
+        onPrimary = Color.White,
+        primaryContainer = Color(0xFF3B1767),
+        onPrimaryContainer = Color(0xFFEBDDFF),
+        inversePrimary = Color(0xFF6D28D9),
+        secondary = accent.light,
+        onSecondary = Color(0xFF1E1037),
+        secondaryContainer = Color(0xFF2A1E44),
+        onSecondaryContainer = Color(0xFFE6DEFF),
+        tertiary = Color(0xFFF0ABFC),
+        onTertiary = Color(0xFF3B0A45),
+        tertiaryContainer = Color(0xFF3A1840),
+        onTertiaryContainer = Color(0xFFFCD9FF),
+        background = accent.background,
+        onBackground = Palette.Text,
+        surface = accent.background,
+        onSurface = Palette.Text,
+        surfaceVariant = Color(0xFF241B33),
+        onSurfaceVariant = Palette.TextMuted,
+        surfaceTint = accent.primary,
+        inverseSurface = Color(0xFFEDE7F6),
+        inverseOnSurface = Color(0xFF1A1326),
+        error = Palette.Danger,
+        onError = Color(0xFF3D0A14),
+        errorContainer = Color(0xFF3D1220),
+        onErrorContainer = Color(0xFFFFD6DD),
+        outline = Color(0xFF4A3F5E),
+        outlineVariant = Color(0xFF2C2340),
+        scrim = Color.Black,
+        surfaceBright = Color(0xFF2E2540),
+        surfaceContainer = Color(0xFF1A1326),
+        surfaceContainerHigh = Color(0xFF211930),
+        surfaceContainerHighest = Color(0xFF2A2139),
+        surfaceContainerLow = Color(0xFF151020),
+        surfaceContainerLowest = Color(0xFF0E0915),
+        surfaceDim = accent.background,
+    )
+} else {
+    lightColorScheme(
+        primary = accent.primary,
+        onPrimary = Color.White,
+        primaryContainer = Color(0xFFE9DDFF),
+        onPrimaryContainer = Color(0xFF2A0A5E),
+        inversePrimary = Color(0xFFD0BCFF),
+        secondary = accent.light,
+        onSecondary = Color.White,
+        secondaryContainer = Color(0xFFEDE7FA),
+        onSecondaryContainer = Color(0xFF21143F),
+        tertiary = Color(0xFFB4338C),
+        onTertiary = Color.White,
+        tertiaryContainer = Color(0xFFFFD8F0),
+        onTertiaryContainer = Color(0xFF3B0A2D),
+        background = accent.background,
+        onBackground = Palette.Text,
+        surface = accent.background,
+        onSurface = Palette.Text,
+        surfaceVariant = Color(0xFFEDE7F6),
+        onSurfaceVariant = Palette.TextMuted,
+        surfaceTint = accent.primary,
+        inverseSurface = Color(0xFF2E2540),
+        inverseOnSurface = Color(0xFFF5F3FA),
+        error = Palette.Danger,
+        onError = Color.White,
+        errorContainer = Color(0xFFFFE1E6),
+        onErrorContainer = Color(0xFF5A0F1F),
+        outline = Color(0xFFB4A9C9),
+        outlineVariant = Color(0xFFDDD5EA),
+        scrim = Color.Black,
+        surfaceBright = Color.White,
+        surfaceContainer = Color(0xFFF1EBFA),
+        surfaceContainerHigh = Color(0xFFEBE4F6),
+        surfaceContainerHighest = Color(0xFFE5DDF2),
+        surfaceContainerLow = Color(0xFFF6F1FC),
+        surfaceContainerLowest = Color.White,
+        surfaceDim = accent.background,
+    )
+}
 
-/** Тема приложения: всегда тёмная, в стиле референса (тёмный фиолетовый, стекло, свечение). */
+/**
+ * Тема приложения. Тёмная (по умолчанию) в стиле референса: тёмный фиолетовый, стекло, свечение.
+ * Светлая включается в настройках; «как в системе» следует за темой телефона.
+ */
 @Composable
 fun AppTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = appColors(LocalAccent.current), typography = AppTypography, content = content)
+    val dark = ThemeSettings.isDark()
+    val accent = Accents.of(Person.AIZAT, dark)
+    CompositionLocalProvider(LocalDark provides dark, LocalAccent provides accent) {
+        MaterialTheme(colorScheme = appColors(accent, dark), typography = AppTypography, content = content)
+    }
 }
 
 /** Тема страницы одного человека: его палитра для всего, что внутри. */
 @Composable
 fun PersonTheme(person: Person, content: @Composable () -> Unit) {
-    AccentTheme(Accents.of(person), content)
+    AccentTheme(Accents.of(person, LocalDark.current), content)
 }
 
 @Composable
 fun AccentTheme(accent: Accent, content: @Composable () -> Unit) {
+    val dark = LocalDark.current
     CompositionLocalProvider(LocalAccent provides accent) {
-        MaterialTheme(colorScheme = appColors(accent), typography = AppTypography, content = content)
+        MaterialTheme(colorScheme = appColors(accent, dark), typography = AppTypography, content = content)
     }
 }

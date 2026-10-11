@@ -280,8 +280,8 @@ private fun BalanceChart(
     val accent = LocalAccent.current
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = Palette.TextFaint)
-    val gridColor = Color.White.copy(alpha = 0.07f)
-    val crossColor = Color.White.copy(alpha = 0.25f)
+    val gridColor = Palette.Grid
+    val crossColor = Palette.GridStrong
 
     fun indexAt(x: Float, width: Int): Int =
         if (points.size <= 1 || width <= 0) 0

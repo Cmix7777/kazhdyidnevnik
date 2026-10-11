@@ -44,6 +44,20 @@ data class Diary(
 
     fun withoutMoney(id: String): Diary = copy(money = money.filter { it.id != id })
 
+    /** Начальные данные владельца: смены и постоянные дела из профиля, каждое один раз. */
+    fun withSeeds(person: Person): Diary {
+        var result = seededWithShifts(person)
+        for (event in person.profile.regularEvents) {
+            val key = "event-${event.id}"
+            if (key in result.seeded) continue
+            result = result.copy(
+                events = result.events.filter { it.id != event.id } + event,
+                seeded = result.seeded + key,
+            )
+        }
+        return result
+    }
+
     /** Перенести разовые смены из профиля в свои дела (один раз для человека). */
     fun seededWithShifts(person: Person): Diary {
         val key = "shifts-${person.id}"

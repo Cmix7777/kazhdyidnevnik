@@ -32,12 +32,18 @@ fun progressKey(date: LocalDate, kind: PlanKind): String = "$date|${kind.name}"
  */
 object PlanGenerator {
 
-    /** С этого дня приложение показывает план учёбы и напоминает о нём. */
-    val firstDay: LocalDate = LocalDate.of(2026, 10, 8)
+    /** С этого дня приложение показывает полный план учёбы и напоминает о нём. */
+    val firstDay: LocalDate = LocalDate.of(2026, 10, 12)
 
-    /** План на день с учётом [firstDay]: до него план пустой. */
-    fun planFor(date: LocalDate, items: List<DayItem>): List<PlanBlock> =
-        if (date.isBefore(firstDay)) emptyList() else plan(date, items)
+    /**
+     * План на день с учётом [firstDay]: до него план пустой. Единственное исключение — день
+     * перед проверкой по тестированию: в нём остаётся только срочная подготовка к ней.
+     */
+    fun planFor(date: LocalDate, items: List<DayItem>): List<PlanBlock> = when {
+        !date.isBefore(firstDay) -> plan(date, items)
+        ExamPrep.step(date) != null -> plan(date, items).filter { it.kind == PlanKind.QA }
+        else -> emptyList()
+    }
 
     private const val DAY_START = 8 * 60 + 30
     private const val DAY_END = 23 * 60
@@ -120,6 +126,12 @@ object PlanGenerator {
             }
         }
 
+        // Накануне проверки и в её день обычное «Тестирование» заменяется срочной подготовкой.
+        ExamPrep.step(date)?.let { prep ->
+            requests.removeAll { it.kind == PlanKind.QA }
+            requests.add(0, Request(PlanKind.QA, prep.desired, prep.minimum))
+        }
+
         val blocks = mutableListOf<PlanBlock>()
         for (request in requests) {
             val index = windows.indexOfFirst { it.length >= request.desired }
@@ -160,6 +172,7 @@ object PlanGenerator {
                 )
             }
             PlanKind.QA -> {
+                ExamPrep.step(date)?.let { return ExamPrep.block(it, start, end) }
                 val (topic, repeat) = Curriculum.qaTopic(date)
                 PlanBlock(
                     kind, start, end,

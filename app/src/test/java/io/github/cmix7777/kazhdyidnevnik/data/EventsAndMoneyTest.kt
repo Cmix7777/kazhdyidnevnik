@@ -66,8 +66,9 @@ class EventsAndMoneyTest {
     @Test
     fun workEventsCountForTheRoadOthersDoNot() {
         val shift = driving.copy(id = "w", kind = EventKind.WORK, weekly = false, start = LocalTime.of(16, 30), end = LocalTime.of(21, 30))
-        val trips = WeatherAdvice.trips(buildDay(saturday, emptyList(), emptyList(), listOf(shift, driving)), 50)
-        assertEquals(LocalTime.of(15, 40), trips[0].time)
+        val trips = WeatherAdvice.trips(buildDay(saturday, emptyList(), emptyList(), listOf(shift, driving)), LeaveTimes(50, 18))
+        // На работу — за 18 минут, а не за 50, как в колледж.
+        assertEquals(LocalTime.of(16, 12), trips[0].time)
         assertEquals(LocalTime.of(21, 40), trips[1].time)
         assertTrue(WeatherAdvice.trips(buildDay(saturday, emptyList(), emptyList(), listOf(driving))).isEmpty())
     }

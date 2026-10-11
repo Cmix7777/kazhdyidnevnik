@@ -13,6 +13,7 @@ import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
 import io.github.cmix7777.kazhdyidnevnik.data.ProgressRepository
 import io.github.cmix7777.kazhdyidnevnik.data.Reminder
 import io.github.cmix7777.kazhdyidnevnik.data.ReminderKind
+import io.github.cmix7777.kazhdyidnevnik.data.PartnerEventsRepository
 import io.github.cmix7777.kazhdyidnevnik.data.ReminderPlanner
 import io.github.cmix7777.kazhdyidnevnik.data.Summaries
 import io.github.cmix7777.kazhdyidnevnik.data.WeatherAdvice
@@ -40,8 +41,9 @@ object ReminderScheduler {
     fun dayItems(context: Context, person: Person, date: LocalDate): List<DayItem>? {
         val week = ScheduleSync.repository(context, person).loadOrBuild(weekStartFor(date)) ?: return null
         val isOwner = AppSettings(context).owner == person
-        val events = if (isOwner) DiaryRepository.current(context.filesDir).events else emptyList()
-        return person.dayItems(date, week.lessons, isOwner, events)
+        val shared = PartnerEventsRepository.current(context.filesDir)?.takeIf { it.from == person }
+        val events = if (isOwner) DiaryRepository.current(context.filesDir).events else shared?.events.orEmpty()
+        return person.dayItems(date, week.lessons, isOwner, events, eventsKnown = isOwner || shared != null)
     }
 
     /** План учёбы человека на день (у кого плана нет — пусто). */
@@ -159,7 +161,7 @@ object ReminderScheduler {
                     tomorrow,
                     dayItems(context, person, tomorrow),
                     forecast,
-                    person.profile.leaveBeforeMinutes,
+                    person.profile.leave,
                 ) ?: return
                 val title = if (reminder.partner) "${person.shortName} · ${note.title}" else note.title
                 Notifier.weather(context, title, note.text, reminder.partner)

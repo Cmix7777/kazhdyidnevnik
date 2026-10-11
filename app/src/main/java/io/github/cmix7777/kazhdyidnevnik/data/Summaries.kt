@@ -37,15 +37,15 @@ object Summaries {
                 }
                 "${pluralLessons(lessons.size)}, первая в ${formatTime(first.start)}$where."
             }
-            items.filter { it.isWork }.forEach {
-                lines += "Работа ${formatTime(it.start)}–${formatTime(it.end)}."
+            items.filter { it.isWork && !it.isContinuation }.forEach {
+                lines += "Работа ${formatTime(it.start)}–${formatTime(it.shownEnd)}."
             }
-            items.filterIsInstance<DayItem.EventItem>().filter { !it.isWork }.forEach {
-                lines += "${it.event.displayTitle} ${formatTime(it.start)}–${formatTime(it.end)}."
+            items.filterIsInstance<DayItem.EventItem>().filter { !it.isWork && !it.isContinuation }.forEach {
+                lines += "${it.event.displayTitle} ${formatTime(it.start)}–${formatTime(it.shownEnd)}."
             }
         }
 
-        lines += WeatherAdvice.morningLines(date, items, forecast, profile.leaveBeforeMinutes)
+        lines += WeatherAdvice.morningLines(date, items, forecast, profile.leave)
 
         if (profile.hasPractice) {
             Practice.dayNumber(date)?.let { lines += "Практика: день $it из ${Practice.totalDays}." }

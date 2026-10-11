@@ -8,6 +8,17 @@ import kotlin.math.roundToInt
 /** Когда выходить из дома и когда возвращаться — по парам (не онлайн) и сменам. */
 data class Trip(val label: String, val time: LocalTime)
 
+/**
+ * За сколько минут до начала выходить из дома: на пары — [college], на работу — [work].
+ * До работы обычно ближе, чем до колледжа, поэтому времена разные.
+ */
+data class LeaveTimes(val college: Long, val work: Long) {
+    companion object {
+        val Aizat = LeaveTimes(college = 40, work = 10)
+        val Nastya = LeaveTimes(college = 50, work = 18)
+    }
+}
+
 /** Погода в момент выхода или возвращения. */
 data class TripWeather(val trip: Trip, val hour: HourWeather)
 
@@ -17,31 +28,36 @@ data class WeatherNote(val title: String, val text: String)
 /** Превращает прогноз в пользу: погода в дорогу, что надеть, о чём предупредить. */
 object WeatherAdvice {
 
-    /** За сколько минут до первой пары выходит Айзат. У Насти своё время, см. [Profile]. */
-    const val LEAVE_BEFORE_MIN = 40L
     private const val BACK_AFTER_MIN = 10L
 
     /**
      * Выход перед первым делом вне дома и возвращение после последнего. Онлайн-пары дорогу не требуют.
-     * [leaveBefore] — за сколько минут до начала выходить.
+     * [leave] — за сколько минут до начала выходить: до пары и до работы по-разному.
+     * Смена через полночь: выход вечером, а возвращение уже завтра, поэтому сегодня «Обратно» нет.
      */
-    fun trips(items: List<DayItem>, leaveBefore: Long = LEAVE_BEFORE_MIN): List<Trip> {
+    fun trips(items: List<DayItem>, leave: LeaveTimes = LeaveTimes.Aizat): List<Trip> {
         // Дорога — к очным парам и на работу. Онлайн-пары и прочие свои дела её не меняют.
-        val outside = items.filter { (it is DayItem.LessonItem && !it.lesson.online) || it.isWork }
+        // Продолжение вчерашней смены сегодня выхода не требует.
+        val outside = items.filter {
+            ((it is DayItem.LessonItem && !it.lesson.online) || it.isWork) &&
+                !(it is DayItem.EventItem && it.continued)
+        }
         if (outside.isEmpty()) return emptyList()
-        return listOf(
-            Trip("Выход", outside.minOf { it.start }.minusMinutes(leaveBefore)),
-            Trip("Обратно", outside.maxOf { it.end }.plusMinutes(BACK_AFTER_MIN)),
-        )
+        val first = outside.minByOrNull { it.start } ?: return emptyList()
+        val before = if (first.isWork) leave.work else leave.college
+        val result = mutableListOf(Trip("Выход", first.start.minusMinutes(before)))
+        val back = outside.filterNot { it is DayItem.EventItem && it.event.crossesMidnight }
+        if (back.isNotEmpty()) result += Trip("Обратно", back.maxOf { it.end }.plusMinutes(BACK_AFTER_MIN))
+        return result
     }
 
     fun tripWeather(
         date: LocalDate,
         items: List<DayItem>,
         forecast: Forecast,
-        leaveBefore: Long = LEAVE_BEFORE_MIN,
+        leave: LeaveTimes = LeaveTimes.Aizat,
     ): List<TripWeather> =
-        trips(items, leaveBefore).mapNotNull { trip ->
+        trips(items, leave).mapNotNull { trip ->
             forecast.hourAt(date.atTime(trip.time))?.let { TripWeather(trip, it) }
         }
 
@@ -115,11 +131,11 @@ object WeatherAdvice {
         date: LocalDate,
         items: List<DayItem>?,
         forecast: Forecast?,
-        leaveBefore: Long = LEAVE_BEFORE_MIN,
+        leave: LeaveTimes = LeaveTimes.Aizat,
     ): List<String> {
         val day = forecast?.day(date) ?: return emptyList()
         val lines = mutableListOf("Погода: ${WeatherText.short(day)}.")
-        val trips = if (items != null) tripWeather(date, items, forecast, leaveBefore) else emptyList()
+        val trips = if (items != null) tripWeather(date, items, forecast, leave) else emptyList()
         trips.forEach { lines += tripLine(it) + "." }
         advice(trips, day)?.let { lines += it }
         val alerts = alerts(day, forecast.day(date.minusDays(1)))
@@ -132,7 +148,7 @@ object WeatherAdvice {
         date: LocalDate,
         items: List<DayItem>?,
         forecast: Forecast?,
-        leaveBefore: Long = LEAVE_BEFORE_MIN,
+        leave: LeaveTimes = LeaveTimes.Aizat,
     ): WeatherNote? {
         val day = forecast?.day(date) ?: return null
         val alerts = alerts(day, forecast.day(date.minusDays(1)))
@@ -145,7 +161,7 @@ object WeatherAdvice {
             "${WeatherText.short(day).replaceFirstChar { it.uppercase() }}" +
                 (day.precipitationChance?.takeIf { it >= 30 }?.let { ", осадки $it%" }.orEmpty()) + ".",
         )
-        val trips = if (items != null) tripWeather(date, items, forecast, leaveBefore) else emptyList()
+        val trips = if (items != null) tripWeather(date, items, forecast, leave) else emptyList()
         trips.forEach { lines += tripLine(it) + "." }
         if (trips.isEmpty()) {
             lines += "Выходить никуда не нужно."

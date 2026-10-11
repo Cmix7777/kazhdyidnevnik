@@ -28,6 +28,13 @@ data class UserEvent(
     val remindBefore: Int? = null,
     val note: String = "",
 ) {
+    /** Дело через полночь: начинается вечером, а «конец» — это время уже следующего дня (23:00–02:00). */
+    val crossesMidnight: Boolean get() = end.isBefore(start)
+
+    /** Сколько длится дело, в минутах (с учётом ночи). */
+    val minutes: Int
+        get() = (end.toSecondOfDay() - start.toSecondOfDay()).let { if (it <= 0) it + 24 * 3600 else it } / 60
+
     /** Название для показа: своё или название вида. */
     val displayTitle: String get() = title.trim().ifEmpty { kind.title }
 
