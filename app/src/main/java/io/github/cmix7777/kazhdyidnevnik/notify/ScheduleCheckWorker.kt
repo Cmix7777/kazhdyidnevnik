@@ -12,13 +12,14 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import io.github.cmix7777.kazhdyidnevnik.service.Backups
+import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
 import io.github.cmix7777.kazhdyidnevnik.service.Updates
 import io.github.cmix7777.kazhdyidnevnik.service.WeatherRepository
 import java.util.concurrent.TimeUnit
 
 /**
  * Фоновая проверка расписания: примерно раз в 3 часа и повтор, если в 23:00 или 6:30 не было сети.
- * Заодно проверяет обновления приложения и делает автокопию прогресса.
+ * Заодно проверяет обновления приложения, делает автокопию прогресса и обменивается делами со вторым телефоном.
  */
 class ScheduleCheckWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
 
@@ -28,6 +29,8 @@ class ScheduleCheckWorker(context: Context, params: WorkerParameters) : Coroutin
         runCatching { Updates.checkInBackground(applicationContext) }
         runCatching { Backups.saveAutoIfDue(applicationContext) }
         runCatching { WeatherRepository.fetch(applicationContext) }
+        // Дела второго человека приходят и тогда, когда приложение закрыто.
+        runCatching { PartnerSync.sync(applicationContext) }
         return when {
             ok -> Result.success()
             runAttemptCount < MAX_ATTEMPTS -> Result.retry()

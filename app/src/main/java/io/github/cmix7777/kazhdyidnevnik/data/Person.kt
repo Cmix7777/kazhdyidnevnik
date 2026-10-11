@@ -10,6 +10,9 @@ enum class Person(val id: String, val shortName: String, val genitive: String) {
 
     val partner: Person get() = if (this == AIZAT) NASTYA else AIZAT
 
+    /** «с Айзатом», «с Настей». */
+    val instrumental: String get() = if (this == AIZAT) "Айзатом" else "Настей"
+
     val profile: Profile get() = if (this == AIZAT) Profiles.aizat else Profiles.nastya
 
     companion object {

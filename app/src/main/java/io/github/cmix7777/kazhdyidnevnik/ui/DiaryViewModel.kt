@@ -20,6 +20,7 @@ import io.github.cmix7777.kazhdyidnevnik.data.Lesson
 import io.github.cmix7777.kazhdyidnevnik.data.UserEvent
 import io.github.cmix7777.kazhdyidnevnik.notify.ReminderScheduler
 import io.github.cmix7777.kazhdyidnevnik.service.Backups
+import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -44,7 +45,13 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             PartnerEventsRepository.state.collect { partnerShare = it }
         }
+        // Если телефоны связаны, при запуске сразу обмениваемся делами.
+        PartnerSync.load(app)
+        PartnerSync.syncNow(app, force = false)
     }
+
+    /** Обменяться делами со вторым телефоном сейчас (если телефоны связаны). */
+    fun syncPartner(force: Boolean = true) = PartnerSync.syncNow(getApplication<Application>(), force)
 
     /** Пары, смены и дела [person] за день: свои дела — из дневника, чужие — если ими поделились. */
     fun dayItems(person: Person, isOwner: Boolean, date: LocalDate, lessons: List<Lesson>): List<DayItem> {
@@ -98,6 +105,8 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
             DiaryRepository.update(app.filesDir, block)
             ReminderScheduler.scheduleNext(app)
             runCatching { Backups.saveAfterChange(app) }
+            // Свои дела изменились: через пару секунд они уйдут второму телефону.
+            PartnerSync.syncSoon(app)
         }
     }
 

@@ -120,6 +120,9 @@ fun SettingsScreen(
             }
         }
 
+        item { SectionTitle("Связь с ${partner.instrumental}") }
+        item { PartnerLinkCard(owner) }
+
         item { SectionTitle("Оформление") }
         item {
             GlassCard(verticalArrangement = Arrangement.spacedBy(10.dp)) {

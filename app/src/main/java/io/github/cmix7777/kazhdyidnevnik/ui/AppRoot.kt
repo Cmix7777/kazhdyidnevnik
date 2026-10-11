@@ -58,6 +58,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.Person
@@ -95,6 +96,11 @@ fun AppRoot(
     val owner = vm.owner
     // Смены владельца из профиля один раз переносятся в его дела, дальше он меняет их сам.
     LaunchedEffect(owner) { owner?.let { diary.seedFor(it) } }
+    // Каждый раз, когда приложение открывают, подтягиваем дела второго человека (не чаще раза в минуту).
+    LifecycleResumeEffect(owner) {
+        if (owner != null) diary.syncPartner(force = false)
+        onPauseOrDispose { }
+    }
     if (owner == null) {
         AccentTheme(Accents.blend(Accents.of(Person.AIZAT, dark), Accents.of(Person.NASTYA, dark), 0.5f)) {
             OwnerPicker(onPick = { vm.chooseOwner(it) })

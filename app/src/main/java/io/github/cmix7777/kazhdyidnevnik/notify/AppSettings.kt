@@ -2,11 +2,14 @@ package io.github.cmix7777.kazhdyidnevnik.notify
 
 import android.content.Context
 import androidx.core.content.edit
+import io.github.cmix7777.kazhdyidnevnik.data.CloudToken
+import io.github.cmix7777.kazhdyidnevnik.data.PairCode
 import io.github.cmix7777.kazhdyidnevnik.data.PartnerAlerts
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.Release
 import io.github.cmix7777.kazhdyidnevnik.data.ReminderSettings
 import io.github.cmix7777.kazhdyidnevnik.data.ThemeMode
+import io.github.cmix7777.kazhdyidnevnik.data.TokenStore
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -63,6 +66,59 @@ class AppSettings(context: Context) {
     var themeMode: ThemeMode
         get() = ThemeMode.fromId(prefs.getString(THEME, null))
         set(value) = prefs.edit { putString(THEME, value.id) }
+
+    /** Код связи с телефоном второго человека. null — телефоны не связаны. */
+    var pairCode: String?
+        get() = prefs.getString(PAIR_CODE, null)?.takeIf { PairCode.isValid(it) }
+        set(value) = prefs.edit {
+            if (value == null) remove(PAIR_CODE) else putString(PAIR_CODE, value)
+            // Другая пара или отвязка: прошлые отправки и пропуск больше не годятся.
+            remove(PUBLISHED_FINGERPRINT)
+            remove(PUBLISHED_AT)
+        }
+
+    /** Отпечаток последних отправленных дел и когда они ушли (чтобы не слать одно и то же). */
+    var publishedFingerprint: String?
+        get() = prefs.getString(PUBLISHED_FINGERPRINT, null)
+        set(value) = prefs.edit { if (value == null) remove(PUBLISHED_FINGERPRINT) else putString(PUBLISHED_FINGERPRINT, value) }
+
+    var publishedMillis: Long
+        get() = prefs.getLong(PUBLISHED_AT, 0L)
+        set(value) = prefs.edit { putLong(PUBLISHED_AT, value) }
+
+    /** Последняя синхронизация с облаком: когда и чем кончилась (пусто — успешно). */
+    val lastSyncMillis: Long get() = prefs.getLong(LAST_SYNC, 0L)
+
+    val lastSyncResult: String get() = prefs.getString(LAST_SYNC_RESULT, null).orEmpty()
+
+    fun recordSync(millis: Long, result: String) {
+        prefs.edit {
+            putLong(LAST_SYNC, millis)
+            putString(LAST_SYNC_RESULT, result)
+        }
+    }
+
+    /** Вход в облако без аккаунта (пропуск и ключ продления). */
+    val cloudTokens: TokenStore = object : TokenStore {
+        override fun load(): CloudToken? {
+            val id = prefs.getString(CLOUD_ID, null) ?: return null
+            val refresh = prefs.getString(CLOUD_REFRESH, null) ?: return null
+            return CloudToken(id, refresh, prefs.getLong(CLOUD_EXPIRES, 0L))
+        }
+
+        override fun save(token: CloudToken?) {
+            prefs.edit {
+                if (token == null) {
+                    remove(CLOUD_ID)
+                    remove(CLOUD_EXPIRES)
+                } else {
+                    putString(CLOUD_ID, token.idToken)
+                    putString(CLOUD_REFRESH, token.refreshToken)
+                    putLong(CLOUD_EXPIRES, token.expiresAtMillis)
+                }
+            }
+        }
+    }
 
     /** До какого момента напоминания уже показаны. */
     var lastFiredMillis: Long
@@ -181,6 +237,14 @@ class AppSettings(context: Context) {
         const val RELEASE_URL = "releaseUrl"
         const val RELEASE_SIZE = "releaseSize"
         const val UPDATE_NOTIFIED = "updateNotified"
+        const val PAIR_CODE = "pairCode"
+        const val PUBLISHED_FINGERPRINT = "publishedFingerprint"
+        const val PUBLISHED_AT = "publishedAt"
+        const val LAST_SYNC = "lastSync"
+        const val LAST_SYNC_RESULT = "lastSyncResult"
+        const val CLOUD_ID = "cloudId"
+        const val CLOUD_REFRESH = "cloudRefresh"
+        const val CLOUD_EXPIRES = "cloudExpires"
         const val AUTO_BACKUP_URI = "autoBackupUri"
         const val LAST_AUTO_BACKUP = "lastAutoBackup"
 

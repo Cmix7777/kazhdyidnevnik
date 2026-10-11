@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +41,7 @@ import io.github.cmix7777.kazhdyidnevnik.formatDate
 import io.github.cmix7777.kazhdyidnevnik.formatDayTitle
 import io.github.cmix7777.kazhdyidnevnik.formatStamp
 import io.github.cmix7777.kazhdyidnevnik.formatTime
+import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -80,6 +82,7 @@ fun TodayScreen(
             vm.refresh(person, 0)
             vm.refresh(person, 1)
             extras.refreshWeather()
+            diary.syncPartner()
         },
         modifier = modifier.fillMaxSize(),
     ) {
@@ -322,20 +325,20 @@ private fun footer(fetchedAt: Long?, source: String): String {
 }
 
 /** Отправить текст в любой мессенджер через системное окно «Поделиться». */
-private fun shareText(context: Context, text: String) {
+internal fun shareText(context: Context, text: String, title: String = "Поделиться делами") {
     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
-    context.startActivity(Intent.createChooser(send, "Поделиться делами").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    context.startActivity(Intent.createChooser(send, title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
 /** Текст из буфера обмена или пустая строка. */
-private fun clipboardText(context: Context): String {
+internal fun clipboardText(context: Context): String {
     val manager = context.getSystemService(ClipboardManager::class.java) ?: return ""
     return manager.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
 }
 
 /**
- * Дела второго человека на странице, которая не его: они приходят только если он сам ими поделился
- * (сообщением, которое здесь вставляют). Сервера нет, поэтому это снимок на момент отправки.
+ * Дела второго человека на странице, которая не его. Если телефоны связаны (Настройки → Связь), они приходят
+ * сами; иначе только когда второй человек поделился ими сообщением, которое здесь вставляют.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -343,20 +346,40 @@ private fun PartnerEventsCard(person: Person, owner: Person?, diary: DiaryViewMo
     val context = LocalContext.current
     var message by remember { mutableStateOf<String?>(null) }
     val shared = diary.partnerShare?.takeIf { it.from == person }
+    val link by PartnerSync.info.collectAsState()
     GlassCard(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            text = if (shared == null) {
-                "Дела ${person.genitive} здесь появятся, когда ${person.shortName} ими поделится: " +
-                    "пусть нажмёт «Поделиться делами» на своей странице и отправит сообщение тебе. " +
-                    "Потом скопируй его и нажми «Вставить дела»."
-            } else {
-                "Дела ${person.genitive} от ${formatStamp(shared.at)}. Это снимок: чтобы обновить, " +
-                    "пусть ${person.shortName} поделится ещё раз."
+            text = when {
+                link.paired && shared == null ->
+                    "Телефоны связаны, но дела ${person.genitive} ещё не пришли. У ${person.genitive} в приложении " +
+                        "должна быть эта же версия или новее и вставленный код связи (Настройки → Связь)."
+                link.paired && shared != null ->
+                    "Дела ${person.genitive} приходят сами. Изменены ${formatStamp(shared.at)}" +
+                        (if (link.lastSyncMillis > 0) ", проверено ${formatStamp(link.lastSyncMillis)}." else ".")
+                shared == null ->
+                    "Дела ${person.genitive} здесь появятся, когда ${person.shortName} ими поделится: " +
+                        "пусть нажмёт «Поделиться делами» на своей странице и отправит сообщение тебе. " +
+                        "Потом скопируй его и нажми «Вставить дела». Чтобы так не делать каждый раз, " +
+                        "свяжите телефоны в настройках."
+                else ->
+                    "Дела ${person.genitive} от ${formatStamp(shared.at)}. Это снимок: чтобы обновить, " +
+                        "пусть ${person.shortName} поделится ещё раз или свяжите телефоны в настройках."
             },
             style = MaterialTheme.typography.bodyMedium,
             color = Palette.TextMuted,
         )
+        link.problem?.takeIf { link.paired }?.let {
+            Text(text = "Не вышло обновить: $it", style = MaterialTheme.typography.bodySmall, color = Palette.DangerText)
+        }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (link.paired) {
+                GhostButton(
+                    text = if (link.running) "Обновляю…" else "Обновить сейчас",
+                    onClick = { diary.syncPartner() },
+                    enabled = !link.running,
+                    small = true,
+                )
+            }
             GhostButton(
                 text = "Вставить дела",
                 onClick = {
