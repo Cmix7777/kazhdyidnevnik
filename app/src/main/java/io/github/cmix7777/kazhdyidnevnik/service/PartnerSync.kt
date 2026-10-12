@@ -29,15 +29,17 @@ import java.io.IOException
 import java.time.LocalDate
 
 /**
- * Связь двух телефонов через бесплатное облако: свои дела уходят туда сами, дела второго человека
- * приходят сюда. Нужен общий код связи (создаёт один телефон, второй вставляет). Работает, пока
- * телефоны связаны; ручная передача сообщением тоже остаётся.
+ * Связь двух телефонов через бесплатное облако: свои дела уходят туда сами (в зашифрованном виде),
+ * дела второго человека приходят сюда. Нужен общий код связи (создаёт один телефон, второй вставляет).
+ * Работает, пока телефоны связаны; ручная передача сообщением тоже остаётся.
  */
 object PartnerSync {
 
     /** Что показывать в настройках и на странице второго человека. */
     data class Info(
         val paired: Boolean = false,
+        /** Телефон был связан по старому коду (до шифрования), связь нужно создать заново. */
+        val legacy: Boolean = false,
         val running: Boolean = false,
         /** Когда последний обмен прошёл успешно (0 — ещё не было). */
         val lastSyncMillis: Long = 0L,
@@ -45,7 +47,7 @@ object PartnerSync {
         val problem: String? = null,
     )
 
-    enum class JoinResult { Done, NoCode, AlreadyJoined }
+    enum class JoinResult { Done, NoCode, OldCode, AlreadyJoined }
 
     private val mutableInfo = MutableStateFlow(Info())
     val info: StateFlow<Info> = mutableInfo.asStateFlow()
@@ -64,6 +66,7 @@ object PartnerSync {
         mutableInfo.update {
             it.copy(
                 paired = settings.pairCode != null,
+                legacy = settings.hasLegacyPairing,
                 lastSyncMillis = settings.lastSyncMillis,
                 problem = settings.lastSyncResult.ifEmpty { null },
             )
@@ -82,7 +85,8 @@ object PartnerSync {
 
     /** Подключиться по коду из скопированного сообщения. */
     fun join(context: Context, text: String): JoinResult {
-        val code = PairCode.parse(text) ?: return JoinResult.NoCode
+        val code = PairCode.parse(text)
+            ?: return if (PairCode.isLegacy(text)) JoinResult.OldCode else JoinResult.NoCode
         val settings = AppSettings(context)
         if (settings.pairCode == code) return JoinResult.AlreadyJoined
         settings.pairCode = code

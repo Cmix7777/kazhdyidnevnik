@@ -33,11 +33,20 @@ fun PartnerLinkCard(owner: Person) {
 
     GlassCard(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (!info.paired) {
+            if (info.legacy) {
+                Text(
+                    text = "После обновления связь нужно создать заново: дела теперь шифруются на телефоне, и " +
+                        "старый код для этого не годится. Один создаёт новый код, второй вставляет его здесь же.",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Palette.Text,
+                )
+            }
             Text(
                 text = "Чтобы дела ${partner.genitive} появлялись у тебя сами, свяжите телефоны один раз: один " +
                     "создаёт код и отправляет его другому, второй вставляет код здесь же, в настройках. " +
                     "Дальше дела обновляются сами: при открытии приложения и примерно раз в три часа. " +
-                    "Передаются только дела и смены, без заметок, бюджета и дат. Без кода их никто не откроет.",
+                    "Передаются только дела и смены, без заметок, бюджета и дат. Они шифруются на телефоне, " +
+                    "в облаке лежит нечитаемый набор знаков, а открыть его можно только этим кодом.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Palette.TextMuted,
             )
@@ -80,6 +89,8 @@ fun PartnerLinkCard(owner: Person) {
                         note = when (PartnerSync.join(context, clipboardText(context))) {
                             PartnerSync.JoinResult.Done -> "Телефоны связаны, обмениваюсь делами."
                             PartnerSync.JoinResult.NoCode -> "В буфере нет кода. Скопируй всё сообщение с кодом целиком."
+                            PartnerSync.JoinResult.OldCode ->
+                                "Это код старого вида. Попроси создать новый кнопкой «Создать код и отправить» в последней версии."
                             PartnerSync.JoinResult.AlreadyJoined -> "Этот код уже подключён."
                         }
                     },
@@ -102,6 +113,8 @@ fun PartnerLinkCard(owner: Person) {
                         note = when (PartnerSync.join(context, clipboardText(context))) {
                             PartnerSync.JoinResult.Done -> "Подключился по новому коду."
                             PartnerSync.JoinResult.NoCode -> "В буфере нет кода. Скопируй всё сообщение с кодом целиком."
+                            PartnerSync.JoinResult.OldCode ->
+                                "Это код старого вида. Попроси создать новый кнопкой «Создать код и отправить» в последней версии."
                             PartnerSync.JoinResult.AlreadyJoined -> "Этот код уже подключён."
                         }
                     },

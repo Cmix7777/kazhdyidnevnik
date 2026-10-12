@@ -66,7 +66,7 @@ class CloudShareTest {
     @Test
     fun displayAndParseRoundTripEvenInsideAMessage() {
         val shown = PairCode.display(code)
-        assertEquals("kdp-abcde-fghjk-mnpqr-stuvw", shown)
+        assertEquals("kds-abcde-fghjk-mnpqr-stuvw", shown)
         val message = PairCode.message(Person.AIZAT, code)
         assertTrue(message.contains(shown))
         // Мессенджер мог сделать буквы заглавными или приписать текст вокруг.
@@ -77,20 +77,35 @@ class CloudShareTest {
     @Test
     fun parseRejectsNonsense() {
         assertNull(PairCode.parse("нет тут кода"))
-        assertNull(PairCode.parse("kdp-abcde-fghjk-mnpqr"))
+        assertNull(PairCode.parse("kds-abcde-fghjk-mnpqr"))
         // Буквы i, l, o и цифры 0, 1 в коде не бывают.
-        assertNull(PairCode.parse("kdp-abcde-fghjk-mnpqr-stuv0"))
-        assertNull(PairCode.parse("kdp-abcde-fghjk-mnpqr-stuvi"))
+        assertNull(PairCode.parse("kds-abcde-fghjk-mnpqr-stuv0"))
+        assertNull(PairCode.parse("kds-abcde-fghjk-mnpqr-stuvi"))
         assertFalse(PairCode.isValid("short"))
         assertFalse(PairCode.isValid(code + "x"))
     }
 
     @Test
-    fun documentNameDependsOnWhoOwnsIt() {
-        assertEquals("abcdefghjkmnpqrstuvw-aizat", PairCode.docId(code, Person.AIZAT))
-        assertEquals("abcdefghjkmnpqrstuvw-nastya", PairCode.docId(code, Person.NASTYA))
+    fun oldStyleCodesAreRecognisedButNeverAccepted() {
+        val old = "Код связи Каждогодневника (Настя): kdp-abcde-fghjk-mnpqr-stuvw"
+        assertNull(PairCode.parse(old))
+        assertTrue(PairCode.isLegacy(old))
+        assertFalse(PairCode.isLegacy(PairCode.message(Person.AIZAT, code)))
+        assertFalse(PairCode.isLegacy("просто текст"))
+    }
+
+    @Test
+    fun documentNameDependsOnWhoOwnsItAndHidesTheCode() {
+        val keys = CloudCrypto.derive(code)
+        val aizat = keys.docId(Person.AIZAT)
+        val nastya = keys.docId(Person.NASTYA)
+        assertTrue(aizat.endsWith("-aizat"))
+        assertTrue(nastya.endsWith("-nastya"))
+        assertFalse(aizat == nastya)
+        assertFalse(aizat.contains(code))
         // Правила базы требуют имя длиной от 20 до 60 знаков.
-        assertTrue(PairCode.docId(code, Person.AIZAT).length in 20..60)
+        assertTrue(aizat.length in 20..60)
+        assertTrue(nastya.length in 20..60)
     }
 
     @Test
@@ -127,12 +142,19 @@ class CloudShareTest {
         assertEquals("Bearer ID-1", commit.headers["Authorization"])
         assertEquals("application/json", commit.headers["Content-Type"])
         val update = Json.parseToJsonElement(commit.body).jsonObject["writes"]!!.jsonArray[0].jsonObject["update"]!!.jsonObject
+        val keys = CloudCrypto.derive(code)
+        val docId = keys.docId(Person.NASTYA)
         assertEquals(
-            "projects/kazhdyidnevnik/databases/(default)/documents/shares/abcdefghjkmnpqrstuvw-nastya",
+            "projects/kazhdyidnevnik/databases/(default)/documents/shares/$docId",
             update["name"]!!.jsonPrimitive.content,
         )
         val fields = update["fields"]!!.jsonObject
-        assertEquals("KD1:abc-_", fields["payload"]!!.jsonObject["stringValue"]!!.jsonPrimitive.content)
+        // В облако уходит зашифрованная строка, а не сами дела и не код связи.
+        val stored = fields["payload"]!!.jsonObject["stringValue"]!!.jsonPrimitive.content
+        assertTrue(stored.startsWith(CloudCrypto.PREFIX))
+        assertFalse(stored.contains("KD1:abc-_"))
+        assertFalse(commit.body.contains(code))
+        assertEquals("KD1:abc-_", CloudCrypto.open(keys, docId, stored))
         assertEquals("123", fields["updatedAt"]!!.jsonObject["integerValue"]!!.jsonPrimitive.content)
         // Только два поля: больше правила базы не пропустят.
         assertEquals(setOf("payload", "updatedAt"), fields.keys)
@@ -247,13 +269,16 @@ class CloudShareTest {
 
     @Test
     fun fetchReadsTheOtherPersonsDocument() {
+        val keys = CloudCrypto.derive(code)
+        val docId = keys.docId(Person.NASTYA)
+        val sealed = CloudCrypto.seal(keys, docId, "KD1:zzz")
         val http = FakeHttp { call ->
             if (call.url.contains("accounts:signUp")) {
                 signUpReply()
             } else {
                 HttpReply(
                     200,
-                    """{"name":"x","fields":{"payload":{"stringValue":"KD1:zzz"},"updatedAt":{"integerValue":"1790000000000"}},"createTime":"t"}""",
+                    """{"name":"x","fields":{"payload":{"stringValue":"$sealed"},"updatedAt":{"integerValue":"1790000000000"}},"createTime":"t"}""",
                 )
             }
         }
@@ -264,9 +289,37 @@ class CloudShareTest {
         val get = http.calls.last()
         assertEquals("GET", get.method)
         assertEquals(
-            "https://firestore.googleapis.com/v1/projects/kazhdyidnevnik/databases/(default)/documents/shares/abcdefghjkmnpqrstuvw-nastya",
+            "https://firestore.googleapis.com/v1/projects/kazhdyidnevnik/databases/(default)/documents/shares/$docId",
             get.url,
         )
+        assertFalse(get.url.contains(code))
+    }
+
+    @Test
+    fun documentThatDoesNotDecryptIsAnError() {
+        val keys = CloudCrypto.derive(code)
+        val otherKeys = CloudCrypto.derive("zzzzzzzzzzzzzzzzzzzz")
+        val docId = keys.docId(Person.NASTYA)
+        val answers = listOf(
+            "KD1:открытый текст без шифрования",
+            CloudCrypto.seal(otherKeys, docId, "KD1:чужой ключ"),
+            CloudCrypto.seal(keys, keys.docId(Person.AIZAT), "KD1:чужой документ"),
+        )
+        for (stored in answers) {
+            val http = FakeHttp { call ->
+                if (call.url.contains("accounts:signUp")) {
+                    signUpReply()
+                } else {
+                    HttpReply(200, """{"fields":{"payload":{"stringValue":"$stored"},"updatedAt":{"integerValue":"1"}}}""")
+                }
+            }
+            try {
+                cloud(http, MemoryTokens()).fetch(code, Person.NASTYA)
+                fail("должна быть ошибка для: $stored")
+            } catch (e: CloudException) {
+                assertTrue(e.message!!.contains("не расшифровались"))
+            }
+        }
     }
 
     @Test
@@ -327,6 +380,9 @@ class CloudShareTest {
         val sent = SharedEvents(Person.NASTYA, 100L, PartnerShare.relevant(listOf(nastyaEvent), LocalDate.of(2026, 10, 12)))
         val api = cloud(http, MemoryTokens())
         api.publish(code, Person.NASTYA, PartnerShare.encode(sent), 100L)
+        // В хранилище облака лежит только шифротекст.
+        assertEquals(1, stored.size)
+        assertTrue(stored.values.single().startsWith(CloudCrypto.PREFIX))
 
         // Телефон Айзата читает документ Насти и разбирает дела.
         val remote = api.fetch(code, Person.NASTYA)!!

@@ -23,38 +23,39 @@ object CloudConfig {
 }
 
 /**
- * Код связи двух телефонов: 20 случайных знаков (около 100 бит), показывается как kdp-xxxxx-xxxxx-xxxxx-xxxxx.
- * Его создаёт один телефон, второй вставляет. Угадать его нельзя, поэтому чужой документ не открыть.
+ * Код связи двух телефонов: 20 случайных знаков (около 100 бит), показывается как kds-xxxxx-xxxxx-xxxxx-xxxxx.
+ * Его создаёт один телефон, второй вставляет. Из кода выводятся имя документа и ключ шифрования
+ * ([CloudCrypto]), сам код в облако не уходит. Угадать его нельзя, поэтому чужой документ не найти и не прочитать.
+ * Коды kdp-... были у версии без шифрования: сервер их видел, поэтому они больше не годятся.
  */
 object PairCode {
 
     private const val ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
     const val LENGTH = 20
     private const val GROUP = 5
-    private val regex = Regex(
-        "kdp-([a-hj-km-np-z2-9]{5})-([a-hj-km-np-z2-9]{5})-([a-hj-km-np-z2-9]{5})-([a-hj-km-np-z2-9]{5})",
-        RegexOption.IGNORE_CASE,
-    )
+    private const val GROUPS = "([a-hj-km-np-z2-9]{5})-([a-hj-km-np-z2-9]{5})-([a-hj-km-np-z2-9]{5})-([a-hj-km-np-z2-9]{5})"
+    private val regex = Regex("kds-$GROUPS", RegexOption.IGNORE_CASE)
+    private val legacyRegex = Regex("kdp-$GROUPS", RegexOption.IGNORE_CASE)
 
     fun generate(random: Random = SecureRandom()): String =
         buildString { repeat(LENGTH) { append(ALPHABET[random.nextInt(ALPHABET.length)]) } }
 
     fun isValid(code: String): Boolean = code.length == LENGTH && code.all { it in ALPHABET }
 
-    /** Красивый вид для людей: kdp-xxxxx-xxxxx-xxxxx-xxxxx. */
-    fun display(code: String): String = "kdp-" + code.chunked(GROUP).joinToString("-")
+    /** Красивый вид для людей: kds-xxxxx-xxxxx-xxxxx-xxxxx. */
+    fun display(code: String): String = "kds-" + code.chunked(GROUP).joinToString("-")
 
     /** Достаёт код из любого текста (сообщения целиком). null — кода нет. */
     fun parse(text: String): String? =
         regex.find(text)?.groupValues?.drop(1)?.joinToString("")?.lowercase()
 
-    /** Имя документа одного человека внутри пары: код и кто это. */
-    fun docId(code: String, person: Person): String = code + "-" + person.id
+    /** В тексте есть код старого вида (без шифрования), нового кода при этом нет. */
+    fun isLegacy(text: String): Boolean = parse(text) == null && legacyRegex.containsMatchIn(text)
 
     /** Сообщение, которое уходит второму человеку в мессенджер. */
     fun message(from: Person, code: String): String =
         "Код связи Каждогодневника (${from.shortName}): ${display(code)}\n" +
-            "Скопируй всё сообщение, открой Настройки приложения и нажми «Вставить код» в разделе связи."
+            "Нужна последняя версия приложения. Скопируй всё сообщение, открой Настройки и нажми «Вставить код» в разделе связи."
 
     /** Короткий отпечаток данных: если он не изменился, заново отправлять нечего. */
     fun fingerprint(text: String): String =
@@ -85,7 +86,8 @@ class CloudException(message: String, val code: Int = 0, cause: Throwable? = nul
 
 /**
  * Обмен делами через Firestore по REST, без библиотек Google. Каждый человек кладёт свои дела в
- * документ shares/<код>-<имя> и читает документ второго. Вход анонимный, без паролей.
+ * документ shares/<имя из кода>-<кто> и читает документ второго. Дела шифруются на телефоне
+ * ([CloudCrypto]), вход анонимный, без паролей.
  */
 class CloudShares(
     private val http: HttpTransport,
@@ -95,7 +97,7 @@ class CloudShares(
     private val apiKey: String = CloudConfig.API_KEY,
 ) {
 
-    /** Что лежит в облаке: сам набор дел в виде строки и время, когда его положили. */
+    /** Что лежит в облаке: набор дел (уже расшифрованный) в виде строки и время, когда его положили. */
     data class Remote(val payload: String, val updatedAt: Long)
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -104,14 +106,17 @@ class CloudShares(
     /** Положить (или заменить) дела [owner] в паре [code]. */
     fun publish(code: String, owner: Person, payload: String, updatedAt: Long) {
         require(PairCode.isValid(code)) { "Неверный код связи" }
-        val name = "$database/shares/${PairCode.docId(code, owner)}"
+        val keys = CloudCrypto.derive(code)
+        val docId = keys.docId(owner)
+        val name = "$database/shares/$docId"
+        val sealed = CloudCrypto.seal(keys, docId, payload)
         val body = buildJsonObject {
             put("writes", buildJsonArray {
                 add(buildJsonObject {
                     put("update", buildJsonObject {
                         put("name", name)
                         put("fields", buildJsonObject {
-                            put("payload", buildJsonObject { put("stringValue", payload) })
+                            put("payload", buildJsonObject { put("stringValue", sealed) })
                             put("updatedAt", buildJsonObject { put("integerValue", updatedAt.toString()) })
                         })
                     })
@@ -132,9 +137,11 @@ class CloudShares(
     /** Забрать дела [person] из пары [code]. null — он ещё ничего не отправлял. */
     fun fetch(code: String, person: Person): Remote? {
         require(PairCode.isValid(code)) { "Неверный код связи" }
+        val keys = CloudCrypto.derive(code)
+        val docId = keys.docId(person)
         val reply = authorized { token ->
             http.get(
-                "https://firestore.googleapis.com/v1/$database/shares/${PairCode.docId(code, person)}",
+                "https://firestore.googleapis.com/v1/$database/shares/$docId",
                 mapOf("Authorization" to "Bearer $token"),
             )
         }
@@ -142,7 +149,9 @@ class CloudShares(
         if (reply.code !in 200..299) throw failure(reply, "Не удалось получить дела")
         val fields = runCatching { json.parseToJsonElement(reply.body).jsonObject["fields"]?.jsonObject }.getOrNull()
             ?: throw CloudException("Облако ответило непонятно", reply.code)
-        val payload = fields.stringOf("payload", "stringValue") ?: throw CloudException("В облаке нет дел", reply.code)
+        val sealed = fields.stringOf("payload", "stringValue") ?: throw CloudException("В облаке нет дел", reply.code)
+        val payload = CloudCrypto.open(keys, docId, sealed)
+            ?: throw CloudException("Дела в облаке не расшифровались: код не тот или данные повреждены", reply.code)
         val updated = fields.stringOf("updatedAt", "integerValue")?.toLongOrNull() ?: 0L
         return Remote(payload, updated)
     }

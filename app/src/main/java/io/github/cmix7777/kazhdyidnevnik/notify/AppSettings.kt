@@ -69,13 +69,18 @@ class AppSettings(context: Context) {
 
     /** Код связи с телефоном второго человека. null — телефоны не связаны. */
     var pairCode: String?
-        get() = prefs.getString(PAIR_CODE, null)?.takeIf { PairCode.isValid(it) }
+        get() = prefs.getString(PAIR_SECRET, null)?.takeIf { PairCode.isValid(it) }
         set(value) = prefs.edit {
-            if (value == null) remove(PAIR_CODE) else putString(PAIR_CODE, value)
+            if (value == null) remove(PAIR_SECRET) else putString(PAIR_SECRET, value)
+            // Код старого вида (до шифрования) больше не нужен.
+            remove(PAIR_CODE)
             // Другая пара или отвязка: прошлые отправки и пропуск больше не годятся.
             remove(PUBLISHED_FINGERPRINT)
             remove(PUBLISHED_AT)
         }
+
+    /** Телефон был связан по коду старого вида (до шифрования): связь нужно создать заново. */
+    val hasLegacyPairing: Boolean get() = prefs.getString(PAIR_CODE, null) != null && pairCode == null
 
     /** Отпечаток последних отправленных дел и когда они ушли (чтобы не слать одно и то же). */
     var publishedFingerprint: String?
@@ -238,6 +243,7 @@ class AppSettings(context: Context) {
         const val RELEASE_SIZE = "releaseSize"
         const val UPDATE_NOTIFIED = "updateNotified"
         const val PAIR_CODE = "pairCode"
+        const val PAIR_SECRET = "pairSecret"
         const val PUBLISHED_FINGERPRINT = "publishedFingerprint"
         const val PUBLISHED_AT = "publishedAt"
         const val LAST_SYNC = "lastSync"
