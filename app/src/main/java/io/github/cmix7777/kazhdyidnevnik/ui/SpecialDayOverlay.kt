@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +57,11 @@ fun SpecialDayHost(diary: DiaryViewModel) {
     var shown by remember { mutableStateOf(settings.specialShown) }
     val special = SpecialDates.today(diary.specialDates(), today)
     if (special != null && special.key != shown) {
+        // Пока идёт поздравление, капля привета ждёт своей очереди.
+        DisposableEffect(special.key) {
+            OverlayGate.special = true
+            onDispose { OverlayGate.special = false }
+        }
         SpecialDayOverlay(special, today, onDone = {
             settings.specialShown = special.key
             shown = special.key
@@ -244,4 +250,9 @@ private fun SpecialShaderLayer(
             onFail()
         }
     }
+}
+
+/** Какие большие анимации сейчас поверх экрана, чтобы они не наслаивались друг на друга. */
+object OverlayGate {
+    var special by mutableStateOf(false)
 }

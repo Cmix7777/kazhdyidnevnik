@@ -1,6 +1,22 @@
 package io.github.cmix7777.kazhdyidnevnik
 
 import android.graphics.Bitmap
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.onNodeWithTag
+import io.github.cmix7777.kazhdyidnevnik.ui.GreetingArrival
+import io.github.cmix7777.kazhdyidnevnik.ui.GreetingDropLayer
+import io.github.cmix7777.kazhdyidnevnik.ui.GreetingDropState
+import io.github.cmix7777.kazhdyidnevnik.ui.greetingDropSource
+import java.time.LocalDateTime
+import java.time.ZoneId
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -240,5 +256,110 @@ class LiveUiShotsTest {
         compose.onRoot().performTouchInput { up() }
         compose.mainClock.advanceTimeBy(2_000)
         save("ink_6_first_page")
+    }
+
+    @Test
+    fun greetingSend() {
+        var sent = 0L
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            Dark {
+                val scope = rememberCoroutineScope()
+                val state = remember { GreetingDropState(scope) { sent = it } }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LocalAccent.current.background),
+                ) {
+                    FakePage("Понедельник", Modifier.padding(top = 70.dp))
+                    Row(
+                        modifier = Modifier
+                            .statusBarsPadding()
+                            .padding(20.dp)
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .clip(CircleShape)
+                            .background(Palette.Chip),
+                    ) {
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                            Text("Айзат", color = Palette.Text)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .testTag("partner")
+                                .greetingDropSource(state, enabled = true, onTap = {}),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("Настя", color = Palette.TextMuted)
+                        }
+                    }
+                    GreetingDropLayer(state, Person.AIZAT)
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(300)
+        compose.onNodeWithTag("partner").performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(900)
+        save("greet_1_growing")
+        compose.onNodeWithTag("partner").performTouchInput { moveBy(Offset(-40f, 420f)) }
+        compose.mainClock.advanceTimeBy(600)
+        save("greet_2_held")
+        compose.onNodeWithTag("partner").performTouchInput { up() }
+        compose.mainClock.advanceTimeBy(260)
+        save("greet_3_fly")
+        compose.mainClock.advanceTimeBy(600)
+        save("greet_4_undo")
+        compose.mainClock.advanceTimeBy(3_300)
+        check(sent > 0L) { "Капля не отправилась" }
+        save("greet_5_sent")
+    }
+
+    @Test
+    fun greetingArrival() {
+        val today = LocalDate.of(2026, 10, 12)
+        fun at(hour: Int, minute: Int) =
+            LocalDateTime.of(today, LocalTime.of(hour, minute)).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            Dark(Person.NASTYA) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LocalAccent.current.background),
+                ) {
+                    FakePage("Понедельник")
+                    GreetingArrival(Person.AIZAT, listOf(at(9, 10), at(14, 20), at(18, 5)), today, onDone = {})
+                }
+            }
+        }
+        var elapsed = 0L
+        for (ms in listOf(400L, 800L, 1_000L, 1_700L, 2_800L, 4_000L, 4_700L)) {
+            compose.mainClock.advanceTimeBy(ms - elapsed)
+            elapsed = ms
+            save("arrive_%04d".format(ms))
+        }
+    }
+
+    @Test
+    fun greetingArrivalSingle() {
+        val today = LocalDate.of(2026, 10, 12)
+        val at = LocalDateTime.of(today, LocalTime.of(14, 20)).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            Dark(Person.AIZAT) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(LocalAccent.current.background),
+                ) {
+                    FakePage("Понедельник")
+                    GreetingArrival(Person.NASTYA, listOf(at), today, onDone = {})
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(1_900)
+        save("arrive_single")
     }
 }

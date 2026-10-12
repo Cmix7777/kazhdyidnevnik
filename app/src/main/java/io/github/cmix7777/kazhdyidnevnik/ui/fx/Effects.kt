@@ -92,6 +92,31 @@ object Haptics {
         }
     }
 
+    /** Капля привета улетела: лёгкий щелчок с подъёмом. */
+    fun dropThrow(context: Context) = play(context) { vibrator ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, VibrationEffect.Composition.PRIMITIVE_CLICK)
+        ) {
+            VibrationEffect.startComposition()
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_QUICK_RISE, 0.4f)
+                .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK, 0.6f, 20)
+                .compose()
+        } else {
+            VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)
+        }
+    }
+
+    /** Капля привета упала на экран: мягкий глухой удар. */
+    fun dropLand(context: Context) = play(context) { vibrator ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_THUD)
+        ) {
+            VibrationEffect.startComposition().addPrimitive(VibrationEffect.Composition.PRIMITIVE_THUD, 0.7f).compose()
+        } else {
+            VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK)
+        }
+    }
+
     private fun vibrator(context: Context): Vibrator? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator

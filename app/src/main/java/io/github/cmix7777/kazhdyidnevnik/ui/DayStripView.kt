@@ -102,7 +102,7 @@ fun DayStripView(strip: DayStrip, now: LocalTime, modifier: Modifier = Modifier)
                 }
             }
 
-            drawNowBead(nowX, y, accent.primary, t)
+            drawNowBead(nowX, y, x0, accent.primary, t)
 
             // Время над бусиной.
             val text = measurer.measure(label, labelStyle.copy(color = labelColor))
@@ -121,13 +121,17 @@ fun DayStripView(strip: DayStrip, now: LocalTime, modifier: Modifier = Modifier)
 }
 
 /** Бусина «сейчас»: светящееся ядро, след по линии назад и волна, которая расходится и тает. */
-private fun DrawScope.drawNowBead(x: Float, y: Float, color: Color, t: Float) {
+private fun DrawScope.drawNowBead(x: Float, y: Float, start: Float, color: Color, t: Float) {
+    // След тянется назад по линии, но не дальше её начала.
     val trail = 40.dp.toPx()
-    drawRect(
-        brush = Brush.horizontalGradient(listOf(Color.Transparent, color.copy(alpha = 0.55f)), startX = x - trail, endX = x),
-        topLeft = Offset(x - trail, y - 1.5.dp.toPx()),
-        size = Size(trail, 3.dp.toPx()),
-    )
+    val from = maxOf(x - trail, start)
+    if (x - from > 1f) {
+        drawRect(
+            brush = Brush.horizontalGradient(listOf(Color.Transparent, color.copy(alpha = 0.55f)), startX = x - trail, endX = x),
+            topLeft = Offset(from, y - 1.5.dp.toPx()),
+            size = Size(x - from, 3.dp.toPx()),
+        )
+    }
     drawCircle(
         brush = Brush.radialGradient(listOf(color.copy(alpha = 0.75f), Color.Transparent), center = Offset(x, y), radius = 11.dp.toPx()),
         radius = 11.dp.toPx(),

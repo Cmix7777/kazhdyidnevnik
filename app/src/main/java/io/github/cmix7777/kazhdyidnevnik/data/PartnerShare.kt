@@ -20,6 +20,8 @@ data class SharedEvents(
     val events: List<UserEvent>,
     /** Особые даты (дни рождения, годовщины): они общие, поэтому уходят второму телефону без заметок. */
     val dates: List<Deadline> = emptyList(),
+    /** Капли привета: когда человек «думал о втором» (время в миллисекундах, за последние сутки-двое). */
+    val drops: List<Long> = emptyList(),
 )
 
 @Serializable
@@ -29,6 +31,7 @@ internal data class ShareDto(
     val at: Long,
     val events: List<EventDto> = emptyList(),
     val dates: List<DeadlineDto> = emptyList(),
+    val drops: List<Long> = emptyList(),
 )
 
 /**
@@ -56,7 +59,7 @@ object PartnerShare {
 
     fun encode(shared: SharedEvents): String {
         val dto = DiaryCodec.toDto(Diary(events = shared.events, deadlines = shared.dates)).let { codec ->
-            ShareDto(from = shared.from.id, at = shared.at, events = codec.events, dates = codec.deadlines)
+            ShareDto(from = shared.from.id, at = shared.at, events = codec.events, dates = codec.deadlines, drops = shared.drops)
         }
         val raw = json.encodeToString(ShareDto.serializer(), dto).toByteArray(Charsets.UTF_8)
         val packed = ByteArrayOutputStream().also { out -> GZIPOutputStream(out).use { it.write(raw) } }.toByteArray()
@@ -82,7 +85,7 @@ object PartnerShare {
             val dto = json.decodeFromString(ShareDto.serializer(), raw.toString(Charsets.UTF_8))
             val from = Person.fromId(dto.from) ?: return null
             val diary = DiaryCodec.fromDto(DiaryDto(events = dto.events, deadlines = dto.dates))
-            SharedEvents(from, dto.at, diary.events, diary.deadlines.filter { it.special })
+            SharedEvents(from, dto.at, diary.events, diary.deadlines.filter { it.special }, dto.drops)
         }.getOrNull()
     }
 
