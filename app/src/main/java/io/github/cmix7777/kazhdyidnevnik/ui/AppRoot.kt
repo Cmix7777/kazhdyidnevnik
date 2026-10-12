@@ -116,6 +116,8 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
     val dark = LocalDark.current
     var current by rememberSaveable { mutableStateOf(Tab.Today) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    // Совместная неделя открыта: номер недели относительно текущей, null — закрыта.
+    var together by rememberSaveable { mutableStateOf<Int?>(null) }
     val pagerState = rememberPagerState(initialPage = owner.ordinal) { Person.entries.size }
     val scope = rememberCoroutineScope()
     val position by remember {
@@ -162,6 +164,7 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                                 onClick = {
                                     current = tab
                                     settingsOpen = false
+                                    together = null
                                 },
                                 icon = { Icon(painterResource(tab.icon), contentDescription = null) },
                                 label = { Text(tab.title, style = MaterialTheme.typography.labelMedium) },
@@ -183,24 +186,31 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                         SettingsScreen(vm, extras, onBack = { settingsOpen = false }, modifier = Modifier.padding(padding))
                     }
                 } else {
-                    HorizontalPager(
-                        state = pagerState,
+                    Box(
                         modifier = Modifier
                             .padding(padding)
                             .fillMaxSize(),
-                        beyondViewportPageCount = 1,
-                        key = { Person.entries[it].id },
-                    ) { page ->
-                        val person = Person.entries[page]
-                        PersonTheme(person) {
-                            val isOwner = person == owner
-                            when (current) {
-                                Tab.Today -> TodayScreen(vm, extras, diary, person)
-                                Tab.Week -> WeekScreen(vm, extras, diary, person)
-                                Tab.Budget -> BudgetScreen(diary, person, isOwner)
-                                Tab.Deadlines -> DeadlinesScreen(diary, person, isOwner)
-                                Tab.Progress -> ProgressScreen(vm, person)
+                    ) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxSize(),
+                            beyondViewportPageCount = 1,
+                            key = { Person.entries[it].id },
+                        ) { page ->
+                            val person = Person.entries[page]
+                            PersonTheme(person) {
+                                val isOwner = person == owner
+                                when (current) {
+                                    Tab.Today -> TodayScreen(vm, extras, diary, person)
+                                    Tab.Week -> WeekScreen(vm, extras, diary, person, onTogether = { together = it })
+                                    Tab.Budget -> BudgetScreen(diary, person, isOwner)
+                                    Tab.Deadlines -> DeadlinesScreen(diary, person, isOwner)
+                                    Tab.Progress -> ProgressScreen(vm, person)
+                                }
                             }
+                        }
+                        together?.let { offset ->
+                            TogetherWeekOverlay(vm, diary, offset, onClose = { together = null })
                         }
                     }
                 }

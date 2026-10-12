@@ -13,11 +13,13 @@ import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
 import io.github.cmix7777.kazhdyidnevnik.ui.AppRoot
 import io.github.cmix7777.kazhdyidnevnik.ui.AppTheme
 import io.github.cmix7777.kazhdyidnevnik.ui.ThemeSettings
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.EffectsSettings
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ThemeSettings.load(AppSettings(this))
+        EffectsSettings.load(AppSettings(this))
         val systemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
         applyChrome(ThemeSettings.mode.isDark(systemDark))

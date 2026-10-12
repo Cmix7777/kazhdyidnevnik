@@ -67,6 +67,11 @@ class AppSettings(context: Context) {
         get() = ThemeMode.fromId(prefs.getString(THEME, null))
         set(value) = prefs.edit { putString(THEME, value.id) }
 
+    /** Меньше анимаций: живые эффекты (склейка недель и др.) показываются сразу, без движения и вибрации. */
+    var reduceMotion: Boolean
+        get() = prefs.getBoolean(REDUCE_MOTION, false)
+        set(value) = prefs.edit { putBoolean(REDUCE_MOTION, value) }
+
     /** Код связи с телефоном второго человека. null — телефоны не связаны. */
     var pairCode: String?
         get() = prefs.getString(PAIR_SECRET, null)?.takeIf { PairCode.isValid(it) }
@@ -229,6 +234,7 @@ class AppSettings(context: Context) {
         const val PARTNER_WEATHER = "partnerWeather"
         const val OWNER = "owner"
         const val THEME = "theme"
+        const val REDUCE_MOTION = "reduceMotion"
         const val LAST_FIRED = "lastFired"
         const val NEXT_ALARM = "nextAlarm"
         const val NOTIFICATIONS_ASKED = "notificationsAsked"
