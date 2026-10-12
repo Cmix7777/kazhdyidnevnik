@@ -1,0 +1,112 @@
+name: Тесты экранов
+
+# Запускает приложение на эмуляторе Android и нажимает на экраны. Выпуск версий (build.yml)
+# от этих тестов не зависит: если они упали, версия всё равно собирается, а результат смотрим отдельно.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle.properties"
+      - ".github/workflows/ui-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ui-tests
+  cancel-in-progress: true
+
+jobs:
+  screens:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Ускорение эмулятора (KVM)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Тесты экранов на эмуляторе
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-boot-timeout: 900
+          script: gradle --no-daemon --continue connectedDebugAndroidTest > ui-build.log 2>&1
+
+      - name: Отчёт о тестах экранов
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/status" && cd "$RUNNER_TEMP/status"
+          {
+            echo "run=${GITHUB_RUN_NUMBER}"
+            echo "sha=${GITHUB_SHA}"
+            echo "result=${RESULT}"
+            echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "--- tests ---"
+            python3 - "$GITHUB_WORKSPACE" <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          root = sys.argv[1]
+          files = glob.glob(root + "/app/build/outputs/androidTest-results/**/*.xml", recursive=True)
+          total = failed = 0
+          for path in sorted(files):
+              try:
+                  suite = ET.parse(path).getroot()
+              except ET.ParseError:
+                  continue
+              for case in suite.iter("testcase"):
+                  total += 1
+                  bad = case.find("failure") if case.find("failure") is not None else case.find("error")
+                  if bad is not None:
+                      failed += 1
+                      text = (bad.get("message") or bad.text or "").strip().replace("\n", " ")
+                      print("FAIL " + case.get("classname", "").split(".")[-1] + "." + case.get("name", "") + ": " + text[:700])
+                  else:
+                      print("PASS " + case.get("classname", "").split(".")[-1] + "." + case.get("name", ""))
+          print("total=%d failed=%d" % (total, failed))
+          PY
+            echo "--- what went wrong ---"
+            grep -A 25 "What went wrong" "$GITHUB_WORKSPACE/ui-build.log" 2>/dev/null | head -n 80 || true
+            echo "--- errors ---"
+            grep -E "^e: |error:|FAILED|BUILD" "$GITHUB_WORKSPACE/ui-build.log" 2>/dev/null | head -n 40 || true
+            echo "--- tail ---"
+            tail -n 40 "$GITHUB_WORKSPACE/ui-build.log" 2>/dev/null || true
+          } > status-ui.txt
+          git init -q
+          git checkout -q -b ci-status-ui
+          git add status-ui.txt
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "Тесты экранов ${GITHUB_RUN_NUMBER}: ${RESULT}"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-status-ui
+
+      - name: Подробный отчёт (файлы)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-report
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+            ui-build.log
+          if-no-files-found: ignore

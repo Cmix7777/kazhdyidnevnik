@@ -3,6 +3,11 @@ name: Сборка
 on:
   push:
     branches: [main]
+    # Правки только в автотестах экранов и описании версию приложения не меняют, выпускать её заново не нужно.
+    paths-ignore:
+      - "app/src/androidTest/**"
+      - ".github/workflows/ui-tests.yml"
+      - "README.md"
   workflow_dispatch:
 
 permissions:
