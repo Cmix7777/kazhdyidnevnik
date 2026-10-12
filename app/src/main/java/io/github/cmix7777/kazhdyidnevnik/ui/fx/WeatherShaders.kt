@@ -14,6 +14,11 @@ float vnoise(float2 p) {
     return mix(mix(h21(i), h21(i + float2(1.0, 0.0)), f.x), mix(h21(i + float2(0.0, 1.0)), h21(i + float2(1.0, 1.0)), f.x), f.y);
 }
 
+// Облегчённый шум из двух слоёв: для инея, который при прокрутке пересчитывается каждый кадр.
+float fbm2(float2 p) {
+    return vnoise(p) * 0.625 + vnoise(p * 2.03) * 0.3125;
+}
+
 float fbm(float2 p) {
     float s = 0.0;
     float a = 0.5;
@@ -148,11 +153,11 @@ half4 main(float2 p) {
                 melt += w.z * smoothstep(36.0, 14.0, length(q - w.xy));
             }
             melt = clamp(melt, 0.0, 1.0);
-            float warp = fbm(q * 0.025);
+            float warp = fbm2(q * 0.025);
             float fv = fbm(q * 0.06 + warp * 2.5);
             float veins = smoothstep(0.82, 0.98, 1.0 - abs(fv * 2.0 - 1.0));
             float amount = zone * (1.0 - melt);
-            amount *= smoothstep(0.25, 0.6, fbm(q * 0.02 + 3.0) + amount * 0.4);
+            amount *= smoothstep(0.25, 0.6, fbm2(q * 0.02 + 3.0) + amount * 0.4);
             if (amount > 0.001) {
                 float a = amount * 0.7;
                 float4 frosted = blur5(p, 3.0 * uDp, float4(base)) * 0.75 + float4(0.11, 0.14, 0.19, 0.25);

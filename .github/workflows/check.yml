@@ -77,15 +77,15 @@ jobs:
             echo "result=${RESULT}"
             echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "--- errors ---"
-            grep -E "^e: |error:|FAILED|BUILD|tests completed|warning:.*deprecated" "$GITHUB_WORKSPACE/build.log" 2>/dev/null | head -n 80 || true
+            grep -E "^e: |error:|FAILED|BUILD|tests completed|warning:.*deprecated" "$GITHUB_WORKSPACE/build.log" 2>/dev/null | grep -v SystemServerTiming | head -n 40 || true
             echo "--- what went wrong ---"
             grep -A 25 "What went wrong" "$GITHUB_WORKSPACE/build.log" 2>/dev/null | head -n 120 || true
             echo "--- instrument ---"
             tail -n 80 "$GITHUB_WORKSPACE/instrument.log" 2>/dev/null || true
             echo "--- screens ---"
-            tail -n 60 "$GITHUB_WORKSPACE/screens.log" 2>/dev/null || true
+            grep -v "^\s*at " "$GITHUB_WORKSPACE/screens.log" 2>/dev/null | tail -n 40 || true
             echo "--- logcat ---"
-            grep -iE "clipboard|ANR in|not responding|FATAL EXCEPTION|AndroidRuntime|WindowManager.*focus|Input dispatching" "$GITHUB_WORKSPACE/logcat.txt" 2>/dev/null | head -n 80 || true
+            grep -iE "Denying clipboard|ANR in|not responding|FATAL EXCEPTION|Input dispatching timed out" "$GITHUB_WORKSPACE/logcat.txt" 2>/dev/null | grep -v SystemServerTiming | head -n 40 || true
           } > status.txt
           cp -r "$GITHUB_WORKSPACE/shots" . 2>/dev/null || true
           mkdir -p tests && cp -r "$GITHUB_WORKSPACE"/app/build/test-results/testDebugUnitTest/*.xml tests/ 2>/dev/null || true
