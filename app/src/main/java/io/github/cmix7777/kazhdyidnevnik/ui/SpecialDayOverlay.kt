@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -129,7 +132,27 @@ fun SpecialDayOverlay(special: SpecialToday, today: LocalDate, onDone: () -> Uni
             .pointerInput(Unit) { detectTapGestures { onDone() } },
     ) {
         if (shaders && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            SpecialShaderLayer(special.kind, { t.value }, colorA, colorB, years, today.year, onFail = { shaders = false })
+            // Эффект мягкий (капли, свечение, снег), поэтому считаем его в уменьшенном в 3 раза слое и растягиваем:
+            // в 9 раз меньше работы видеокарте, и анимация не тормозит даже на средних телефонах.
+            val scale = SHADER_SCALE
+            SpecialShaderLayer(
+                kind = special.kind,
+                t = { t.value },
+                colorA = colorA,
+                colorB = colorB,
+                years = years,
+                year = today.year,
+                scale = scale,
+                onFail = { shaders = false },
+                modifier = Modifier
+                    .size(maxWidth / scale, maxHeight / scale)
+                    .graphicsLayer {
+                        transformOrigin = TransformOrigin(0f, 0f)
+                        scaleX = scale
+                        scaleY = scale
+                        compositingStrategy = CompositingStrategy.Offscreen
+                    },
+            )
         } else {
             Canvas(modifier = Modifier.fillMaxSize()) { drawRect(Color(0xF2080510)) }
         }
@@ -153,6 +176,9 @@ fun SpecialDayOverlay(special: SpecialToday, today: LocalDate, onDone: () -> Uni
     }
 }
 
+/** Во сколько раз уменьшен слой шейдера особого дня. */
+private const val SHADER_SCALE = 3f
+
 private fun textVisibility(t: Float, timing: SpecialTiming): Float {
     val fadeIn = ((t - timing.textFrom) / 0.3f).coerceIn(0f, 1f)
     val fadeOut = ((timing.textTo - t) / 0.3f).coerceIn(0f, 1f)
@@ -168,7 +194,9 @@ private fun SpecialShaderLayer(
     colorB: Color,
     years: Int?,
     year: Int,
+    scale: Float,
     onFail: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val shader = remember(kind) {
         runCatching {
@@ -189,10 +217,10 @@ private fun SpecialShaderLayer(
     val age = years?.takeIf { it in 1..99 }
     val digits = if (age == null) -1f to -1f else (if (age >= 10) (age / 10).toFloat() else -1f) to (age % 10).toFloat()
     val yearDigits = year.toString().padStart(4, '0').map { it.digitToInt().toFloat() }
-    Canvas(modifier = Modifier.fillMaxSize()) {
+    Canvas(modifier = modifier) {
         try {
             shader.setFloatUniform("uSize", size.width, size.height)
-            shader.setFloatUniform("uDp", density)
+            shader.setFloatUniform("uDp", density / scale)
             shader.setFloatUniform("uT", t())
             when (kind) {
                 SpecialKind.ANNIVERSARY -> {
