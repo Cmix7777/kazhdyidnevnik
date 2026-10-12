@@ -72,6 +72,26 @@ object Haptics {
         }
     }
 
+    /**
+     * Натяжение капли при обновлении: короткий тик, чем сильнее тянешь, тем он плотнее.
+     * [strength] от 0 до 1.
+     */
+    fun tension(context: Context, strength: Float) = play(context) { vibrator ->
+        val scale = strength.coerceIn(0.15f, 1f)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_LOW_TICK, VibrationEffect.Composition.PRIMITIVE_TICK)
+        ) {
+            val primitive = if (strength < 0.6f) VibrationEffect.Composition.PRIMITIVE_LOW_TICK else VibrationEffect.Composition.PRIMITIVE_TICK
+            VibrationEffect.startComposition().addPrimitive(primitive, scale).compose()
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_TICK)
+        ) {
+            VibrationEffect.startComposition().addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, scale).compose()
+        } else {
+            VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
+        }
+    }
+
     private fun vibrator(context: Context): Vibrator? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator

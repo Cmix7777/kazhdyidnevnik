@@ -44,7 +44,7 @@ import java.time.LocalDateTime
  * время стоит и картинка не перерисовывается. В автотестах такие анимации тоже стоят.
  */
 @Composable
-private fun rememberEffectTime(fps: Int, running: Boolean = true): () -> Float {
+internal fun rememberEffectTime(fps: Int, running: Boolean = true): () -> Float {
     var time by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(fps, running) {
         if (!running) return@LaunchedEffect

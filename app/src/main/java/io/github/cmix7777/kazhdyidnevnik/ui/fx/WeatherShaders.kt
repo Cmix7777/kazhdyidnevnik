@@ -1,6 +1,6 @@
 package io.github.cmix7777.kazhdyidnevnik.ui.fx
 
-private const val NOISE = """
+internal const val NOISE = """
 float h21(float2 p) {
     p = fract(p * float2(123.34, 456.21));
     p += dot(p, p + 45.32);
@@ -250,7 +250,9 @@ half4 main(float2 p) {
         float lit = (1.0 - cos(6.2832 * uMoon)) * 0.5;
         float side = uMoon < 0.5 ? -1.0 : 1.0;
         float shadow = smoothstep(r + 0.8, r - 0.8, length(d - float2(side * 2.0 * r * lit, 0.0)));
-        col += float3(0.95, 0.93, 0.85) * disc * (1.0 - shadow) * 0.9 * (1.0 - uCloud * 0.7)
+        // Почти новая луна не видна совсем, иначе от неё остаётся тонкий контур.
+        float vis = smoothstep(0.03, 0.12, lit);
+        col += float3(0.95, 0.93, 0.85) * disc * (1.0 - shadow) * 0.9 * (1.0 - uCloud * 0.7) * vis
              + float3(0.6, 0.65, 0.9) * exp(-length(d) / 34.0) * 0.18 * lit * (1.0 - uCloud * 0.7);
     }
 

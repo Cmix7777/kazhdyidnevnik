@@ -1,5 +1,10 @@
 package io.github.cmix7777.kazhdyidnevnik.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -14,6 +19,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.BuildConfig
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
+import io.github.cmix7777.kazhdyidnevnik.data.DayStrip
 import io.github.cmix7777.kazhdyidnevnik.data.GlassWeather
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
@@ -43,6 +50,9 @@ import io.github.cmix7777.kazhdyidnevnik.formatDayTitle
 import io.github.cmix7777.kazhdyidnevnik.formatStamp
 import io.github.cmix7777.kazhdyidnevnik.formatTime
 import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.DropRefreshIndicator
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.dropShift
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberDropRefresh
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.weatherGlass
 import android.content.ClipboardManager
 import android.content.Context
@@ -80,19 +90,38 @@ fun TodayScreen(
     // Погода на стекле: дождь, снег или мороз по прогнозу на сейчас.
     val glass = remember(forecast, now) { GlassWeather.from(forecast, now) }
 
+    // Обновление каплей: капля тянется из края страницы, кольцом крутится, пока идёт загрузка,
+    // и закрывается галочкой. Подпись «обновлено только что» появляется в шапке, а не поверх текста.
+    val pullState = rememberPullToRefreshState()
+    val drop = rememberDropRefresh(refreshing, failed = schedule.error != null)
+    val accent = LocalAccent.current
+
     PullToRefreshBox(
-        isRefreshing = refreshing,
+        isRefreshing = drop.holding(refreshing),
         onRefresh = {
+            drop.pulled()
             vm.refresh(person, 0)
             vm.refresh(person, 1)
             extras.refreshWeather()
             diary.syncPartner()
+        },
+        state = pullState,
+        indicator = {
+            DropRefreshIndicator(
+                state = pullState,
+                drop = drop,
+                refreshing = refreshing,
+                colorTop = accent.primary,
+                colorBottom = accent.light,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         },
         modifier = modifier.fillMaxSize(),
     ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .dropShift(pullState)
                 .weatherGlass(glass),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -113,6 +142,13 @@ fun TodayScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Pill(text = daySummary(todayItems))
+                    AnimatedVisibility(
+                        visible = drop.justUpdated,
+                        enter = fadeIn() + expandHorizontally(),
+                        exit = fadeOut() + shrinkHorizontally(),
+                    ) {
+                        Pill(text = "обновлено только что", accent = true)
+                    }
                     if (profile.hasPractice) {
                         Practice.dayNumber(today)?.let { day ->
                             Pill(text = "практика: день $day из ${Practice.totalDays}", accent = true)
@@ -144,6 +180,10 @@ fun TodayScreen(
             }
 
             item { SectionTitle("Расписание", accent = scheduleAccent(todayItems)) }
+            // Живая полоска дня: пока день идёт, видно, где ты сейчас и что дальше.
+            DayStrip.build(todayItems, now.toLocalTime())?.let { strip ->
+                item { DayStripView(strip, now.toLocalTime()) }
+            }
             when {
                 todayWeek == null && refreshing -> item { InfoNote("Загружаю расписание…") }
                 todayWeek == null -> item {

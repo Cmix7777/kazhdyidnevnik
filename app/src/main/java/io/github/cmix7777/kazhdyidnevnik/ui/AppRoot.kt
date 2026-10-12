@@ -62,6 +62,9 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.Person
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.InkOrigin
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.inkPage
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.inkTouchOrigin
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberSky
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -133,6 +136,7 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
 
     // Живое небо в фоне: солнце, луна и звёзды по времени, облака по прогнозу.
     val sky = rememberSky(extras.forecast)
+    val ink = remember { InkOrigin() }
 
     AccentTheme(chrome) {
         GlowBackground(sky = sky) {
@@ -143,7 +147,11 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                     if (!settingsOpen) {
                         PersonBar(
                             position = position,
-                            onSelect = { person -> scope.launch { pagerState.animateScrollToPage(person.ordinal) } },
+                            onSelect = { person ->
+                                // Чернила потекут сверху, от нажатого имени.
+                                ink.tappedName(if (person.ordinal == 0) 0.27f else 0.68f)
+                                scope.launch { pagerState.animateScrollToPage(person.ordinal) }
+                            },
                             onOpenSettings = { settingsOpen = true },
                         )
                     }
@@ -197,19 +205,34 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                     ) {
                         HorizontalPager(
                             state = pagerState,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .inkTouchOrigin(ink),
                             beyondViewportPageCount = 1,
                             key = { Person.entries[it].id },
                         ) { page ->
                             val person = Person.entries[page]
-                            PersonTheme(person) {
-                                val isOwner = person == owner
-                                when (current) {
-                                    Tab.Today -> TodayScreen(vm, extras, diary, person)
-                                    Tab.Week -> WeekScreen(vm, extras, diary, person, onTogether = { together = it })
-                                    Tab.Budget -> BudgetScreen(diary, person, isOwner)
-                                    Tab.Deadlines -> DeadlinesScreen(diary, person, isOwner)
-                                    Tab.Progress -> ProgressScreen(vm, person)
+                            // Перелив при свайпе: вторая страница проступает чернилами от пальца.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .inkPage(
+                                        pager = pagerState,
+                                        page = page,
+                                        origin = ink,
+                                        first = Accents.of(Person.AIZAT, dark).primary,
+                                        second = Accents.of(Person.NASTYA, dark).primary,
+                                    ),
+                            ) {
+                                PersonTheme(person) {
+                                    val isOwner = person == owner
+                                    when (current) {
+                                        Tab.Today -> TodayScreen(vm, extras, diary, person)
+                                        Tab.Week -> WeekScreen(vm, extras, diary, person, onTogether = { together = it })
+                                        Tab.Budget -> BudgetScreen(diary, person, isOwner)
+                                        Tab.Deadlines -> DeadlinesScreen(diary, person, isOwner)
+                                        Tab.Progress -> ProgressScreen(vm, person)
+                                    }
                                 }
                             }
                         }
