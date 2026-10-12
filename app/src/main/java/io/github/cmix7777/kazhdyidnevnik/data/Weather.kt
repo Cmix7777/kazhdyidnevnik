@@ -22,6 +22,8 @@ data class CurrentWeather(
     val wind: Double?,
     val gusts: Double?,
     val isDay: Boolean,
+    /** Облачность, % (для живого неба). */
+    val cloudCover: Int? = null,
 )
 
 /** Погода на один час. */
@@ -35,6 +37,7 @@ data class HourWeather(
     val wind: Double?,
     val gusts: Double?,
     val isDay: Boolean,
+    val cloudCover: Int? = null,
 ) {
     val feels: Double get() = feelsLike ?: temperature
 }
@@ -101,6 +104,7 @@ object WeatherParser {
             wind = obj.double("wind_speed_10m"),
             gusts = obj.double("wind_gusts_10m"),
             isDay = (obj.int("is_day") ?: 1) == 1,
+            cloudCover = obj.int("cloud_cover"),
         )
     }
 
@@ -114,6 +118,7 @@ object WeatherParser {
         val wind = obj.doubles("wind_speed_10m")
         val gusts = obj.doubles("wind_gusts_10m")
         val isDay = obj.ints("is_day")
+        val clouds = obj.ints("cloud_cover")
         return times.mapIndexedNotNull { i, time ->
             val temperature = temps.getOrNull(i) ?: return@mapIndexedNotNull null
             HourWeather(
@@ -126,6 +131,7 @@ object WeatherParser {
                 wind = wind?.getOrNull(i),
                 gusts = gusts?.getOrNull(i),
                 isDay = (isDay?.getOrNull(i) ?: if (time.hour in 7..18) 1 else 0) == 1,
+                cloudCover = clouds?.getOrNull(i),
             )
         }
     }

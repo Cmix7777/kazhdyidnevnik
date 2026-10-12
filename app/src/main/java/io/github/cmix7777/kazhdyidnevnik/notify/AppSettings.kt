@@ -67,6 +67,26 @@ class AppSettings(context: Context) {
         get() = ThemeMode.fromId(prefs.getString(THEME, null))
         set(value) = prefs.edit { putString(THEME, value.id) }
 
+    /** Меньше анимаций: живые эффекты (склейка недель и др.) показываются сразу, без движения и вибрации. */
+    var reduceMotion: Boolean
+        get() = prefs.getBoolean(REDUCE_MOTION, false)
+        set(value) = prefs.edit { putBoolean(REDUCE_MOTION, value) }
+
+    /** Какой особый день уже показан анимацией (дата и номер), чтобы не повторять её при каждом открытии. */
+    var specialShown: String?
+        get() = prefs.getString(SPECIAL_SHOWN, null)
+        set(value) = prefs.edit { putString(SPECIAL_SHOWN, value) }
+
+    /** Когда я отправлял капли привета (время в миллисекундах, только за последние двое суток). */
+    var sentDrops: List<Long>
+        get() = prefs.getString(SENT_DROPS, null).orEmpty().split(',').mapNotNull { it.trim().toLongOrNull() }
+        set(value) = prefs.edit { putString(SENT_DROPS, value.joinToString(",")) }
+
+    /** До какого времени капли второго человека уже показаны (или тихо отмечены как старые). */
+    var dropsSeenUntil: Long
+        get() = prefs.getLong(DROPS_SEEN_UNTIL, 0L)
+        set(value) = prefs.edit { putLong(DROPS_SEEN_UNTIL, value) }
+
     /** Код связи с телефоном второго человека. null — телефоны не связаны. */
     var pairCode: String?
         get() = prefs.getString(PAIR_SECRET, null)?.takeIf { PairCode.isValid(it) }
@@ -229,6 +249,10 @@ class AppSettings(context: Context) {
         const val PARTNER_WEATHER = "partnerWeather"
         const val OWNER = "owner"
         const val THEME = "theme"
+        const val REDUCE_MOTION = "reduceMotion"
+        const val SPECIAL_SHOWN = "specialShown"
+        const val SENT_DROPS = "sentDrops"
+        const val DROPS_SEEN_UNTIL = "dropsSeenUntil"
         const val LAST_FIRED = "lastFired"
         const val NEXT_ALARM = "nextAlarm"
         const val NOTIFICATIONS_ASKED = "notificationsAsked"

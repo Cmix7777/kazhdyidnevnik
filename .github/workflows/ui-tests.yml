@@ -51,7 +51,11 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-boot-timeout: 900
-          script: gradle --no-daemon --continue connectedDebugAndroidTest > ui-build.log 2>&1
+          # Медленный эмулятор иногда показывает «Приложение не отвечает» про свой лаунчер: это окно
+          # забирает фокус, и Android перестаёт давать приложению буфер обмена. Такие окна прячем.
+          script: |
+            adb shell settings put global hide_error_dialogs 1 || true
+            gradle --no-daemon --continue connectedDebugAndroidTest > ui-build.log 2>&1
 
       - name: Отчёт о тестах экранов
         if: always()

@@ -1,6 +1,7 @@
 package io.github.cmix7777.kazhdyidnevnik.data
 
 import java.time.LocalDate
+import java.time.Year
 import java.time.temporal.ChronoUnit
 
 /**
@@ -14,7 +15,104 @@ data class Deadline(
     val note: String? = null,
     /** Есть у дат, добавленных в приложении: по нему их меняют и удаляют. */
     val id: String? = null,
-)
+    /**
+     * Повод. У особой даты (день рождения, годовщина) он есть: она повторяется каждый год, видна обоим,
+     * в этот день приложение встречает анимацией. null — обычная важная дата без повода.
+     */
+    val occasion: Occasion? = null,
+    /** Чей день рождения (null — кого-то другого). */
+    val whose: Person? = null,
+    /** Год в [date] настоящий: тогда считаем, сколько исполнится или сколько лет вместе. */
+    val yearKnown: Boolean = true,
+) {
+    val special: Boolean get() = occasion != null
+
+    /** Ближайший раз с [today] включительно: особая дата — в этом году или в следующем. */
+    fun nextDate(today: LocalDate): LocalDate = if (occasion == null) date else SpecialDates.next(date, today)
+
+    /** Сколько лет исполнится (или лет вместе) в день [day]; null — год неизвестен или это не особая дата. */
+    fun yearsAt(day: LocalDate): Int? =
+        if (occasion != null && yearKnown) (day.year - date.year).takeIf { it > 0 } else null
+
+    /** Название для показа: своё или по поводу. */
+    val shownTitle: String
+        get() = title.trim().ifEmpty {
+            when (occasion) {
+                Occasion.BIRTHDAY -> whose?.let { "День рождения ${it.genitive}" } ?: "День рождения"
+                Occasion.ANNIVERSARY -> "Годовщина"
+                null -> ""
+            }
+        }
+
+    /** Подпись к особой дате в день [day]: «исполнится 21», «3 года вместе». */
+    fun yearsText(day: LocalDate): String? {
+        val years = yearsAt(day) ?: return null
+        return when (occasion) {
+            Occasion.BIRTHDAY -> "исполнится $years"
+            Occasion.ANNIVERSARY -> "$years ${plural(years.toLong(), "год", "года", "лет")} вместе"
+            null -> null
+        }
+    }
+}
+
+/** Поводы особых дат. Новый год отдельно не добавляется: он особый день для всех сам. */
+enum class Occasion(val id: String, val title: String) {
+    BIRTHDAY("birthday", "День рождения"),
+    ANNIVERSARY("anniversary", "Годовщина");
+
+    companion object {
+        fun fromId(id: String?): Occasion? = entries.firstOrNull { it.id == id }
+    }
+}
+
+/** Что за особый день встречает приложение анимацией. */
+enum class SpecialKind { ANNIVERSARY, BIRTHDAY, NEW_YEAR }
+
+/** Особый день сегодня: вид, дата-основание (у Нового года её нет) и ключ, чтобы показать его один раз. */
+data class SpecialToday(val kind: SpecialKind, val date: Deadline?, val key: String)
+
+object SpecialDates {
+
+    /** Дата [date] в году [year]; 29 февраля в невисокосный год — 28-е. */
+    fun onYear(date: LocalDate, year: Int): LocalDate =
+        if (date.monthValue == 2 && date.dayOfMonth == 29 && !Year.isLeap(year.toLong())) {
+            LocalDate.of(year, 2, 28)
+        } else {
+            date.withYear(year)
+        }
+
+    /** Ближайший раз особой даты, начиная с [today]. */
+    fun next(date: LocalDate, today: LocalDate): LocalDate {
+        val thisYear = onYear(date, today.year)
+        return if (thisYear.isBefore(today)) onYear(date, today.year + 1) else thisYear
+    }
+
+    /** Особые даты обоих без повторов: свои и те, которыми поделился второй человек. */
+    fun merge(mine: List<Deadline>, partners: List<Deadline>): List<Deadline> {
+        val own = mine.filter { it.special }
+        val ids = own.mapNotNull { it.id }.toSet()
+        return own + partners.filter { it.special && it.id !in ids }
+    }
+
+    /**
+     * Какой особый день сегодня. Годовщина важнее дня рождения, день рождения важнее Нового года;
+     * если совпало несколько, показываем один.
+     */
+    fun today(dates: List<Deadline>, today: LocalDate): SpecialToday? {
+        val todays = dates.filter { it.special && it.nextDate(today) == today }
+        todays.firstOrNull { it.occasion == Occasion.ANNIVERSARY }?.let {
+            return SpecialToday(SpecialKind.ANNIVERSARY, it, "$today:${it.id}")
+        }
+        todays.firstOrNull { it.occasion == Occasion.BIRTHDAY }?.let {
+            return SpecialToday(SpecialKind.BIRTHDAY, it, "$today:${it.id}")
+        }
+        if (today.monthValue == 1 && today.dayOfMonth == 1) return SpecialToday(SpecialKind.NEW_YEAR, null, "$today:new-year")
+        return null
+    }
+
+    /** За сколько дней до дня рождения напомнить заранее. */
+    const val BIRTHDAY_AHEAD_DAYS = 7
+}
 
 object Deadlines {
     val default: List<Deadline> = listOf(

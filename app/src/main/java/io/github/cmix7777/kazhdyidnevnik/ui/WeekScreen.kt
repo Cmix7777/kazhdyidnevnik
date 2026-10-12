@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -46,6 +47,7 @@ fun WeekScreen(
     diary: DiaryViewModel,
     person: Person,
     modifier: Modifier = Modifier,
+    onTogether: (offset: Int) -> Unit = {},
 ) {
     val now by rememberNow()
     val today = now.toLocalDate()
@@ -67,15 +69,20 @@ fun WeekScreen(
                 .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Pill(
-                text = when (offset) {
-                    0 -> "эта неделя"
-                    1 -> "следующая неделя"
-                    -1 -> "прошлая неделя"
-                    else -> if (offset > 0) "через ${offset} нед." else "${-offset} нед. назад"
-                },
-                accent = offset == 0,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Pill(
+                    text = when (offset) {
+                        0 -> "эта неделя"
+                        1 -> "следующая неделя"
+                        -1 -> "прошлая неделя"
+                        else -> if (offset > 0) "через ${offset} нед." else "${-offset} нед. назад"
+                    },
+                    accent = offset == 0,
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                // Совместная неделя: обе недели слипаются в одну.
+                TogetherChip(onClick = { onTogether(offset) })
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TwoToneTitle(
                     first = "Неделя",

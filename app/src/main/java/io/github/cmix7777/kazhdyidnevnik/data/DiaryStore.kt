@@ -29,6 +29,9 @@ internal data class DeadlineDto(
     val title: String,
     val date: String,
     val note: String? = null,
+    val occasion: String? = null,
+    val whose: String? = null,
+    val yearKnown: Boolean = true,
 )
 
 @Serializable
@@ -74,7 +77,17 @@ object DiaryCodec {
             )
         },
         deadlines = diary.deadlines.mapNotNull { d ->
-            d.id?.let { DeadlineDto(id = it, title = d.title, date = d.date.toString(), note = d.note) }
+            d.id?.let {
+                DeadlineDto(
+                    id = it,
+                    title = d.title,
+                    date = d.date.toString(),
+                    note = d.note,
+                    occasion = d.occasion?.id,
+                    whose = d.whose?.id,
+                    yearKnown = d.yearKnown,
+                )
+            }
         },
         money = diary.money.map {
             MoneyDto(
@@ -108,7 +121,17 @@ object DiaryCodec {
             }.getOrNull()
         },
         deadlines = dto.deadlines.mapNotNull { d ->
-            runCatching { Deadline(title = d.title, date = LocalDate.parse(d.date), note = d.note, id = d.id) }.getOrNull()
+            runCatching {
+                Deadline(
+                    title = d.title,
+                    date = LocalDate.parse(d.date),
+                    note = d.note,
+                    id = d.id,
+                    occasion = Occasion.fromId(d.occasion),
+                    whose = Person.fromId(d.whose),
+                    yearKnown = d.yearKnown,
+                )
+            }.getOrNull()
         },
         money = dto.money.mapNotNull { m ->
             runCatching {

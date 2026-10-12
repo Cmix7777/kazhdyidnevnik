@@ -40,6 +40,7 @@ import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
 import io.github.cmix7777.kazhdyidnevnik.notify.Notifier
 import io.github.cmix7777.kazhdyidnevnik.notify.SystemSettings
 import io.github.cmix7777.kazhdyidnevnik.service.Backups
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.EffectsSettings
 import java.time.LocalTime
 
 private enum class TimeField { Morning, Evening }
@@ -142,6 +143,29 @@ fun SettingsScreen(
                             onClick = { ThemeSettings.choose(appSettings, option) },
                         )
                     }
+                }
+                GlassDivider()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(text = "Меньше анимаций", style = MaterialTheme.typography.titleSmall, color = Palette.Text)
+                        Text(
+                            text = "Склейка недель и другие живые эффекты показываются сразу, без движения и вибрации.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Palette.TextMuted,
+                        )
+                    }
+                    Switch(
+                        checked = EffectsSettings.reduced,
+                        onCheckedChange = { EffectsSettings.choose(appSettings, it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Palette.Violet,
+                            checkedBorderColor = Color.Transparent,
+                            uncheckedThumbColor = Palette.TextMuted,
+                            uncheckedTrackColor = Palette.Chip,
+                            uncheckedBorderColor = Palette.BorderStrong,
+                        ),
+                    )
                 }
             }
         }

@@ -4,6 +4,7 @@ import android.content.Context
 import io.github.cmix7777.kazhdyidnevnik.data.CloudException
 import io.github.cmix7777.kazhdyidnevnik.data.CloudShares
 import io.github.cmix7777.kazhdyidnevnik.data.DiaryRepository
+import io.github.cmix7777.kazhdyidnevnik.data.GreetingDrops
 import io.github.cmix7777.kazhdyidnevnik.data.PairCode
 import io.github.cmix7777.kazhdyidnevnik.data.PartnerEventsRepository
 import io.github.cmix7777.kazhdyidnevnik.data.PartnerShare
@@ -174,9 +175,11 @@ object PartnerSync {
 
         val diary = DiaryRepository.current(app.filesDir)
         val mine = PartnerShare.relevant(diary.events, LocalDate.now())
-        val fingerprint = PairCode.fingerprint(PartnerShare.encode(SharedEvents(owner, 0L, mine)))
+        val dates = PartnerShare.relevantDates(diary.deadlines)
+        val drops = GreetingDrops.recent(settings.sentDrops, now)
+        val fingerprint = PairCode.fingerprint(PartnerShare.encode(SharedEvents(owner, 0L, mine, dates, drops)))
         if (fingerprint != settings.publishedFingerprint || now - settings.publishedMillis > REPUBLISH_MS) {
-            cloud.publish(code, owner, PartnerShare.encode(SharedEvents(owner, now, mine)), now)
+            cloud.publish(code, owner, PartnerShare.encode(SharedEvents(owner, now, mine, dates, drops)), now)
             settings.publishedFingerprint = fingerprint
             settings.publishedMillis = now
         }

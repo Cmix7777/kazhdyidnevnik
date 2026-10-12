@@ -14,6 +14,7 @@ import io.github.cmix7777.kazhdyidnevnik.data.PartnerEventsRepository
 import io.github.cmix7777.kazhdyidnevnik.data.PartnerShare
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.SharedEvents
+import io.github.cmix7777.kazhdyidnevnik.data.SpecialDates
 import io.github.cmix7777.kazhdyidnevnik.data.dayItems
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
 import io.github.cmix7777.kazhdyidnevnik.data.Lesson
@@ -60,9 +61,17 @@ class DiaryViewModel(app: Application) : AndroidViewModel(app) {
         return person.dayItems(date, lessons, isOwner, events, eventsKnown = isOwner || shared != null)
     }
 
+    /** Особые даты обоих: свои и те, которыми поделился второй человек. */
+    fun specialDates(): List<Deadline> = SpecialDates.merge(diary.deadlines, partnerShare?.dates.orEmpty())
+
     /** Сообщение с моими делами, чтобы отправить второму человеку. */
     fun shareMessage(owner: Person): String {
-        val shared = SharedEvents(owner, System.currentTimeMillis(), PartnerShare.relevant(diary.events, LocalDate.now()))
+        val shared = SharedEvents(
+            owner,
+            System.currentTimeMillis(),
+            PartnerShare.relevant(diary.events, LocalDate.now()),
+            PartnerShare.relevantDates(diary.deadlines),
+        )
         return PartnerShare.message(owner, shared)
     }
 

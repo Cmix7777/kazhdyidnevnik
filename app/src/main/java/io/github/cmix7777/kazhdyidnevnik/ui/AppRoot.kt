@@ -38,6 +38,7 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -62,6 +63,11 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.Person
+import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.InkOrigin
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.inkPage
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.inkTouchOrigin
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberSky
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -116,6 +122,8 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
     val dark = LocalDark.current
     var current by rememberSaveable { mutableStateOf(Tab.Today) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    // Совместная неделя открыта: номер недели относительно текущей, null — закрыта.
+    var together by rememberSaveable { mutableStateOf<Int?>(null) }
     val pagerState = rememberPagerState(initialPage = owner.ordinal) { Person.entries.size }
     val scope = rememberCoroutineScope()
     val position by remember {
@@ -128,8 +136,15 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
         Accents.blend(Accents.of(Person.AIZAT, dark), Accents.of(Person.NASTYA, dark), position)
     }
 
+    // Живое небо в фоне: солнце, луна и звёзды по времени, облака по прогнозу.
+    val sky = rememberSky(extras.forecast)
+    val ink = remember { InkOrigin() }
+    // Капля привета: зажать имя второго человека, чтобы вырастить и бросить каплю.
+    val greeting = rememberGreetingDrop()
+    val sync by PartnerSync.info.collectAsState()
+
     AccentTheme(chrome) {
-        GlowBackground {
+        GlowBackground(sky = sky) {
             Scaffold(
                 containerColor = Color.Transparent,
                 contentColor = Palette.Text,
@@ -137,7 +152,14 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                     if (!settingsOpen) {
                         PersonBar(
                             position = position,
-                            onSelect = { person -> scope.launch { pagerState.animateScrollToPage(person.ordinal) } },
+                            owner = owner,
+                            greeting = greeting,
+                            canGreet = sync.paired && !sync.legacy,
+                            onSelect = { person ->
+                                // Чернила потекут сверху, от нажатого имени.
+                                ink.tappedName(if (person.ordinal == 0) 0.27f else 0.68f)
+                                scope.launch { pagerState.animateScrollToPage(person.ordinal) }
+                            },
                             onOpenSettings = { settingsOpen = true },
                         )
                     }
@@ -162,6 +184,7 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                                 onClick = {
                                     current = tab
                                     settingsOpen = false
+                                    together = null
                                 },
                                 icon = { Icon(painterResource(tab.icon), contentDescription = null) },
                                 label = { Text(tab.title, style = MaterialTheme.typography.labelMedium) },
@@ -183,35 +206,69 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                         SettingsScreen(vm, extras, onBack = { settingsOpen = false }, modifier = Modifier.padding(padding))
                     }
                 } else {
-                    HorizontalPager(
-                        state = pagerState,
+                    Box(
                         modifier = Modifier
                             .padding(padding)
                             .fillMaxSize(),
-                        beyondViewportPageCount = 1,
-                        key = { Person.entries[it].id },
-                    ) { page ->
-                        val person = Person.entries[page]
-                        PersonTheme(person) {
-                            val isOwner = person == owner
-                            when (current) {
-                                Tab.Today -> TodayScreen(vm, extras, diary, person)
-                                Tab.Week -> WeekScreen(vm, extras, diary, person)
-                                Tab.Budget -> BudgetScreen(diary, person, isOwner)
-                                Tab.Deadlines -> DeadlinesScreen(diary, person, isOwner)
-                                Tab.Progress -> ProgressScreen(vm, person)
+                    ) {
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .inkTouchOrigin(ink),
+                            beyondViewportPageCount = 1,
+                            key = { Person.entries[it].id },
+                        ) { page ->
+                            val person = Person.entries[page]
+                            // Перелив при свайпе: вторая страница проступает чернилами от пальца.
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .inkPage(
+                                        pager = pagerState,
+                                        page = page,
+                                        origin = ink,
+                                        first = Accents.of(Person.AIZAT, dark).primary,
+                                        second = Accents.of(Person.NASTYA, dark).primary,
+                                    ),
+                            ) {
+                                PersonTheme(person) {
+                                    val isOwner = person == owner
+                                    when (current) {
+                                        Tab.Today -> TodayScreen(vm, extras, diary, person, active = pagerState.settledPage == page)
+                                        Tab.Week -> WeekScreen(vm, extras, diary, person, onTogether = { together = it })
+                                        Tab.Budget -> BudgetScreen(diary, person, isOwner)
+                                        Tab.Deadlines -> DeadlinesScreen(diary, person, isOwner)
+                                        Tab.Progress -> ProgressScreen(vm, person)
+                                    }
+                                }
                             }
+                        }
+                        together?.let { offset ->
+                            TogetherWeekOverlay(vm, diary, offset, onClose = { together = null })
                         }
                     }
                 }
             }
+            // Особый день (годовщина, день рождения, Новый год): анимация один раз за день поверх всего.
+            SpecialDayHost(diary)
+            // Капля привета: своя в полёте и чужая, если второй человек думал о тебе.
+            GreetingDropLayer(greeting, owner)
+            GreetingArrivalHost(diary, owner)
         }
     }
 }
 
 /** Верхняя строка: переключатель «Айзат / Настя» и кнопка настроек. */
 @Composable
-private fun PersonBar(position: Float, onSelect: (Person) -> Unit, onOpenSettings: () -> Unit) {
+private fun PersonBar(
+    position: Float,
+    owner: Person,
+    greeting: GreetingDropState,
+    canGreet: Boolean,
+    onSelect: (Person) -> Unit,
+    onOpenSettings: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -220,14 +277,28 @@ private fun PersonBar(position: Float, onSelect: (Person) -> Unit, onOpenSetting
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        PersonSwitch(position = position, onSelect = onSelect, modifier = Modifier.weight(1f))
+        PersonSwitch(
+            position = position,
+            owner = owner,
+            greeting = greeting,
+            canGreet = canGreet,
+            onSelect = onSelect,
+            modifier = Modifier.weight(1f),
+        )
         GlassIconButton(icon = R.drawable.ic_settings, contentDescription = "Настройки", onClick = onOpenSettings)
     }
 }
 
 /** Таблетка с двумя именами; подсветка едет вместе со свайпом. */
 @Composable
-private fun PersonSwitch(position: Float, onSelect: (Person) -> Unit, modifier: Modifier = Modifier) {
+private fun PersonSwitch(
+    position: Float,
+    owner: Person,
+    greeting: GreetingDropState,
+    canGreet: Boolean,
+    onSelect: (Person) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val accent = LocalAccent.current
     BoxWithConstraints(
         modifier = modifier
@@ -249,12 +320,17 @@ private fun PersonSwitch(position: Float, onSelect: (Person) -> Unit, modifier: 
         Row(modifier = Modifier.fillMaxSize()) {
             Person.entries.forEach { person ->
                 val selected = abs(position - person.ordinal) < 0.5f
+                val tap = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(CircleShape)
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clip(CircleShape)
-                        .clickable(role = Role.Tab) { onSelect(person) },
+                    // Имя второго человека: нажатие листает, долгое удержание выращивает каплю привета.
+                    modifier = if (person == owner.partner) {
+                        tap.greetingDropSource(greeting, enabled = canGreet, onTap = { onSelect(person) })
+                    } else {
+                        tap.clickable(role = Role.Tab) { onSelect(person) }
+                    },
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(

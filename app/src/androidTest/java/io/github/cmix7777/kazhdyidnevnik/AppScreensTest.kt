@@ -8,7 +8,10 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
@@ -130,12 +133,16 @@ class AppScreensTest {
     /**
      * Прокрутить тот из списков экрана, где есть нужная строка, чтобы она оказалась на виду.
      * Списки ленивые: пока строка далеко за экраном, её в дереве нет, поэтому пробуем все списки и ждём.
+     * Берём только вертикальные списки: горизонтальный листатель страниц тоже умеет «прокрутить к строке»,
+     * но вниз он не листает, и строка могла остаться под краем экрана.
      */
     private fun scrollToItem(text: String, substring: Boolean = false) {
         var last: Throwable? = null
         try {
             compose.waitUntil(20_000) {
-                val lists = compose.onAllNodes(hasScrollToNodeAction())
+                val lists = compose.onAllNodes(
+                    hasScrollToNodeAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange),
+                )
                 val count = lists.fetchSemanticsNodes().size
                 for (index in 0 until count) {
                     try {
@@ -214,7 +221,21 @@ class AppScreensTest {
         // Окно закрылось, дело появилось в списке на сегодня.
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Новое дело")).fetchSemanticsNodes().isEmpty() }
         scrollToItem("Автотест экрана", substring = true)
-        compose.onNodeWithText("Автотест экрана", substring = true).assertIsDisplayed()
+        try {
+            compose.onNodeWithText("Автотест экрана", substring = true).assertIsDisplayed()
+        } catch (e: AssertionError) {
+            // Подробности для разбора: где этот узел, размещён ли он, что на экране, и снимок экрана.
+            val nodes = compose.onAllNodes(hasText("Автотест экрана", substring = true)).fetchSemanticsNodes()
+            val where = nodes.joinToString { "${it.boundsInRoot} placed=${it.layoutInfo.isPlaced}" }
+            runCatching {
+                val dir = java.io.File(context.getExternalFilesDir(null), "shots").apply { mkdirs() }
+                val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+                java.io.FileOutputStream(java.io.File(dir, "fail_added_event.png")).use {
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+                }
+            }
+            throw AssertionError("${e.message} || Узлы: $where || Экран: ${screenTexts()}", e)
+        }
     }
 
     @Test

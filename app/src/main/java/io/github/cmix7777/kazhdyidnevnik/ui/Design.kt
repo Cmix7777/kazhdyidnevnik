@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,17 +43,29 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.R
+import io.github.cmix7777.kazhdyidnevnik.data.SkyState
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.SkyBackground
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.SkyFx
 
-/** Фон всех экранов: почти чёрный, со свечением цвета палитры сверху и тонкими кругами, как в референсе. */
+/**
+ * Фон всех экранов: почти чёрный, со свечением цвета палитры сверху и тонкими кругами, как в референсе.
+ * Если передано [sky] и тема тёмная, вместо этого рисуется живое небо (Android 13+).
+ */
 @Composable
-fun GlowBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
+fun GlowBackground(
+    modifier: Modifier = Modifier,
+    sky: State<SkyState>? = null,
+    content: @Composable BoxScope.() -> Unit,
+) {
     val accent = LocalAccent.current
     val ring = Palette.Ring
+    val showSky = sky != null && LocalDark.current && SkyFx.supported
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(accent.background)
             .drawBehind {
+                if (showSky) return@drawBehind
                 val top = Offset(size.width * 0.5f, -size.width * 0.15f)
                 val topRadius = size.width * 1.05f
                 drawCircle(
@@ -85,8 +98,10 @@ fun GlowBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.
                     )
                 }
             },
-        content = content,
-    )
+    ) {
+        if (showSky && sky != null) SkyBackground(sky, accent.glow)
+        content()
+    }
 }
 
 enum class CardTone { Normal, Highlight, Dim, Danger }
