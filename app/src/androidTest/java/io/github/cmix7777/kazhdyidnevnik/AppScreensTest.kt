@@ -4,6 +4,9 @@ import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
@@ -72,8 +75,42 @@ class AppScreensTest {
         launch()
     }
 
+    /** Все надписи, которые сейчас есть на экране (включая окна поверх него): нужны, чтобы понять причину сбоя. */
+    private fun screenTexts(): String =
+        compose.onAllNodes(SemanticsMatcher("любой узел") { true }).fetchSemanticsNodes()
+            .mapNotNull { node -> node.config.getOrNull(SemanticsProperties.Text)?.joinToString("") { it.text } }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(" | ")
+            .take(450)
+
     private fun waitFor(matcher: SemanticsMatcher, timeoutMs: Long = 20_000) {
-        compose.waitUntil(timeoutMs) { compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+        try {
+            compose.waitUntil(timeoutMs) { compose.onAllNodes(matcher).fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: ComposeTimeoutException) {
+            throw AssertionError("Нужное не появилось. Сейчас на экране: ${screenTexts()}", e)
+        }
+    }
+
+    /**
+     * Нажать «+ Добавить дело» и дождаться окна. Пока грузятся погода и расписание, список под пальцем
+     * может сдвинуться, поэтому при промахе прокручиваем и нажимаем ещё раз (до трёх попыток).
+     */
+    private fun openNewEventEditor() {
+        var lastScreen = ""
+        repeat(3) {
+            scrollToItem("+ Добавить дело")
+            compose.onNodeWithText("+ Добавить дело").performClick()
+            val opened = try {
+                compose.waitUntil(8_000) { compose.onAllNodes(hasText("Новое дело")).fetchSemanticsNodes().isNotEmpty() }
+                true
+            } catch (e: ComposeTimeoutException) {
+                false
+            }
+            if (opened) return
+            lastScreen = screenTexts()
+        }
+        throw AssertionError("Окно «Новое дело» не открылось. Сейчас на экране: $lastScreen")
     }
 
     private fun waitForText(text: String, substring: Boolean = false) = waitFor(hasText(text, substring = substring))
@@ -169,10 +206,7 @@ class AppScreensTest {
     @Test
     fun addedEventShowsUpInTodayList() {
         launchAs(Person.AIZAT)
-        scrollToItem("+ Добавить дело")
-        compose.onNodeWithText("+ Добавить дело").performClick()
-
-        waitForText("Новое дело")
+        openNewEventEditor()
         compose.onNodeWithText("Название (можно не писать)").performTextInput("Автотест экрана")
         compose.onNodeWithText("Сохранить").performClick()
 
@@ -185,9 +219,7 @@ class AppScreensTest {
     @Test
     fun cancelledEditorLeavesNothingBehind() {
         launchAs(Person.AIZAT)
-        scrollToItem("+ Добавить дело")
-        compose.onNodeWithText("+ Добавить дело").performClick()
-        waitForText("Новое дело")
+        openNewEventEditor()
         compose.onNodeWithText("Название (можно не писать)").performTextInput("Это не должно сохраниться")
         compose.onNodeWithText("Отмена").performClick()
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Новое дело")).fetchSemanticsNodes().isEmpty() }
