@@ -56,7 +56,7 @@ jobs:
           script: |
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
-            adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.TogetherWeekShotsTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > instrument.log 2>&1 || true
+            adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.TogetherWeekShotsTest,io.github.cmix7777.kazhdyidnevnik.SpecialDayShotsTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > instrument.log 2>&1 || true
             adb pull /sdcard/Android/data/io.github.cmix7777.kazhdyidnevnik/files/shots shots || true
 
       - name: Отчёт проверки

@@ -174,9 +174,10 @@ object PartnerSync {
 
         val diary = DiaryRepository.current(app.filesDir)
         val mine = PartnerShare.relevant(diary.events, LocalDate.now())
-        val fingerprint = PairCode.fingerprint(PartnerShare.encode(SharedEvents(owner, 0L, mine)))
+        val dates = PartnerShare.relevantDates(diary.deadlines)
+        val fingerprint = PairCode.fingerprint(PartnerShare.encode(SharedEvents(owner, 0L, mine, dates)))
         if (fingerprint != settings.publishedFingerprint || now - settings.publishedMillis > REPUBLISH_MS) {
-            cloud.publish(code, owner, PartnerShare.encode(SharedEvents(owner, now, mine)), now)
+            cloud.publish(code, owner, PartnerShare.encode(SharedEvents(owner, now, mine, dates)), now)
             settings.publishedFingerprint = fingerprint
             settings.publishedMillis = now
         }

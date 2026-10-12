@@ -215,6 +215,8 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                     }
                 }
             }
+            // Особый день (годовщина, день рождения, Новый год): анимация один раз за день поверх всего.
+            SpecialDayHost(diary)
         }
     }
 }

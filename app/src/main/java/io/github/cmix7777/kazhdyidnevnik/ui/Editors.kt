@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import io.github.cmix7777.kazhdyidnevnik.data.Deadline
+import io.github.cmix7777.kazhdyidnevnik.data.Person
+import io.github.cmix7777.kazhdyidnevnik.data.Occasion
 import io.github.cmix7777.kazhdyidnevnik.data.EventKind
 import io.github.cmix7777.kazhdyidnevnik.data.MoneyCategories
 import io.github.cmix7777.kazhdyidnevnik.data.MoneyEntry
@@ -348,6 +350,7 @@ fun EventEditorHost(edit: EventEdit, diary: DiaryViewModel, onClose: () -> Unit)
 }
 
 /** Добавить или изменить важную дату. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DeadlineEditor(
     initial: Deadline?,
@@ -358,15 +361,54 @@ fun DeadlineEditor(
     var title by remember { mutableStateOf(initial?.title.orEmpty()) }
     var date by remember { mutableStateOf(initial?.date ?: LocalDate.now().plusDays(7)) }
     var note by remember { mutableStateOf(initial?.note.orEmpty()) }
+    var occasion by remember { mutableStateOf(initial?.occasion) }
+    var whose by remember { mutableStateOf(initial?.whose) }
+    var yearKnown by remember { mutableStateOf(initial?.yearKnown ?: true) }
     var picking by remember { mutableStateOf(false) }
 
     EditorDialog(title = if (initial == null) "Новая важная дата" else "Важная дата", onDismiss = onDismiss) {
-        EditorField(value = title, onValueChange = { title = it }, label = "Что (зачёт, экзамен, сдача работы…)")
+        EditorLabel("Повод")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            SelectPill(text = "Без повода", selected = occasion == null, onClick = { occasion = null })
+            Occasion.entries.forEach { option ->
+                SelectPill(text = option.title, selected = occasion == option, onClick = { occasion = option })
+            }
+        }
+        if (occasion == Occasion.BIRTHDAY) {
+            EditorLabel("Чей")
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Person.entries.forEach { person ->
+                    SelectPill(text = person.shortName, selected = whose == person, onClick = { whose = person })
+                }
+                SelectPill(text = "Другого человека", selected = whose == null, onClick = { whose = null })
+            }
+        }
+        EditorField(
+            value = title,
+            onValueChange = { title = it },
+            label = if (occasion == null) "Что (зачёт, экзамен, сдача работы…)" else "Название (можно не писать)",
+        )
         EditorLabel("Когда")
         GhostButton(text = formatDate(date), onClick = { picking = true }, small = true)
-        EditorField(value = note, onValueChange = { note = it }, label = "Заметка", singleLine = false)
+        if (occasion != null) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SelectPill(
+                    text = if (occasion == Occasion.BIRTHDAY) "Год рождения верный" else "Год верный",
+                    selected = yearKnown,
+                    onClick = { yearKnown = true },
+                )
+                SelectPill(text = "Год не важен", selected = !yearKnown, onClick = { yearKnown = false })
+            }
+            Text(
+                text = "Повторяется каждый год и видна вам обоим. В этот день приложение встретит анимацией" +
+                    if (occasion == Occasion.BIRTHDAY) ", а за неделю напомнит." else ".",
+                style = MaterialTheme.typography.bodySmall,
+                color = Palette.TextMuted,
+            )
+        }
+        EditorField(value = note, onValueChange = { note = it }, label = "Заметка (видна только тебе)", singleLine = false)
         EditorButtons(
-            canSave = title.isNotBlank(),
+            canSave = title.isNotBlank() || occasion != null,
             onSave = {
                 onSave(
                     Deadline(
@@ -374,6 +416,9 @@ fun DeadlineEditor(
                         date = date,
                         note = note.trim().ifEmpty { null },
                         id = initial?.id ?: DiaryViewModel.newId(),
+                        occasion = occasion,
+                        whose = if (occasion == Occasion.BIRTHDAY) whose else null,
+                        yearKnown = if (occasion != null) yearKnown else true,
                     ),
                 )
             },

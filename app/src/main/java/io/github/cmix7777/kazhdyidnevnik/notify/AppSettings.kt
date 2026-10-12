@@ -72,6 +72,11 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean(REDUCE_MOTION, false)
         set(value) = prefs.edit { putBoolean(REDUCE_MOTION, value) }
 
+    /** Какой особый день уже показан анимацией (дата и номер), чтобы не повторять её при каждом открытии. */
+    var specialShown: String?
+        get() = prefs.getString(SPECIAL_SHOWN, null)
+        set(value) = prefs.edit { putString(SPECIAL_SHOWN, value) }
+
     /** Код связи с телефоном второго человека. null — телефоны не связаны. */
     var pairCode: String?
         get() = prefs.getString(PAIR_SECRET, null)?.takeIf { PairCode.isValid(it) }
@@ -235,6 +240,7 @@ class AppSettings(context: Context) {
         const val OWNER = "owner"
         const val THEME = "theme"
         const val REDUCE_MOTION = "reduceMotion"
+        const val SPECIAL_SHOWN = "specialShown"
         const val LAST_FIRED = "lastFired"
         const val NEXT_ALARM = "nextAlarm"
         const val NOTIFICATIONS_ASKED = "notificationsAsked"

@@ -87,6 +87,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
+    // Пустой экран для тестов отдельных частей интерфейса (createComposeRule)
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     // Разбор страницы расписания, кэш на телефоне, фоновые задачи
     implementation("org.jsoup:jsoup:1.20.1")

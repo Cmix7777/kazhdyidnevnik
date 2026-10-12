@@ -6,6 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
+import io.github.cmix7777.kazhdyidnevnik.data.Deadline
+import io.github.cmix7777.kazhdyidnevnik.data.SpecialDates
+import io.github.cmix7777.kazhdyidnevnik.formatDate
 import io.github.cmix7777.kazhdyidnevnik.data.DiaryRepository
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
@@ -52,6 +55,12 @@ object ReminderScheduler {
         return dayItems(context, person, date)?.let { PlanGenerator.planFor(date, it) }.orEmpty()
     }
 
+    /** Особые даты обоих: свои и те, которыми поделился второй человек. */
+    private fun specialDates(context: Context): List<Deadline> = SpecialDates.merge(
+        DiaryRepository.current(context.filesDir).deadlines,
+        PartnerEventsRepository.current(context.filesDir)?.dates.orEmpty(),
+    )
+
     /** Напоминания в промежутке (from, until]: свои и, если включены, про второго человека. */
     private fun reminders(context: Context, from: LocalDateTime, until: LocalDateTime): List<Reminder> {
         val appSettings = AppSettings(context)
@@ -64,6 +73,12 @@ object ReminderScheduler {
             result += ReminderPlanner.forDay(date, plan(context, owner, date), settings)
             val partnerPlan = if (settings.partner.study) plan(context, owner.partner, date) else emptyList()
             result += ReminderPlanner.forPartnerDay(date, partnerPlan, settings)
+            date = date.plusDays(1)
+        }
+        val special = specialDates(context)
+        date = from.toLocalDate()
+        while (!date.isAfter(until.toLocalDate())) {
+            result += ReminderPlanner.forSpecial(date, special)
             date = date.plusDays(1)
         }
         // Напоминание о деле утром может прийти ещё накануне вечером, поэтому смотрим на день дальше.
@@ -173,6 +188,19 @@ object ReminderScheduler {
                 // Дело могли перенести или убрать — тогда напомним по новому времени.
                 if (!event.occursOn(startsAt.toLocalDate()) || event.start != startsAt.toLocalTime()) return
                 Notifier.event(context, event, startsAt.toLocalDate())
+            }
+            ReminderKind.SPECIAL -> {
+                val deadline = specialDates(context).firstOrNull { it.id == reminder.eventId } ?: return
+                val day = date.plusDays(reminder.daysBefore.toLong())
+                // Дату могли перенести или удалить — тогда напоминать не о чем.
+                if (deadline.nextDate(date) != day) return
+                val title = if (reminder.daysBefore == 0) "Сегодня особенный день" else "Через неделю: ${deadline.shownTitle}"
+                val text = if (reminder.daysBefore == 0) {
+                    listOfNotNull(deadline.shownTitle, deadline.yearsText(day)).joinToString(": ")
+                } else {
+                    listOfNotNull(formatDate(day), deadline.yearsText(day)).joinToString(", ") + ". Самое время подумать о подарке."
+                }
+                Notifier.special(context, "${deadline.id}-${reminder.daysBefore}", title, text)
             }
             ReminderKind.EVENING -> {
                 if (reminder.partner) return

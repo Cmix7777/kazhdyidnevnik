@@ -172,6 +172,16 @@ object Notifier {
         post(context, id, notification)
     }
 
+    /** Особая дата: день рождения, годовщина (в сам день и заранее). [key] отличает одно напоминание от другого. */
+    fun special(context: Context, key: String, title: String, text: String) {
+        val id = 5000 + ((key.hashCode() and 0x7FFFFFFF) % 1000)
+        val notification = builder(context, CHANNEL_EVENTS, title, text)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_EVENT)
+            .build()
+        post(context, id, notification)
+    }
+
     fun weather(context: Context, title: String, text: String, partner: Boolean = false) {
         val id = ID_WEATHER + if (partner) PARTNER_OFFSET else 0
         post(context, id, builder(context, CHANNEL_WEATHER, title, text).build())

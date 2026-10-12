@@ -5,7 +5,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 
-enum class ReminderKind { CHECK, MORNING, BLOCK, WEATHER, EVENING, EVENT }
+enum class ReminderKind { CHECK, MORNING, BLOCK, WEATHER, EVENING, EVENT, SPECIAL }
 
 /**
  * Одно напоминание: когда и что. Для блока учёбы [block] — его вид.
@@ -16,8 +16,10 @@ data class Reminder(
     val kind: ReminderKind,
     val block: PlanKind? = null,
     val partner: Boolean = false,
-    /** Для напоминания о своём деле — его номер. */
+    /** Для напоминания о своём деле — его номер; для особой даты — её номер. */
     val eventId: String? = null,
+    /** Для особой даты: за сколько дней до неё напоминание (0 — в сам день). */
+    val daysBefore: Int = 0,
 )
 
 /** Какие уведомления приходят про второго человека. По умолчанию — никакие. */
@@ -103,6 +105,27 @@ object ReminderPlanner {
             }
             .sortedBy { it.at.toLocalTime() }
 
+    /** Когда напоминать об особой дате: в сам день утром, а о дне рождения ещё и за неделю. */
+    val specialTime: LocalTime = LocalTime.of(9, 0)
+    val specialAheadTime: LocalTime = LocalTime.of(10, 0)
+
+    /** Напоминания об особых датах (дни рождения, годовщины), которые приходятся на [date]. */
+    fun forSpecial(date: LocalDate, dates: List<Deadline>): List<Reminder> {
+        val result = mutableListOf<Reminder>()
+        for (deadline in dates) {
+            val id = deadline.id ?: continue
+            if (!deadline.special) continue
+            if (deadline.nextDate(date) == date) {
+                result += Reminder(date.atTime(specialTime), ReminderKind.SPECIAL, eventId = id)
+            }
+            val ahead = SpecialDates.BIRTHDAY_AHEAD_DAYS
+            if (deadline.occasion == Occasion.BIRTHDAY && deadline.nextDate(date) == date.plusDays(ahead.toLong())) {
+                result += Reminder(date.atTime(specialAheadTime), ReminderKind.SPECIAL, eventId = id, daysBefore = ahead)
+            }
+        }
+        return result
+    }
+
     /** Насколько напоминание может опоздать (телефон спал), чтобы его ещё стоило показать. */
     fun maxDelay(kind: ReminderKind): Duration = when (kind) {
         ReminderKind.CHECK -> Duration.ofHours(6)
@@ -111,5 +134,6 @@ object ReminderPlanner {
         ReminderKind.WEATHER -> Duration.ofHours(2)
         ReminderKind.EVENING -> Duration.ofHours(2)
         ReminderKind.EVENT -> Duration.ofMinutes(30)
+        ReminderKind.SPECIAL -> Duration.ofHours(10)
     }
 }
