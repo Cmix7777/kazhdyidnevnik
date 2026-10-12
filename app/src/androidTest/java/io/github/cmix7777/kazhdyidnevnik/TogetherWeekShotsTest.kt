@@ -64,6 +64,9 @@ class TogetherWeekShotsTest {
     fun gluingWeeksFrames() {
         scenario = ActivityScenario.launch(MainActivity::class.java)
         compose.waitUntil(30_000) { compose.onAllNodes(hasText("Неделя") and hasClickAction()).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitForIdle()
+        // Экран «Сегодня» как есть: живое небо и погода на стекле по настоящему прогнозу.
+        save("app_today")
         compose.onAllNodes(hasText("Неделя") and hasClickAction()).onLast().performClick()
         compose.waitUntil(30_000) { compose.onAllNodes(hasText("вместе") and hasClickAction()).fetchSemanticsNodes().isNotEmpty() }
         compose.waitForIdle()

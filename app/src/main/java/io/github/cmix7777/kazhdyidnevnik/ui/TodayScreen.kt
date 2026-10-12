@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.BuildConfig
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
+import io.github.cmix7777.kazhdyidnevnik.data.GlassWeather
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
 import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
@@ -42,6 +43,7 @@ import io.github.cmix7777.kazhdyidnevnik.formatDayTitle
 import io.github.cmix7777.kazhdyidnevnik.formatStamp
 import io.github.cmix7777.kazhdyidnevnik.formatTime
 import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.weatherGlass
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -75,6 +77,8 @@ fun TodayScreen(
     }
     val refreshing = vm.isLoading(person, 0)
     val forecast = extras.forecast
+    // Погода на стекле: дождь, снег или мороз по прогнозу на сейчас.
+    val glass = remember(forecast, now) { GlassWeather.from(forecast, now) }
 
     PullToRefreshBox(
         isRefreshing = refreshing,
@@ -87,7 +91,9 @@ fun TodayScreen(
         modifier = modifier.fillMaxSize(),
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .weatherGlass(glass),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {

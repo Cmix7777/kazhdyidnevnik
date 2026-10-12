@@ -62,6 +62,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.Person
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberSky
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -130,8 +131,11 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
         Accents.blend(Accents.of(Person.AIZAT, dark), Accents.of(Person.NASTYA, dark), position)
     }
 
+    // Живое небо в фоне: солнце, луна и звёзды по времени, облака по прогнозу.
+    val sky = rememberSky(extras.forecast)
+
     AccentTheme(chrome) {
-        GlowBackground {
+        GlowBackground(sky = sky) {
             Scaffold(
                 containerColor = Color.Transparent,
                 contentColor = Palette.Text,

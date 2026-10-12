@@ -15,9 +15,9 @@ object WeatherRepository {
 
     private const val URL = "https://api.open-meteo.com/v1/forecast" +
         "?latitude=56.85&longitude=53.20" +
-        "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,is_day" +
+        "&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,is_day,cloud_cover" +
         "&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code," +
-        "wind_speed_10m,wind_gusts_10m,is_day" +
+        "wind_speed_10m,wind_gusts_10m,is_day,cloud_cover" +
         "&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_min," +
         "precipitation_probability_max,precipitation_sum,snowfall_sum,wind_speed_10m_max,wind_gusts_10m_max" +
         "&wind_speed_unit=ms&timezone=Europe%2FSamara&forecast_days=8"
