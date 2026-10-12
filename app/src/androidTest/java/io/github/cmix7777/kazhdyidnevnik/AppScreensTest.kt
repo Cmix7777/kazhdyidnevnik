@@ -89,20 +89,29 @@ class AppScreensTest {
         }
     }
 
-    /** Прокрутить тот из списков экрана, где есть нужная строка, чтобы она оказалась на виду. */
+    /**
+     * Прокрутить тот из списков экрана, где есть нужная строка, чтобы она оказалась на виду.
+     * Списки ленивые: пока строка далеко за экраном, её в дереве нет, поэтому пробуем все списки и ждём.
+     */
     private fun scrollToItem(text: String, substring: Boolean = false) {
-        val lists = compose.onAllNodes(hasScrollToNodeAction())
-        val count = lists.fetchSemanticsNodes().size
         var last: Throwable? = null
-        for (index in 0 until count) {
-            try {
-                lists[index].performScrollToNode(hasText(text, substring = substring))
-                return
-            } catch (e: Throwable) {
-                last = e
+        try {
+            compose.waitUntil(20_000) {
+                val lists = compose.onAllNodes(hasScrollToNodeAction())
+                val count = lists.fetchSemanticsNodes().size
+                for (index in 0 until count) {
+                    try {
+                        lists[index].performScrollToNode(hasText(text, substring = substring))
+                        return@waitUntil true
+                    } catch (e: Throwable) {
+                        last = e
+                    }
+                }
+                false
             }
+        } catch (e: Throwable) {
+            throw AssertionError("Не нашёл на экране «$text» ни в одном списке: ${last?.message}", e)
         }
-        throw AssertionError("Не нашёл на экране «$text» ни в одном списке", last)
     }
 
     private fun openSettings() {
@@ -160,7 +169,6 @@ class AppScreensTest {
     @Test
     fun addedEventShowsUpInTodayList() {
         launchAs(Person.AIZAT)
-        waitForText("Расписание", substring = true)
         scrollToItem("+ Добавить дело")
         compose.onNodeWithText("+ Добавить дело").performClick()
 
@@ -177,7 +185,6 @@ class AppScreensTest {
     @Test
     fun cancelledEditorLeavesNothingBehind() {
         launchAs(Person.AIZAT)
-        waitForText("Расписание", substring = true)
         scrollToItem("+ Добавить дело")
         compose.onNodeWithText("+ Добавить дело").performClick()
         waitForText("Новое дело")
