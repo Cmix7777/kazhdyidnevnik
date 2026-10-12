@@ -60,11 +60,11 @@ half4 main(float2 p) {
     }
     float bump = sin(3.14159 * s);
     float t = s * 2.5;
-    // Волнистый край: несколько волн по кругу вместо дорогого шума.
+    // Мягкий волнистый край: несколько крупных волн по кругу вместо дорогого шума.
+    // Пока пятно маленькое, волны слабее, чтобы край не мельчил.
     float ang = atan(d.y, d.x + 0.0001);
-    float warp = (sin(ang * 5.0 + t * 1.3) * 0.5 + sin(ang * 9.0 - t * 1.7 + 1.3) * 0.3 + sin(ang * 17.0 + t * 2.3 + 0.7) * 0.2) * 44.0
-               + sin(ang * 31.0 - t * 3.1) * 5.0;
-    float e = raw + warp * bump;
+    float warp = (sin(ang * 4.0 + t * 1.3) * 0.55 + sin(ang * 7.0 - t * 1.7 + 1.3) * 0.3 + sin(ang * 11.0 + t * 2.3 + 0.7) * 0.15) * 44.0;
+    float e = raw + warp * bump * min(1.0, R / 220.0);
     float m = smoothstep(5.0, -5.0, e);
     float mask = mix(1.0 - m, m, uInside);
     float2 dir = d / max(dist, 0.001);

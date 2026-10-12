@@ -133,6 +133,8 @@ class LiveUiShotsTest {
                 val state = rememberPullToRefreshState()
                 val drop = rememberDropRefresh(refreshing.value, failed = false)
                 LaunchedEffect(fraction.floatValue) { state.snapTo(fraction.floatValue) }
+                // Как будто обновление начато жестом: тогда в конце рисуется галочка.
+                LaunchedEffect(refreshing.value) { if (refreshing.value) drop.pulled() }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

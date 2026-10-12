@@ -175,7 +175,9 @@ fun rememberDropRefresh(refreshing: Boolean, failed: Boolean): DropRefreshState 
             return@LaunchedEffect
         }
         if (!state.wasRefreshing) return@LaunchedEffect
-        if (failedNow) {
+        // Галочка только когда обновляли сами жестом и всё получилось. Обновление при запуске
+        // приложения просто тихо прячет кольцо.
+        if (failedNow || !state.byUser) {
             state.wasRefreshing = false
             state.byUser = false
             return@LaunchedEffect
@@ -187,14 +189,12 @@ fun rememberDropRefresh(refreshing: Boolean, failed: Boolean): DropRefreshState 
         } finally {
             state.done = false
         }
-        if (state.byUser) {
-            state.byUser = false
-            try {
-                state.justUpdated = true
-                delay(LABEL_MS)
-            } finally {
-                state.justUpdated = false
-            }
+        state.byUser = false
+        try {
+            state.justUpdated = true
+            delay(LABEL_MS)
+        } finally {
+            state.justUpdated = false
         }
     }
     return state
