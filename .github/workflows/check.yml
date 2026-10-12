@@ -56,6 +56,9 @@ jobs:
           script: |
             adb install -r app/build/outputs/apk/debug/app-debug.apk
             adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb logcat -c || true
+            adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.AppScreensTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > screens.log 2>&1 || true
+            adb logcat -d -v time > logcat.txt 2>&1 || true
             adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.TogetherWeekShotsTest,io.github.cmix7777.kazhdyidnevnik.SpecialDayShotsTest,io.github.cmix7777.kazhdyidnevnik.WeatherShotsTest,io.github.cmix7777.kazhdyidnevnik.LiveUiShotsTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > instrument.log 2>&1 || true
             adb pull /sdcard/Android/data/io.github.cmix7777.kazhdyidnevnik/files/shots shots || true
 
@@ -79,6 +82,10 @@ jobs:
             grep -A 25 "What went wrong" "$GITHUB_WORKSPACE/build.log" 2>/dev/null | head -n 120 || true
             echo "--- instrument ---"
             tail -n 80 "$GITHUB_WORKSPACE/instrument.log" 2>/dev/null || true
+            echo "--- screens ---"
+            tail -n 60 "$GITHUB_WORKSPACE/screens.log" 2>/dev/null || true
+            echo "--- logcat ---"
+            grep -iE "clipboard|ANR in|not responding|FATAL EXCEPTION|AndroidRuntime|WindowManager.*focus|Input dispatching" "$GITHUB_WORKSPACE/logcat.txt" 2>/dev/null | head -n 80 || true
           } > status.txt
           cp -r "$GITHUB_WORKSPACE/shots" . 2>/dev/null || true
           mkdir -p tests && cp -r "$GITHUB_WORKSPACE"/app/build/test-results/testDebugUnitTest/*.xml tests/ 2>/dev/null || true

@@ -146,17 +146,21 @@ class DropRefreshState {
     var justUpdated by mutableStateOf(false)
         internal set
 
-    /** Обновление начато жестом (а не само при запуске): только тогда показываем подпись в шапке. */
-    internal var byUser = false
+    /**
+     * Обновление начато жестом. Только тогда капля держит промежуток и рисует галочку: обновление
+     * при запуске приложения идёт тихо, страница не сдвигается и ничего не перекрывает.
+     */
+    var byUser by mutableStateOf(false)
+        internal set
 
     /**
-     * Обновление шло и ещё не разобрано. Это состояние, а не простой флаг: в кадр, когда загрузка
+     * Обновление жестом шло и ещё не разобрано. Это состояние, а не простой флаг: в кадр, когда загрузка
      * уже кончилась, а галочка ещё не включилась, капля не должна на миг снова повиснуть на шейке.
      */
     internal var wasRefreshing by mutableStateOf(false)
 
-    /** Индикатор держит страницу сдвинутой: пока идёт обновление и пока видна галочка. */
-    fun holding(refreshing: Boolean): Boolean = refreshing || done || wasRefreshing
+    /** Индикатор держит страницу сдвинутой: пока идёт обновление жестом и пока видна галочка. */
+    fun holding(refreshing: Boolean): Boolean = (refreshing && byUser) || done || wasRefreshing
 
     fun pulled() {
         byUser = true
@@ -168,16 +172,15 @@ class DropRefreshState {
 fun rememberDropRefresh(refreshing: Boolean, failed: Boolean): DropRefreshState {
     val state = remember { DropRefreshState() }
     val failedNow by rememberUpdatedState(failed)
-    LaunchedEffect(refreshing) {
-        if (refreshing) {
+    val loading = refreshing && state.byUser
+    LaunchedEffect(loading) {
+        if (loading) {
             state.wasRefreshing = true
             state.justUpdated = false
             return@LaunchedEffect
         }
         if (!state.wasRefreshing) return@LaunchedEffect
-        // Галочка только когда обновляли сами жестом и всё получилось. Обновление при запуске
-        // приложения просто тихо прячет кольцо.
-        if (failedNow || !state.byUser) {
+        if (failedNow) {
             state.wasRefreshing = false
             state.byUser = false
             return@LaunchedEffect
@@ -185,11 +188,11 @@ fun rememberDropRefresh(refreshing: Boolean, failed: Boolean): DropRefreshState 
         try {
             state.done = true
             state.wasRefreshing = false
+            state.byUser = false
             delay(DONE_HOLD_MS)
         } finally {
             state.done = false
         }
-        state.byUser = false
         try {
             state.justUpdated = true
             delay(LABEL_MS)

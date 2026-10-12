@@ -123,7 +123,7 @@ fun TodayScreen(
             DropRefreshIndicator(
                 state = pullState,
                 drop = drop,
-                refreshing = refreshing,
+                refreshing = refreshing && drop.byUser,
                 colorTop = accent.primary,
                 colorBottom = accent.light,
                 modifier = Modifier.align(Alignment.TopCenter),
