@@ -8,7 +8,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,9 +31,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -70,6 +69,8 @@ import io.github.cmix7777.kazhdyidnevnik.formatWeekRange
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.EffectsSettings
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.GLUE_AGSL
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.Haptics
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.SkyFx
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberEffectTime
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -200,17 +201,17 @@ fun TogetherWeekOverlay(
     val shown = remember { Animatable(0f) }
     var latched by remember { mutableStateOf(!animate) }
     var closing by remember { mutableStateOf(false) }
-    var time by remember { mutableFloatStateOf(0f) }
     val glueSpec = spring<Float>(dampingRatio = GlueParams.DAMPING, stiffness = GlueParams.STIFFNESS)
 
     fun latch() {
-        if (latched) return
+        if (latched || closing) return
         latched = true
         Haptics.glue(context)
         scope.launch { fuse.animateTo(1f, tween(450, easing = FastOutSlowInEasing)) }
     }
 
     fun glue() {
+        if (closing) return
         scope.launch {
             p.animateTo(1f, glueSpec) { if (value >= 0.985f) latch() }
             latch()
@@ -221,14 +222,18 @@ fun TogetherWeekOverlay(
         if (closing) return
         closing = true
         scope.launch {
-            latched = false
-            fuse.animateTo(0f, tween(160))
-            if (animate) {
-                Haptics.tear(context)
-                p.animateTo(0f, spring(dampingRatio = 0.6f, stiffness = 220f))
+            // Даже если анимацию закрытия что-то прервёт, неделя всё равно закроется.
+            try {
+                latched = false
+                fuse.animateTo(0f, tween(160))
+                if (animate) {
+                    Haptics.tear(context)
+                    p.animateTo(0f, spring(dampingRatio = 0.6f, stiffness = 220f))
+                }
+                shown.animateTo(0f, tween(180))
+            } finally {
+                onClose()
             }
-            shown.animateTo(0f, tween(180))
-            onClose()
         }
     }
 
@@ -239,15 +244,14 @@ fun TogetherWeekOverlay(
             glue()
         }
     }
-    LaunchedEffect(animate) {
-        if (!animate) return@LaunchedEffect
-        // Бесконечная анимация переливов: в автотестах она сама отключается и не мешает ждать экран.
-        val start = withInfiniteAnimationFrameNanos { it }
-        while (true) {
-            withInfiniteAnimationFrameNanos { time = (it - start) / 1_000_000_000f }
-        }
-    }
+    // Переливы на склейке: 30 кадров в секунду хватает, чаще только зря грузит телефон.
+    val clock = rememberEffectTime(fps = 30, running = animate)
     BackHandler { close() }
+    // Совместная неделя почти непрозрачна: небо под ней можно не перерисовывать.
+    DisposableEffect(Unit) {
+        SkyFx.covered = true
+        onDispose { SkyFx.covered = false }
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -272,7 +276,7 @@ fun TogetherWeekOverlay(
         val shaderOk = remember { mutableStateOf(animate && EffectsSettings.shadersSupported) }
 
         if (shaderOk.value && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            GlueShaderLayer(geometry, { p.value }, { fuse.value }, { time }, dark, onFail = { shaderOk.value = false })
+            GlueShaderLayer(geometry, { p.value }, { fuse.value }, clock, dark, onFail = { shaderOk.value = false })
         } else {
             GlueSimpleLayer(geometry, { p.value }, { fuse.value })
         }
@@ -331,6 +335,7 @@ fun TogetherWeekOverlay(
                     detectHorizontalDragGestures(
                         onDragStart = {
                             pulled = 0f
+                            if (closing) return@detectHorizontalDragGestures
                             if (latched) {
                                 latched = false
                                 scope.launch { fuse.animateTo(0f, tween(140)) }
@@ -338,12 +343,15 @@ fun TogetherWeekOverlay(
                         },
                         onHorizontalDrag = { change, amount ->
                             change.consume()
+                            if (closing) return@detectHorizontalDragGestures
                             pulled += amount
                             val value = (1f - abs(pulled) / (widthPx * 0.55f)).coerceIn(0f, 1f)
                             scope.launch { p.snapTo(value) }
                         },
                         onDragEnd = {
-                            if (p.value < 0.55f) close() else glue()
+                            if (!closing) {
+                                if (p.value < 0.55f) close() else glue()
+                            }
                         },
                         onDragCancel = { glue() },
                     )

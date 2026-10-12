@@ -21,15 +21,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.data.DayStrip
 import io.github.cmix7777.kazhdyidnevnik.formatTime
-import io.github.cmix7777.kazhdyidnevnik.ui.fx.EffectsSettings
-import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberEffectTime
 import java.time.LocalTime
 import kotlin.math.sin
 
@@ -38,15 +35,15 @@ import kotlin.math.sin
  * до бусины «сейчас», от бусины расходится лёгкая волна. Под полоской одна строка: что идёт и что дальше.
  */
 @Composable
-fun DayStripView(strip: DayStrip, now: LocalTime, modifier: Modifier = Modifier) {
+fun DayStripView(strip: DayStrip, now: LocalTime, clock: () -> Float, modifier: Modifier = Modifier) {
     val accent = LocalAccent.current
     val track = Palette.Text
     val labelColor = Palette.TextMuted
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall
     val position by animateFloatAsState(strip.now, tween(900), label = "now")
-    // Волна от бусины только пока день идёт; при «меньше анимаций» полоска неподвижна.
-    val time = rememberEffectTime(fps = 20, running = EffectsSettings.animate(LocalContext.current))
+    // Волна от бусины идёт по общим часам страницы; при «меньше анимаций» они стоят и полоска неподвижна.
+    val time = clock
     val label = formatTime(now)
 
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {

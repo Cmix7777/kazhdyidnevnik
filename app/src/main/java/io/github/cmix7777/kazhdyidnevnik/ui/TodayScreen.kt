@@ -51,7 +51,10 @@ import io.github.cmix7777.kazhdyidnevnik.formatStamp
 import io.github.cmix7777.kazhdyidnevnik.formatTime
 import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.DropRefreshIndicator
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.EffectsSettings
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.dropShift
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.moving
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberEffectTime
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberDropRefresh
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.weatherGlass
 import android.content.ClipboardManager
@@ -66,6 +69,8 @@ fun TodayScreen(
     diary: DiaryViewModel,
     person: Person,
     modifier: Modifier = Modifier,
+    /** Страница сейчас на экране. Спрятанная страница не тратит силы на живые эффекты. */
+    active: Boolean = true,
 ) {
     val now by rememberNow()
     val today = now.toLocalDate()
@@ -89,6 +94,14 @@ fun TodayScreen(
     val forecast = extras.forecast
     // Погода на стекле: дождь, снег или мороз по прогнозу на сейчас.
     val glass = remember(forecast, now) { GlassWeather.from(forecast, now) }
+    // Живая полоска дня: пока день идёт, видно, где ты сейчас и что дальше.
+    val strip = DayStrip.build(todayItems, now.toLocalTime())
+    // Одни часы на страницу для стекла и полоски: картинка обновляется один раз за тик.
+    val animate = EffectsSettings.animate(LocalContext.current)
+    val clock = rememberEffectTime(
+        fps = if (glass.moving()) 30 else 20,
+        running = active && animate && (glass.moving() || strip != null),
+    )
 
     // Обновление каплей: капля тянется из края страницы, кольцом крутится, пока идёт загрузка,
     // и закрывается галочкой. Подпись «обновлено только что» появляется в шапке, а не поверх текста.
@@ -122,7 +135,7 @@ fun TodayScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .dropShift(pullState)
-                .weatherGlass(glass),
+                .weatherGlass(glass, clock, active),
             contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -180,9 +193,8 @@ fun TodayScreen(
             }
 
             item { SectionTitle("Расписание", accent = scheduleAccent(todayItems)) }
-            // Живая полоска дня: пока день идёт, видно, где ты сейчас и что дальше.
-            DayStrip.build(todayItems, now.toLocalTime())?.let { strip ->
-                item { DayStripView(strip, now.toLocalTime()) }
+            strip?.let {
+                item { DayStripView(it, now.toLocalTime(), clock) }
             }
             when {
                 todayWeek == null && refreshing -> item { InfoNote("Загружаю расписание…") }

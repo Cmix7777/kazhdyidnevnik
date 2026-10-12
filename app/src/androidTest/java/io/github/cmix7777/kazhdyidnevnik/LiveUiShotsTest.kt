@@ -69,6 +69,7 @@ import io.github.cmix7777.kazhdyidnevnik.ui.fx.dropShift
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.inkPage
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.inkTouchOrigin
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberDropRefresh
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberEffectTime
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -194,7 +195,7 @@ class LiveUiShotsTest {
                 ) {
                     for (time in listOf(LocalTime.of(8, 20), LocalTime.of(9, 50), LocalTime.of(12, 35), LocalTime.of(17, 10))) {
                         SectionTitle("Расписание", accent = "9:00–20:00")
-                        DayStripView(DayStrip.build(items, time)!!, time)
+                        DayStripView(DayStrip.build(items, time)!!, time, rememberEffectTime(20))
                     }
                 }
             }
@@ -210,10 +211,12 @@ class LiveUiShotsTest {
         compose.setContent {
             Dark {
                 val pager = rememberPagerState { 2 }
+                // Как в приложении: страницы прозрачные, фон общий. Так видно, не просвечивают ли они друг через друга.
                 HorizontalPager(
                     state = pager,
                     modifier = Modifier
                         .fillMaxSize()
+                        .background(LocalAccent.current.background)
                         .inkTouchOrigin(origin),
                     beyondViewportPageCount = 1,
                 ) { page ->
@@ -224,10 +227,7 @@ class LiveUiShotsTest {
                             .inkPage(pager, page, origin, Accents.of(Person.AIZAT, true).primary, Accents.of(Person.NASTYA, true).primary),
                     ) {
                         PersonTheme(person) {
-                            FakePage(
-                                title = person.shortName,
-                                modifier = Modifier.background(if (page == 0) Color(0xFF1A0608) else Color(0xFF060E1F)),
-                            )
+                            FakePage(title = person.shortName)
                         }
                     }
                 }
@@ -265,7 +265,7 @@ class LiveUiShotsTest {
         compose.setContent {
             Dark {
                 val scope = rememberCoroutineScope()
-                val state = remember { GreetingDropState(scope) { sent = it } }
+                val state = remember { GreetingDropState(scope, send = { sent = it }, cancelSend = { sent = 0L }) }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

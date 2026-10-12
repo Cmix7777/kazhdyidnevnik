@@ -63,6 +63,6 @@ half4 main(float2 p) {
 
     float3 col = mix(edge, fill, cov) + (edge * 0.9 * shimmer + float3(0.08)) * rim;
     float a = max(max(cov, clamp(glowA, 0.0, 1.0)), rim);
-    return half4(half3(col * a), half(a));
+    return half4(half3(min(col, float3(1.0)) * a), half(a));
 }
 """

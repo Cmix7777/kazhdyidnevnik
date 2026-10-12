@@ -36,6 +36,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -77,6 +78,7 @@ import io.github.cmix7777.kazhdyidnevnik.ui.fx.Haptics
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberEffectTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -92,7 +94,13 @@ import kotlin.math.sin
  * Случайное касание ничего не отправит: капля должна дорасти до конца.
  */
 @Stable
-class GreetingDropState(private val scope: CoroutineScope, private val onSend: (Long) -> Unit) {
+class GreetingDropState(
+    private val scope: CoroutineScope,
+    /** Поставить каплю в очередь: она уйдёт через три секунды, если её не отменить. */
+    private val send: (Long) -> Unit,
+    /** Отменить каплю, которая ещё ждёт отправки. */
+    private val cancelSend: () -> Unit,
+) {
     enum class Phase { Idle, Holding, Flying, Waiting }
 
     var phase by mutableStateOf(Phase.Idle)
@@ -159,12 +167,12 @@ class GreetingDropState(private val scope: CoroutineScope, private val onSend: (
             fly.animateTo(1f, tween(FLY_MS, easing = FastOutSlowInEasing))
             phase = Phase.Waiting
             waitingSince = System.currentTimeMillis()
+            send(waitingSince)
             launch {
                 ripple.snapTo(0f)
                 ripple.animateTo(1f, tween(500))
             }
             delay(GreetingDrops.UNDO_MS)
-            onSend(waitingSince)
             phase = Phase.Idle
             grow.snapTo(0f)
         }
@@ -179,6 +187,7 @@ class GreetingDropState(private val scope: CoroutineScope, private val onSend: (
     /** Отменить уже брошенную каплю: она никуда не уйдёт. */
     fun undo() {
         if (phase != Phase.Waiting && phase != Phase.Flying) return
+        cancelSend()
         job?.cancel()
         job = null
         phase = Phase.Idle
@@ -201,17 +210,38 @@ class GreetingDropState(private val scope: CoroutineScope, private val onSend: (
     }
 }
 
-/** Состояние отправки: брошенная капля сохраняется и сразу уходит второму телефону. */
+/** Состояние отправки: брошенная капля ждёт три секунды в [DropOutbox] и уходит второму телефону. */
 @Composable
 fun rememberGreetingDrop(): GreetingDropState {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     return remember {
-        GreetingDropState(scope) { at ->
-            val settings = AppSettings(context)
+        GreetingDropState(scope, send = { at -> DropOutbox.schedule(context, at) }, cancelSend = DropOutbox::cancel)
+    }
+}
+
+/**
+ * Очередь капли на отправку. Живёт дольше экрана: если во время трёх секунд на отмену повернуть
+ * телефон или сменится тема, капля всё равно уйдёт.
+ */
+object DropOutbox {
+    private val scope = MainScope()
+    private var job: Job? = null
+
+    fun schedule(context: Context, at: Long) {
+        val app = context.applicationContext
+        job?.cancel()
+        job = scope.launch {
+            delay(GreetingDrops.UNDO_MS)
+            val settings = AppSettings(app)
             settings.sentDrops = GreetingDrops.withSent(settings.sentDrops, at)
-            PartnerSync.syncNow(context, force = true)
+            PartnerSync.syncNow(app, force = true)
         }
+    }
+
+    fun cancel() {
+        job?.cancel()
+        job = null
     }
 }
 
@@ -435,22 +465,37 @@ fun GreetingArrivalHost(diary: DiaryViewModel, owner: Person) {
 private const val ARRIVAL_TOTAL = 4.6f
 private const val IMPACT = 0.7f
 
+/** Кадр, который показывается без анимации: пятно уже растеклось, брызг нет, текст виден. */
+private const val STILL_FRAME = 2.0f
+
 @Composable
 fun GreetingArrival(from: Person, drops: List<Long>, today: LocalDate, onDone: () -> Unit) {
     val context = LocalContext.current
-    val progress = remember { Animatable(0f) }
+    // «Меньше анимаций»: без падения и брызг, сразу спокойная карточка на несколько секунд.
+    val animate = remember { EffectsSettings.animate(context) }
+    val done by rememberUpdatedState(onDone)
+    val progress = remember { Animatable(if (animate) 0f else STILL_FRAME) }
+    var skip by remember { mutableStateOf(false) }
     val top = TogetherColors.top(from)
     val bottom = TogetherColors.bottom(from)
     val measurer = rememberTextMeasurer()
     val count = drops.size
     val title = GreetingDrops.title(from, count)
     val subtitle = GreetingDrops.subtitle(drops, today)
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) {
-        progress.animateTo(ARRIVAL_TOTAL, tween((ARRIVAL_TOTAL * 1000).toInt(), easing = LinearEasing))
-        onDone()
+    LaunchedEffect(skip) {
+        if (!animate) {
+            if (!skip) delay(4_000)
+            done()
+            return@LaunchedEffect
+        }
+        // Нажатие не обрывает анимацию, а перематывает её к исчезновению: запись тает и закрывается.
+        if (skip && progress.value < 3.6f) progress.snapTo(3.6f)
+        val left = ARRIVAL_TOTAL - progress.value
+        progress.animateTo(ARRIVAL_TOTAL, tween((left * 1000).toInt().coerceAtLeast(1), easing = LinearEasing))
+        done()
     }
     LaunchedEffect(Unit) {
+        if (!animate) return@LaunchedEffect
         snapshotFlow { progress.value >= IMPACT }.collect { hit -> if (hit) Haptics.dropLand(context) }
     }
     Box(
@@ -458,11 +503,7 @@ fun GreetingArrival(from: Person, drops: List<Long>, today: LocalDate, onDone: (
             .fillMaxSize()
             .pointerInput(Unit) {
                 // Нажатие сворачивает запись раньше времени.
-                detectTapGestures {
-                    scope.launch {
-                        if (progress.value < 3.6f) progress.snapTo(3.6f)
-                    }
-                }
+                detectTapGestures { skip = true }
             },
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {

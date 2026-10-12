@@ -126,6 +126,8 @@ object Haptics {
         }
 
     private fun play(context: Context, build: (Vibrator) -> VibrationEffect) {
+        // «Меньше анимаций» обещает и без вибрации.
+        if (EffectsSettings.reduced) return
         val vibrator = vibrator(context) ?: return
         if (!vibrator.hasVibrator()) return
         runCatching { vibrator.vibrate(build(vibrator)) }

@@ -3,6 +3,7 @@ package io.github.cmix7777.kazhdyidnevnik.ui.fx
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import android.os.Build
+import android.os.SystemClock
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -17,6 +18,8 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -40,25 +43,26 @@ import kotlinx.coroutines.delay
 import java.time.LocalDateTime
 
 /**
- * Время для бесконечных эффектов, не чаще [fps] раз в секунду. Если [running] выключен («меньше анимаций»),
- * время стоит и картинка не перерисовывается. В автотестах такие анимации тоже стоят.
+ * Время для бесконечных эффектов, примерно [fps] раз в секунду. Между кадрами корутина спит, а не
+ * просыпается на каждом кадре экрана. Время копится по кадрам (не больше 0,1 с за раз), поэтому
+ * после сворачивания приложения на несколько часов оно не улетает в огромные числа, а через час
+ * начинается заново. Если [running] выключен («меньше анимаций», страница не видна), время стоит
+ * и картинка не перерисовывается. В автотестах с автоматическими часами такие анимации тоже стоят.
  */
 @Composable
 internal fun rememberEffectTime(fps: Int, running: Boolean = true): () -> Float {
     var time by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(fps, running) {
-        if (!running) return@LaunchedEffect
-        val step = 1_000_000_000L / fps
-        val offset = time
-        val start = withInfiniteAnimationFrameNanos { it }
-        var last = start
+        if (!running || fps <= 0) return@LaunchedEffect
+        val stepMs = 1000L / fps
+        var last = withInfiniteAnimationFrameNanos { it }
         while (true) {
-            withInfiniteAnimationFrameNanos { now ->
-                if (now - last >= step) {
-                    last = now
-                    time = offset + (now - start) / 1_000_000_000f
-                }
-            }
+            // Просыпаемся чуть раньше нужного и берём ближайший кадр экрана: шаг ровный, без рывков.
+            delay((stepMs - 6L).coerceAtLeast(0L))
+            val now = withInfiniteAnimationFrameNanos { it }
+            val passed = ((now - last) / 1_000_000_000f).coerceIn(0f, 0.1f)
+            last = now
+            time = (time + passed) % 3600f
         }
     }
     return { time }
@@ -66,32 +70,49 @@ internal fun rememberEffectTime(fps: Int, running: Boolean = true): () -> Float 
 
 /**
  * Погода на стекле поверх содержимого (Android 13+): дождь, снег или мороз по прогнозу.
+ * [clock] — общие часы страницы (их же использует полоска дня, чтобы стекло перерисовывалось
+ * один раз за тик, а не дважды). [active] = false — страница не на экране, эффект выключен.
  * Если погода обычная, телефон старый или включено «меньше анимаций» — ничего не меняет.
  */
 @Composable
-fun Modifier.weatherGlass(glass: GlassWeather): Modifier {
+fun Modifier.weatherGlass(glass: GlassWeather, clock: () -> Float, active: Boolean = true): Modifier {
     val context = LocalContext.current
-    if (glass.mode == GlassMode.NONE || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !EffectsSettings.animate(context)) {
+    if (!active || glass.mode == GlassMode.NONE || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || !EffectsSettings.animate(context)) {
         return this
     }
-    return this.then(weatherGlassLayer(glass))
+    return this.then(weatherGlassLayer(glass, clock))
 }
 
-private class Wipe(val x: Float, val y: Float, val at: Float)
+/** Нужны ли стеклу часы: дождь и снег движутся, иней стоит (оттаивание считается отдельно). */
+fun GlassWeather.moving(): Boolean = mode == GlassMode.RAIN || mode == GlassMode.SNOW
+
+private class Wipe(val x: Float, val y: Float, val at: Long)
+
+/** Сколько живёт след пальца на инее: секунда полностью, потом три секунды затягивается. */
+private const val WIPE_HOLD_MS = 1_500L
+private const val WIPE_FADE_MS = 3_000L
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
-private fun weatherGlassLayer(glass: GlassWeather): Modifier {
+private fun weatherGlassLayer(glass: GlassWeather, clock: () -> Float): Modifier {
     val shader = remember { runCatching { RuntimeShader(WEATHER_GLASS_AGSL) }.getOrNull() }
     var failed by remember { mutableStateOf(false) }
     if (shader == null || failed) return Modifier
     val density = LocalDensity.current.density
-    // Иней почти неподвижен, ему хватает 15 кадров в секунду; дождю и снегу нужно 30.
-    val time = rememberEffectTime(if (glass.mode == GlassMode.FROST) 15 else 30)
     val appear = remember(glass.mode) { Animatable(0f) }
     LaunchedEffect(glass.mode) { appear.animateTo(1f, tween(1500)) }
     val wipes = remember { ArrayDeque<Wipe>() }
     val wipeData = remember { FloatArray(36) }
+    // Иней перерисовывается только пока под пальцем оттаивает и снова затягивается.
+    var lastWipe by remember { mutableLongStateOf(0L) }
+    var wipeTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(lastWipe) {
+        if (lastWipe == 0L) return@LaunchedEffect
+        while (SystemClock.uptimeMillis() - lastWipe < WIPE_HOLD_MS + WIPE_FADE_MS + 100L) {
+            delay(66)
+            wipeTick++
+        }
+    }
     val mode = when (glass.mode) {
         GlassMode.RAIN -> 1f
         GlassMode.SNOW -> 2f
@@ -110,26 +131,35 @@ private fun weatherGlassLayer(glass: GlassWeather): Modifier {
                         val y = change.position.y / density
                         val previous = wipes.lastOrNull()
                         if (previous == null || (previous.x - x) * (previous.x - x) + (previous.y - y) * (previous.y - y) > 100f) {
-                            wipes.addLast(Wipe(x, y, time()))
+                            val now = SystemClock.uptimeMillis()
+                            wipes.addLast(Wipe(x, y, now))
                             while (wipes.size > 12) wipes.removeFirst()
+                            lastWipe = now
                         }
                     }
                 }
             }
         }
         .graphicsLayer {
-            val now = time()
+            val time = clock()
+            @Suppress("UNUSED_VARIABLE")
+            val tick = wipeTick
+            val now = SystemClock.uptimeMillis()
             try {
                 for (i in 0 until 12) {
                     val w = wipes.getOrNull(i)
-                    val age = if (w == null) 99f else now - w.at
+                    val age = if (w == null) Long.MAX_VALUE else now - w.at
                     wipeData[i * 3] = w?.x ?: 0f
                     wipeData[i * 3 + 1] = w?.y ?: 0f
-                    wipeData[i * 3 + 2] = if (w == null) 0f else if (age < 1.5f) 1f else (1f - (age - 1.5f) / 3f).coerceAtLeast(0f)
+                    wipeData[i * 3 + 2] = when {
+                        w == null -> 0f
+                        age < WIPE_HOLD_MS -> 1f
+                        else -> (1f - (age - WIPE_HOLD_MS).toFloat() / WIPE_FADE_MS).coerceAtLeast(0f)
+                    }
                 }
                 shader.setFloatUniform("uSize", size.width, size.height)
                 shader.setFloatUniform("uDp", density)
-                shader.setFloatUniform("uTime", now)
+                shader.setFloatUniform("uTime", time)
                 shader.setFloatUniform("uMode", mode)
                 shader.setFloatUniform("uAmt", appear.value)
                 shader.setFloatUniform("uStrength", glass.strength)
@@ -148,6 +178,22 @@ object SkyFx {
     var broken by mutableStateOf(false)
 
     val supported: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !broken
+
+    /** Небо закрыто чем-то почти непрозрачным (совместная неделя): перерисовывать его незачем. */
+    var covered by mutableStateOf(false)
+
+    /**
+     * Как часто перерисовывать небо. Ночью мерцают звёзды и пролетают падающие — 20 раз в секунду.
+     * Днём и в сумерках двигаются только облака, им хватает 4 раз. Ясным днём небо стоит.
+     */
+    fun fps(sky: SkyState): Int {
+        val night = sky.hour < sky.sunrise - 0.6 || sky.hour > sky.sunset + 0.6
+        return when {
+            night && sky.clouds < 0.9 -> 20
+            sky.clouds > 0.03 -> 4
+            else -> 0
+        }
+    }
 }
 
 /** Небо над Ижевском сейчас: пересчитывается раз в полминуты и когда приходит новый прогноз. */
@@ -180,7 +226,7 @@ private fun SkyLayer(sky: State<SkyState>, accent: Color, running: Boolean, modi
         return
     }
     // При «меньше анимаций» небо остаётся, но звёзды не мерцают и картинка не перерисовывается.
-    val time = rememberEffectTime(20, running)
+    val time = rememberEffectTime(SkyFx.fps(sky.value), running && !SkyFx.covered)
     val scale = 2f
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         Canvas(

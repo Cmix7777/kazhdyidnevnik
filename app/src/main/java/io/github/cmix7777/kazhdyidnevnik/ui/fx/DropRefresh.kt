@@ -107,7 +107,7 @@ half4 main(float2 p) {
     float glow = exp(-max(d, 0.0) / 10.0) * 0.45 * (1.0 - cov);
     float3 fill = edge * 0.85 + float3(0.08);
     float spec = smoothstep(0.5, 0.0, length(rel / max(uDrop.z, 1.0) - float2(-0.35, -0.45))) * (1.0 - uRing);
-    fill += float3(spec * 0.45);
+    fill = min(fill + float3(spec * 0.45), float3(1.0));
     float3 col = fill * cov + edge * glow;
     float a = clamp(cov + glow, 0.0, 1.0);
     // Галочка рисуется слева направо, пока разрыв кольца закрывается.
@@ -148,10 +148,15 @@ class DropRefreshState {
 
     /** Обновление начато жестом (а не само при запуске): только тогда показываем подпись в шапке. */
     internal var byUser = false
-    internal var wasRefreshing = false
+
+    /**
+     * Обновление шло и ещё не разобрано. Это состояние, а не простой флаг: в кадр, когда загрузка
+     * уже кончилась, а галочка ещё не включилась, капля не должна на миг снова повиснуть на шейке.
+     */
+    internal var wasRefreshing by mutableStateOf(false)
 
     /** Индикатор держит страницу сдвинутой: пока идёт обновление и пока видна галочка. */
-    fun holding(refreshing: Boolean): Boolean = refreshing || done
+    fun holding(refreshing: Boolean): Boolean = refreshing || done || wasRefreshing
 
     fun pulled() {
         byUser = true
@@ -170,13 +175,14 @@ fun rememberDropRefresh(refreshing: Boolean, failed: Boolean): DropRefreshState 
             return@LaunchedEffect
         }
         if (!state.wasRefreshing) return@LaunchedEffect
-        state.wasRefreshing = false
         if (failedNow) {
+            state.wasRefreshing = false
             state.byUser = false
             return@LaunchedEffect
         }
         try {
             state.done = true
+            state.wasRefreshing = false
             delay(DONE_HOLD_MS)
         } finally {
             state.done = false
@@ -254,8 +260,9 @@ fun DropRefreshIndicator(
         snapshotFlow { state.distanceFraction }.collect { fraction ->
             val pulled = fraction * PullToRefreshDefaults.PositionalThreshold.value
             if (holdingNow) {
-                lastStep = 0
-                crossed = false
+                // Пока капля держится или страница сама возвращается на место, тиков нет.
+                lastStep = Int.MAX_VALUE
+                crossed = true
                 return@collect
             }
             if (pulled < 2f) {

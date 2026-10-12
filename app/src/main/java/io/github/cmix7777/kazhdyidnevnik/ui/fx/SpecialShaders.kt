@@ -199,14 +199,17 @@ half4 main(float2 p) {
     dS += sin(q.y * 0.12 + uT * 4.0) * 1.2 * hold;
     float b = clamp((uT - 2.85) / 0.7, 0.0, 1.0);
     float d = smin(dB + m * 30.0 + b * 80.0, dS + (1.0 - m) * 70.0 + b * 80.0, 20.0);
-    for (int i = 0; i < 24; i++) {
-        float fi = float(i);
-        float ang = fi / 24.0 * 6.2832 + h21(float2(fi, 2.0)) * 0.4;
-        float v = 160.0 + 160.0 * h21(float2(fi, 9.0));
-        float2 pos = c + float2(cos(ang), sin(ang)) * v * b + float2(0.0, 380.0 * b * b);
-        float r = (4.0 + 5.0 * h21(float2(fi, 4.0))) * (1.0 - b) * step(0.001, b);
-        if (r > 0.4) {
-            d = min(d, length(q - pos) - r);
+    // Брызги считаются только после взрыва, до него цикл не нужен.
+    if (b > 0.0) {
+        for (int i = 0; i < 24; i++) {
+            float fi = float(i);
+            float ang = fi / 24.0 * 6.2832 + h21(float2(fi, 2.0)) * 0.4;
+            float v = 160.0 + 160.0 * h21(float2(fi, 9.0));
+            float2 pos = c + float2(cos(ang), sin(ang)) * v * b + float2(0.0, 380.0 * b * b);
+            float r = (4.0 + 5.0 * h21(float2(fi, 4.0))) * (1.0 - b) * step(0.001, b);
+            if (r > 0.4) {
+                d = min(d, length(q - pos) - r);
+            }
         }
     }
     float endFade = 1.0 - smoothstep(3.3, 3.6, uT);
@@ -217,7 +220,7 @@ half4 main(float2 p) {
     outc = over(glowLayer(cc * exp(-max(d, 0.0) / 16.0) * 0.7 * endFade), outc);
     float cov = (1.0 - smoothstep(-0.8, 0.8, d)) * endFade;
     float3 fill = cc * 0.9 + float3(0.1) + float3(0.22) * exp(min(d, 0.0) / 5.0);
-    outc = over(float4(fill * cov, cov), outc);
+    outc = over(float4(min(fill, float3(1.0)) * cov, cov), outc);
     return half4(outc);
 }
 """
@@ -255,8 +258,9 @@ half4 main(float2 p) {
     if (uT < 1.95) {
     for (int i = 0; i < 48; i++) {
         float fi = float(i);
-        float h1 = h21(float2(fi, 1.1));
-        float h2 = h21(float2(fi, 5.5));
+        // Дешёвые «случайные» числа для каждой снежинки: золотое сечение вместо хеша.
+        float h1 = fract(fi * 0.618034 + 0.13);
+        float h2 = fract(fi * 0.414214 + 0.57);
         float ang = h1 * 6.2832 + uT * (2.0 + 2.0 * h2);
         float R = mix(260.0 + 160.0 * h2, 20.0 + 80.0 * h1, esw);
         float2 pos = c + float2(cos(ang), sin(ang) * 0.55) * R;
@@ -266,20 +270,27 @@ half4 main(float2 p) {
     float white = snow * veil * 0.7 + clamp(flakes, 0.0, 1.0) * (1.0 - smoothstep(1.3, 1.9, uT)) * step(0.001, uT);
 
     float sp = 50.0;
-    float dd = min(min(sdDigit(q - c + float2(sp * 1.5, 0.0), uYear.x, 15.0, 28.0, 7.0), sdDigit(q - c + float2(sp * 0.5, 0.0), uYear.y, 15.0, 28.0, 7.0)),
-                   min(sdDigit(q - c - float2(sp * 0.5, 0.0), uYear.z, 15.0, 28.0, 7.0), sdDigit(q - c - float2(sp * 1.5, 0.0), uYear.w, 15.0, 28.0, 7.0)));
-    dd += (fbm(q * 0.25) - 0.5) * 5.0;
+    float dd0 = min(min(sdDigit(q - c + float2(sp * 1.5, 0.0), uYear.x, 15.0, 28.0, 7.0), sdDigit(q - c + float2(sp * 0.5, 0.0), uYear.y, 15.0, 28.0, 7.0)),
+                    min(sdDigit(q - c - float2(sp * 0.5, 0.0), uYear.z, 15.0, 28.0, 7.0), sdDigit(q - c - float2(sp * 1.5, 0.0), uYear.w, 15.0, 28.0, 7.0)));
     float grow = smoothstep(1.2, 2.0, uT);
     float crumble = clamp((uT - 2.9) / 0.9, 0.0, 1.0);
-    float visible = step(fbm(q * 0.09), grow * 1.2) * step(crumble * 1.15, fbm(q * 0.06 + float2(0.0, -crumble * 1.5)) + 0.1);
-    float3 tint = mix(uCA, uCB, 0.5 + 0.5 * sin(q.x * 0.02 + uT));
-    float3 light = tint * exp(-max(dd, 0.0) / 14.0) * 0.5 * grow * (1.0 - crumble) + float3(white);
+    float3 light = float3(white);
+    float cov = 0.0;
+    float3 snowC = float3(1.0);
+    // Шум для цифр считается только рядом с ними, остальной экран его не трогает.
+    if (dd0 < 60.0) {
+        float dd = dd0 + (fbm(q * 0.25) - 0.5) * 5.0;
+        float3 tint = mix(uCA, uCB, 0.5 + 0.5 * sin(q.x * 0.02 + uT));
+        light += tint * exp(-max(dd, 0.0) / 14.0) * 0.5 * grow * (1.0 - crumble);
+        if (dd < 1.0) {
+            float visible = step(fbm(q * 0.09), grow * 1.2) * step(crumble * 1.15, fbm(q * 0.06 + float2(0.0, -crumble * 1.5)) + 0.1);
+            cov = (1.0 - smoothstep(-0.8, 0.8, dd)) * visible;
+            float2 cell = floor(q * 0.5);
+            float sparkle = pow(h21(cell), 50.0) * (0.5 + 0.5 * sin(uT * 5.0 + h21(cell + 1.0) * 30.0));
+            snowC = mix(float3(0.85, 0.92, 1.0), float3(1.0), fbm(q * 0.3)) + float3(sparkle * 1.5);
+        }
+    }
     outc = over(glowLayer(light * endFade), outc);
-
-    float cov = (1.0 - smoothstep(-0.8, 0.8, dd)) * visible;
-    float2 cell = floor(q * 0.5);
-    float sparkle = pow(h21(cell), 50.0) * (0.5 + 0.5 * sin(uT * 5.0 + h21(cell + 1.0) * 30.0));
-    float3 snowC = mix(float3(0.85, 0.92, 1.0), float3(1.0), fbm(q * 0.3)) + float3(sparkle * 1.5);
     outc = over(float4(min(snowC, float3(1.0)) * cov, cov), outc);
 
     // Осыпающиеся комья: падают вниз за экран и гаснут, на месте ничего не остаётся.

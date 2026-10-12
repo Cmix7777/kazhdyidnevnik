@@ -33,6 +33,7 @@ import io.github.cmix7777.kazhdyidnevnik.ui.Palette
 import io.github.cmix7777.kazhdyidnevnik.ui.PersonTheme
 import io.github.cmix7777.kazhdyidnevnik.ui.Pill
 import io.github.cmix7777.kazhdyidnevnik.ui.TwoToneTitle
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberEffectTime
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.weatherGlass
 import org.junit.Rule
 import org.junit.Test
@@ -68,7 +69,7 @@ class WeatherShotsTest {
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .weatherGlass(glass)
+                                    .weatherGlass(glass, rememberEffectTime(30))
                                     .statusBarsPadding()
                                     .padding(20.dp),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),

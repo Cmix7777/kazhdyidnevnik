@@ -41,7 +41,7 @@ uniform float uAmt;
 uniform float uStrength;
 uniform float3 uWipe[12];
 """ + NOISE + """
-// Лёгкое размытие: центр и четыре точки по диагоналям (5 выборок вместо 9).
+// Лёгкое размытие: центр и четыре точки по диагоналям (для инея).
 float4 blur5(float2 p, float r, float4 center) {
     float4 s = center;
     s += float4(content.eval(p + float2(r, r)));
@@ -49,6 +49,14 @@ float4 blur5(float2 p, float r, float4 center) {
     s += float4(content.eval(p + float2(r, -r)));
     s += float4(content.eval(p + float2(-r, -r)));
     return s * 0.2;
+}
+
+// Совсем лёгкое размытие для дымки в дождь: центр и две точки (3 выборки на пиксель).
+float4 blur3(float2 p, float r, float4 center) {
+    float4 s = center * 2.0;
+    s += float4(content.eval(p + float2(r, r)));
+    s += float4(content.eval(p + float2(-r, -r)));
+    return s * 0.25;
 }
 
 float snowLayer(float2 q, float t, float sc, float sp, float sz, float density) {
@@ -100,7 +108,7 @@ half4 main(float2 p) {
         float trail = smoothstep(0.09, 0.03, abs(d2.x)) * step(d2.y, -r2 * 0.8) * smoothstep(-y * ch / cw - 0.01, 0.0, d2.y) * alive;
         float clearM = clamp(max(m1, m2) + trail * 0.85, 0.0, 1.0);
         // Лёгкая дымка, чтобы текст оставался читаемым.
-        float4 fogged = mix(float4(base), blur5(p, 2.0 * uDp, float4(base)) * 0.92 + float4(0.03, 0.035, 0.05, 0.05), 0.3 * uStrength);
+        float4 fogged = mix(float4(base), blur3(p, 2.0 * uDp, float4(base)) * 0.92 + float4(0.03, 0.035, 0.05, 0.05), 0.3 * uStrength);
         float4 glass = mix(fogged, float4(base), clearM);
         float dropM = max(m1, m2);
         // Преломление и блики считаются только внутри капель: остальной экран не тратит на это время.
@@ -199,7 +207,9 @@ half4 main(float2 p) {
     float h = uHour;
     float t = uTime;
     float dayF = smoothstep(uRise - 0.5, uRise + 1.0, h) * (1.0 - smoothstep(uSet - 1.0, uSet + 0.5, h));
-    float tw = clamp(exp(-pow((h - uRise) / 0.8, 2.0)) + exp(-pow((h - uSet) / 0.8, 2.0)), 0.0, 1.0);
+    float dr = (h - uRise) / 0.8;
+    float ds = (h - uSet) / 0.8;
+    float tw = clamp(exp(-dr * dr) + exp(-ds * ds), 0.0, 1.0);
     float3 night = mix(float3(0.016, 0.02, 0.06), float3(0.045, 0.045, 0.12), v);
     float3 day = mix(float3(0.06, 0.12, 0.30), float3(0.17, 0.28, 0.56), v);
     float3 dusk = mix(float3(0.11, 0.05, 0.22), mix(float3(0.58, 0.2, 0.42), float3(0.98, 0.48, 0.24), smoothstep(0.55, 1.0, v)), smoothstep(0.2, 1.0, v));
@@ -268,6 +278,8 @@ half4 main(float2 p) {
     }
     // Дымка у горизонта.
     col += mix(float3(0.03, 0.03, 0.08), float3(0.25, 0.12, 0.06), tw) * smoothstep(0.7, 1.0, v) * 0.5;
-    return half4(half3(col), 1.0);
+    // Лёгкий шум против полос на плавном градиенте (особенно заметных на OLED).
+    col += (h21(p) - 0.5) / 255.0;
+    return half4(half3(clamp(col, 0.0, 1.0)), 1.0);
 }
 """

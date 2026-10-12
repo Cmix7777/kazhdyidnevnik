@@ -24,47 +24,55 @@ import androidx.compose.ui.zIndex
 import kotlin.math.floor
 
 /**
- * Перелив при свайпе (AGSL, Android 13+): страница не уезжает вбок, а вторая проступает поверх,
- * как чернила, растекающиеся от пальца. Край пятна живой, по нему бежит свечение двух цветов.
- * [uInvert] = 1: пятно не открывает верхнюю страницу, а наоборот прожигает её, открывая нижнюю.
+ * Перелив при свайпе (AGSL, Android 13+): страницы не уезжают вбок, а одна проступает на месте другой,
+ * как чернила, растекающиеся от пальца. Край пятна волнистый, по нему бежит свечение двух цветов.
+ * Шейдер стоит на обеих страницах с одинаковым пятном: [uInside] = 1 — страница видна внутри пятна,
+ * 0 — снаружи. Так содержимое двух страниц никогда не просвечивает друг через друга.
+ * Свечение рисует только верхняя страница ([uGlow] = 1).
  */
 internal const val INK_AGSL = """
 uniform shader content;
 uniform float2 uSize;
 uniform float uDp;
 uniform float uS;
-uniform float uInvert;
+uniform float uInside;
+uniform float uGlow;
 uniform float2 uO;
 uniform float3 uCA;
 uniform float3 uCB;
-""" + NOISE + """
+
 half4 main(float2 p) {
     float2 q = p / uDp;
     float2 o = uO / uDp;
     float2 wh = uSize / uDp;
-    float maxD = length(max(o, wh - o)) + 90.0;
+    float maxD = length(max(o, wh - o)) + 70.0;
     float s = clamp(uS, 0.0, 1.0);
     float R = s * maxD;
-    float raw = length(q - o) - R;
+    float2 d = q - o;
+    float dist = length(d);
+    float raw = dist - R;
     // Далеко от края пятна ничего считать не нужно.
-    if (raw > 160.0) {
-        return uInvert > 0.5 ? content.eval(p) : half4(0.0);
+    if (raw > 110.0) {
+        return uInside > 0.5 ? half4(0.0) : content.eval(p);
     }
-    if (raw < -160.0) {
-        return uInvert > 0.5 ? half4(0.0) : content.eval(p);
+    if (raw < -110.0) {
+        return uInside > 0.5 ? content.eval(p) : half4(0.0);
     }
     float bump = sin(3.14159 * s);
     float t = s * 2.5;
-    float warp = (fbm(q * 0.012 + float2(t * 0.25, 0.0)) - 0.5) * 90.0 * bump + (vnoise(q * 0.05 - t * 0.4) - 0.5) * 14.0 * bump;
-    float e = raw + warp;
+    // Волнистый край: несколько волн по кругу вместо дорогого шума.
+    float ang = atan(d.y, d.x + 0.0001);
+    float warp = (sin(ang * 5.0 + t * 1.3) * 0.5 + sin(ang * 9.0 - t * 1.7 + 1.3) * 0.3 + sin(ang * 17.0 + t * 2.3 + 0.7) * 0.2) * 44.0
+               + sin(ang * 31.0 - t * 3.1) * 5.0;
+    float e = raw + warp * bump;
     float m = smoothstep(5.0, -5.0, e);
-    float mask = mix(m, 1.0 - m, uInvert);
-    float2 dir = normalize(q - o + 0.0001);
+    float mask = mix(1.0 - m, m, uInside);
+    float2 dir = d / max(dist, 0.001);
     float near = exp(-abs(e) / 22.0) * bump;
-    float push = uInvert > 0.5 ? -1.0 : 1.0;
+    float push = uInside > 0.5 ? 1.0 : -1.0;
     float4 col = float4(content.eval(p + dir * near * 14.0 * uDp * push)) * mask;
-    float3 ink = mix(uCA, uCB, 0.5 + 0.5 * sin(atan(dir.y, dir.x) * 2.0 + t));
-    float g = clamp(exp(-abs(e) / 9.0) * bump * 0.6 + exp(-abs(e) / 40.0) * bump * 0.14, 0.0, 1.0);
+    float3 ink = mix(uCA, uCB, 0.5 + 0.5 * sin(ang * 2.0 + t));
+    float g = clamp(exp(-abs(e) / 9.0) * bump * 0.6 + exp(-abs(e) / 24.0) * bump * 0.14, 0.0, 1.0) * uGlow;
     col = float4(ink * g, g) + col * (1.0 - g);
     return half4(col);
 }
@@ -134,19 +142,17 @@ private fun inkLayer(pager: PagerState, page: Int, origin: InkOrigin, first: Col
             }
             // Страницы не едут: возвращаем каждую на место.
             translationX = (position - page) * size.width
-            if (page != 1) {
-                renderEffect = null
-                return@graphicsLayer
-            }
-            // С первой страницы на вторую пятно открывает вторую; обратно — прожигает её.
+            // Вперёд (с первой на вторую) пятно открывает вторую страницу, назад — первую.
             val forward = pager.settledPage == 0
             val spread = if (forward) position else 1f - position
+            val incoming = if (forward) 1 else 0
             val o = origin.at(size.width, size.height)
             try {
                 shader.setFloatUniform("uSize", size.width, size.height)
                 shader.setFloatUniform("uDp", density)
                 shader.setFloatUniform("uS", spread)
-                shader.setFloatUniform("uInvert", if (forward) 0f else 1f)
+                shader.setFloatUniform("uInside", if (page == incoming) 1f else 0f)
+                shader.setFloatUniform("uGlow", if (page == 1) 1f else 0f)
                 shader.setFloatUniform("uO", o.x, o.y)
                 shader.setFloatUniform("uCA", first.red, first.green, first.blue)
                 shader.setFloatUniform("uCB", second.red, second.green, second.blue)
