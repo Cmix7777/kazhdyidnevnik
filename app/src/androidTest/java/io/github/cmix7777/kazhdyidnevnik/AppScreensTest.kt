@@ -133,12 +133,16 @@ class AppScreensTest {
     /**
      * Прокрутить тот из списков экрана, где есть нужная строка, чтобы она оказалась на виду.
      * Списки ленивые: пока строка далеко за экраном, её в дереве нет, поэтому пробуем все списки и ждём.
+     * Берём только вертикальные списки: горизонтальный листатель страниц тоже умеет «прокрутить к строке»,
+     * но вниз он не листает, и строка могла остаться под краем экрана.
      */
     private fun scrollToItem(text: String, substring: Boolean = false) {
         var last: Throwable? = null
         try {
             compose.waitUntil(20_000) {
-                val lists = compose.onAllNodes(hasScrollToNodeAction())
+                val lists = compose.onAllNodes(
+                    hasScrollToNodeAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange),
+                )
                 val count = lists.fetchSemanticsNodes().size
                 for (index in 0 until count) {
                     try {
