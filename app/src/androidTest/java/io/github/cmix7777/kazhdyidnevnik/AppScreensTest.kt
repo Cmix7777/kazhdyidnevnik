@@ -80,9 +80,10 @@ class AppScreensTest {
         compose.onAllNodes(SemanticsMatcher("любой узел") { true }).fetchSemanticsNodes()
             .mapNotNull { node -> node.config.getOrNull(SemanticsProperties.Text)?.joinToString("") { it.text } }
             .filter { it.isNotBlank() }
+            .map { if (it.length > 60) it.take(60) + "…" else it }
             .distinct()
             .joinToString(" | ")
-            .take(450)
+            .take(900)
 
     private fun waitFor(matcher: SemanticsMatcher, timeoutMs: Long = 20_000) {
         try {
@@ -268,7 +269,16 @@ class AppScreensTest {
         putOnClipboard("Код связи Каждогодневника (Настя): kdp-abcde-fghjk-mnpqr-stuvw")
         scrollToItem("Вставить код")
         compose.onNodeWithText("Вставить код").performClick()
-        waitForText("Это код старого вида", substring = true)
+        try {
+            waitForText("Это код старого вида", substring = true)
+        } catch (e: AssertionError) {
+            var inClipboard = ""
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                inClipboard = context.getSystemService(ClipboardManager::class.java)
+                    .primaryClip?.getItemAt(0)?.coerceToText(context)?.toString().orEmpty()
+            }
+            throw AssertionError("${e.message} || В буфере: «${inClipboard.take(80)}»", e)
+        }
         // Старый код не подключился.
         assertEquals(null, AppSettings(context).pairCode)
     }
