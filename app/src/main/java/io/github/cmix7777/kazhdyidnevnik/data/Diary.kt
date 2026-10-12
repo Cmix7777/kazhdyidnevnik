@@ -1,5 +1,7 @@
 package io.github.cmix7777.kazhdyidnevnik.data
 
+import java.time.LocalDate
+
 /**
  * То, что человек сам ведёт в приложении на своём телефоне: свои дела, важные даты и бюджет.
  * [seeded] — какие начальные данные уже перенесены (например, смены из профиля).
@@ -45,8 +47,8 @@ data class Diary(
     fun withoutMoney(id: String): Diary = copy(money = money.filter { it.id != id })
 
     /** Начальные данные владельца: смены и постоянные дела из профиля, каждое один раз. */
-    fun withSeeds(person: Person): Diary {
-        var result = seededWithShifts(person)
+    fun withSeeds(person: Person, today: LocalDate = LocalDate.now()): Diary {
+        var result = seededWithShifts(person, today)
         for (event in person.profile.regularEvents) {
             val key = "event-${event.id}"
             if (key in result.seeded) continue
@@ -58,11 +60,11 @@ data class Diary(
         return result
     }
 
-    /** Перенести разовые смены из профиля в свои дела (один раз для человека). */
-    fun seededWithShifts(person: Person): Diary {
+    /** Перенести смены из профиля в свои дела (один раз для человека): дальше человек меняет их сам. */
+    fun seededWithShifts(person: Person, today: LocalDate = LocalDate.now()): Diary {
         val key = "shifts-${person.id}"
         if (!person.profile.shiftsAreEditable || key in seeded) return this
-        val shifts = person.profile.shifts.mapIndexedNotNull { index, shift -> shift.toEvent("seed-${person.id}-$index") }
+        val shifts = person.profile.shifts.mapIndexed { index, shift -> shift.toEvent("seed-${person.id}-$index", today) }
         return copy(events = events + shifts.filter { seed -> events.none { it.id == seed.id } }, seeded = seeded + key)
     }
 }

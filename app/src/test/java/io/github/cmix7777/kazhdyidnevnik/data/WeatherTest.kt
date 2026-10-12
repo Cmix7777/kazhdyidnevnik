@@ -22,7 +22,7 @@ class WeatherTest {
     private val thursday = forecast.day(thursdayDate)!!
     private val friday = forecast.day(fridayDate)!!
 
-    private fun items(date: LocalDate) = buildDay(date, lessons, WorkSchedule.default)
+    private fun items(date: LocalDate) = buildDay(date, lessons, TestSchedules.octoberAizat)
 
     @Test
     fun parsesCurrentHoursAndDays() {

@@ -10,6 +10,10 @@ import java.time.LocalTime
 
 class OvernightAndPrepTest {
 
+    /** Неделя, с которой смены и теория попадают в дела: тогда воскресенье 11 октября уже рабочее. */
+    private val firstWeek = LocalDate.of(2026, 10, 5)
+
+
     private val saturday = LocalDate.of(2026, 10, 10)
     private val sunday = LocalDate.of(2026, 10, 11)
     private val monday = LocalDate.of(2026, 10, 12)
@@ -87,8 +91,8 @@ class OvernightAndPrepTest {
 
     @Test
     fun drivingTheorySundayIsSeededOnce() {
-        val seeded = Diary().withSeeds(Person.AIZAT)
-        val theory = seeded.events.single()
+        val seeded = Diary().withSeeds(Person.AIZAT, firstWeek)
+        val theory = seeded.events.single { it.kind == EventKind.DRIVING }
         assertEquals(EventKind.DRIVING, theory.kind)
         assertTrue(theory.weekly)
         assertEquals(LocalTime.of(15, 0), theory.start)
@@ -97,15 +101,15 @@ class OvernightAndPrepTest {
         assertTrue(theory.occursOn(sunday.plusWeeks(5)))
         assertFalse(theory.occursOn(saturday))
         // Повторно не добавляется, а если Айзат удалил — не возвращается.
-        assertEquals(seeded, seeded.withSeeds(Person.AIZAT))
-        assertTrue(seeded.withoutEvent(theory.id).withSeeds(Person.AIZAT).events.isEmpty())
+        assertEquals(seeded, seeded.withSeeds(Person.AIZAT, firstWeek))
+        assertTrue(seeded.withoutEvent(theory.id).withSeeds(Person.AIZAT, firstWeek).events.none { it.kind == EventKind.DRIVING })
         // У Насти вождения из профиля нет.
         assertTrue(Diary().withSeeds(Person.NASTYA).events.none { it.kind == EventKind.DRIVING })
     }
 
     @Test
     fun drivingTheoryIsBusyTimeForThePlan() {
-        val events = Diary().withSeeds(Person.AIZAT).events
+        val events = Diary().withSeeds(Person.AIZAT, firstWeek).events
         val items = Person.AIZAT.dayItems(sunday, emptyList(), isOwner = true, events = events)
         val free = PlanGenerator.freeWindows(sunday, items)
         // Теория 15:00–19:00 плюс дорога: свободно только с 19:30.
@@ -114,7 +118,7 @@ class OvernightAndPrepTest {
 
     @Test
     fun urgentPrepTheEveningBeforeTheCheck() {
-        val events = Diary().withSeeds(Person.AIZAT).events
+        val events = Diary().withSeeds(Person.AIZAT, firstWeek).events
         val items = Person.AIZAT.dayItems(sunday, emptyList(), isOwner = true, events = events)
         val plan = PlanGenerator.planFor(sunday, items)
         // Полный план ещё не начался, остаётся только срочная подготовка.

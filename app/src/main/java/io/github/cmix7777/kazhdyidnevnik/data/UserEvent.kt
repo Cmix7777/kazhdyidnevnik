@@ -2,6 +2,7 @@ package io.github.cmix7777.kazhdyidnevnik.data
 
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.temporal.TemporalAdjusters
 
 /** Вид своего дела. */
 enum class EventKind(val title: String) {
@@ -58,7 +59,11 @@ data class UserEvent(
 }
 
 /** Разовые смены из профиля превращаются в свои дела, чтобы их можно было менять. */
-fun WorkShift.toEvent(id: String): UserEvent? {
-    val day = date ?: return null
-    return UserEvent(id = id, kind = EventKind.WORK, title = "", date = day, start = start, end = end)
+/**
+ * Смена как своё дело «Работа». Разовая смена — дело в эту дату. Еженедельная — повторяющееся дело
+ * с ближайшего такого дня недели, начиная с [from].
+ */
+fun WorkShift.toEvent(id: String, from: LocalDate = LocalDate.now()): UserEvent {
+    val day = date ?: from.with(TemporalAdjusters.nextOrSame(this.day))
+    return UserEvent(id = id, kind = EventKind.WORK, title = "", date = day, start = start, end = end, weekly = date == null)
 }

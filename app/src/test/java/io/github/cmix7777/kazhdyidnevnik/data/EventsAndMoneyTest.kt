@@ -50,9 +50,8 @@ class EventsAndMoneyTest {
         val seeded = Diary().seededWithShifts(Person.NASTYA)
         assertEquals(4, seeded.events.size)
         assertTrue(seeded.events.all { it.kind == EventKind.WORK && !it.weekly })
-        // Повторно не добавляются, у Айзата график постоянный — его не трогаем.
+        // Повторно не добавляются.
         assertEquals(seeded, seeded.seededWithShifts(Person.NASTYA))
-        assertEquals(Diary(), Diary().seededWithShifts(Person.AIZAT))
 
         // На своём телефоне смены — это её дела, на телефоне Айзата — смены из профиля.
         val own = Person.NASTYA.dayItems(saturday, emptyList(), isOwner = true, events = seeded.events)
@@ -138,5 +137,27 @@ class EventsAndMoneyTest {
         assertEquals(listOf("z1"), merged.deadlines.map { it.id })
         assertEquals(listOf("m1", "m2"), merged.money.map { it.id })
         assertEquals(4, merged.size)
+    }
+
+    @Test
+    fun aizatWeeklyShiftsBecomeHisOwnRepeatingEvents() {
+        // Посеяно во вторник 13 октября: смены с ближайших Ср, Сб и Вс, дальше каждую неделю.
+        val tuesday = LocalDate.of(2026, 10, 13)
+        val seeded = Diary().seededWithShifts(Person.AIZAT, tuesday)
+        assertEquals(3, seeded.events.size)
+        assertTrue(seeded.events.all { it.kind == EventKind.WORK && it.weekly })
+        assertEquals(
+            listOf(LocalDate.of(2026, 10, 14), LocalDate.of(2026, 10, 17), LocalDate.of(2026, 10, 18)),
+            seeded.events.map { it.date },
+        )
+        assertEquals(seeded, seeded.seededWithShifts(Person.AIZAT, tuesday.plusDays(3)))
+        // Его телефон: в среду 21 октября работа 8–13 как своё дело, которое можно поменять.
+        val wednesday = LocalDate.of(2026, 10, 21)
+        val own = Person.AIZAT.dayItems(wednesday, emptyList(), isOwner = true, events = seeded.events)
+        assertEquals(listOf(LocalTime.of(8, 0) to LocalTime.of(13, 0)), own.map { it.start to it.end })
+        assertTrue(own.single() is DayItem.EventItem)
+        // Во вторник и четверг работы больше нет.
+        assertTrue(Person.AIZAT.dayItems(LocalDate.of(2026, 10, 20), emptyList(), isOwner = true, events = seeded.events).isEmpty())
+        assertTrue(Person.AIZAT.dayItems(LocalDate.of(2026, 10, 22), emptyList(), isOwner = true, events = seeded.events).isEmpty())
     }
 }

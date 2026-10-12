@@ -56,6 +56,8 @@ object Profiles {
         hasPlan = true,
         hasPractice = true,
         scheduleSource = "timeo.mveu.ru",
+        // Смены Айзат выбирает сам каждую неделю, поэтому они его дела, а не жёсткий график.
+        shiftsAreEditable = true,
         regularEvents = listOf(AizatRegular.drivingTheory),
     )
 

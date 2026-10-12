@@ -15,7 +15,7 @@ class PlanGeneratorTest {
         LocalDate.of(2026, 10, 5),
     )
 
-    private fun day(date: LocalDate) = buildDay(date, lessons, WorkSchedule.default)
+    private fun day(date: LocalDate) = buildDay(date, lessons, TestSchedules.octoberAizat)
 
     @Test
     fun wednesdayMorningIsFilledBeforeClasses() {
@@ -62,14 +62,14 @@ class PlanGeneratorTest {
     @Test
     fun noCsharpAfterDeadline() {
         val date = LocalDate.of(2026, 11, 4)
-        val plan = PlanGenerator.plan(date, buildDay(date, emptyList(), WorkSchedule.default))
+        val plan = PlanGenerator.plan(date, buildDay(date, emptyList(), TestSchedules.octoberAizat))
         assertTrue(plan.none { it.kind == PlanKind.CSHARP })
     }
 
     @Test
     fun practiceWeekdayIsBusyDuringTheDay() {
         val date = LocalDate.of(2026, 11, 3)
-        val plan = PlanGenerator.plan(date, buildDay(date, emptyList(), WorkSchedule.default))
+        val plan = PlanGenerator.plan(date, buildDay(date, emptyList(), TestSchedules.octoberAizat))
         assertTrue(plan.isNotEmpty())
         assertTrue(plan.all { it.start >= LocalTime.of(17, 30) || it.end <= LocalTime.of(8, 20) })
     }
@@ -88,7 +88,7 @@ class PlanGeneratorTest {
     @Test
     fun mockDayPlanHasFourHourExam() {
         val date = LocalDate.of(2026, 11, 8)
-        val plan = PlanGenerator.plan(date, buildDay(date, emptyList(), WorkSchedule.default))
+        val plan = PlanGenerator.plan(date, buildDay(date, emptyList(), TestSchedules.octoberAizat))
         val mock = plan.single { it.kind == PlanKind.MOCK }
         assertEquals(240, mock.minutes)
         assertNotNull(mock.mockTask)

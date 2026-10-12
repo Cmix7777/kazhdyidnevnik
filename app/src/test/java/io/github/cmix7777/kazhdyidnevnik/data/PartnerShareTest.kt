@@ -82,11 +82,16 @@ class PartnerShareTest {
         assertEquals(1, after.size)
         assertTrue(after.single() is DayItem.EventItem)
         assertEquals(LocalTime.of(17, 0), after.single().start)
-        // Айзат на своём телефоне делится делами: график работы остаётся из профиля.
-        val aizatSunday = LocalDate.of(2026, 10, 11)
+        // Айзат тоже делится сменами как делами: у Насти видна его смена из дел, а не из профиля.
+        val aizatSunday = LocalDate.of(2026, 10, 18)
         val theory = AizatRegular.drivingTheory
-        val seen = Person.AIZAT.dayItems(aizatSunday, emptyList(), isOwner = false, events = listOf(theory), eventsKnown = true)
-        assertEquals(listOf(true, false), seen.sortedBy { it.start }.map { it is DayItem.WorkItem })
+        val hisShift = UserEvent("w", EventKind.WORK, "", aizatSunday, LocalTime.of(8, 0), LocalTime.of(14, 0), weekly = true)
+        val seen = Person.AIZAT.dayItems(aizatSunday, emptyList(), isOwner = false, events = listOf(theory, hisShift), eventsKnown = true)
+        assertEquals(2, seen.size)
+        assertTrue(seen.all { it is DayItem.EventItem })
+        // Пока он не поделился, у Насти виден график из приложения.
+        val before = Person.AIZAT.dayItems(aizatSunday, emptyList(), isOwner = false)
+        assertTrue(before.single() is DayItem.WorkItem)
     }
 
     @Test

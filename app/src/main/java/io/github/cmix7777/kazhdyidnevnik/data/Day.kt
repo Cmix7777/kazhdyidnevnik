@@ -19,14 +19,15 @@ data class WorkShift(
     }
 }
 
-/** График работы Айзата (не в IT). */
+/**
+ * График работы Айзата (не в IT) с недели 13 октября 2026: Ср 8–13, Сб 12–20, Вс 8–14.
+ * На его телефоне эти смены один раз становятся его делами «Работа», дальше он меняет их сам
+ * (смены он выбирает каждую неделю), а Настя видит их через связь телефонов.
+ */
 object WorkSchedule {
     val default: List<WorkShift> = listOf(
-        WorkShift(DayOfWeek.TUESDAY, LocalTime.of(8, 0), LocalTime.of(13, 0)),
-        WorkShift(DayOfWeek.WEDNESDAY, LocalTime.of(17, 0), LocalTime.of(22, 0)),
-        WorkShift(DayOfWeek.THURSDAY, LocalTime.of(8, 0), LocalTime.of(13, 0)),
-        WorkShift(DayOfWeek.FRIDAY, LocalTime.of(8, 0), LocalTime.of(15, 0)),
-        WorkShift(DayOfWeek.SATURDAY, LocalTime.of(13, 0), LocalTime.of(20, 0)),
+        WorkShift(DayOfWeek.WEDNESDAY, LocalTime.of(8, 0), LocalTime.of(13, 0)),
+        WorkShift(DayOfWeek.SATURDAY, LocalTime.of(12, 0), LocalTime.of(20, 0)),
         WorkShift(DayOfWeek.SUNDAY, LocalTime.of(8, 0), LocalTime.of(14, 0)),
     )
 }
