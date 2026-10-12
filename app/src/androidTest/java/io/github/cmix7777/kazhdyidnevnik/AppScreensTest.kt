@@ -22,7 +22,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.rules.GrantPermissionRule
+import androidx.test.rule.GrantPermissionRule
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.ThemeMode
 import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
