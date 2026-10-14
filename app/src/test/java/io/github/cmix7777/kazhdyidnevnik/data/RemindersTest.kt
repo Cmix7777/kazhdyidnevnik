@@ -15,7 +15,7 @@ class RemindersTest {
         LocalDate.of(2026, 10, 5),
     )
 
-    private fun day(date: LocalDate) = buildDay(date, lessons, WorkSchedule.default)
+    private fun day(date: LocalDate) = buildDay(date, lessons, TestSchedules.octoberAizat)
 
     private val nextWeekLessons = TimeoParser.parse(
         requireNotNull(javaClass.getResource("/timeo/week-2026-10-12.html")).readText(),
@@ -26,14 +26,14 @@ class RemindersTest {
     // Четверг следующей недели: полный план учёбы уже идёт.
     private val thursday = LocalDate.of(2026, 10, 15)
 
-    private fun thursdayItems() = buildDay(thursday, nextWeekLessons, WorkSchedule.default)
+    private fun thursdayItems() = buildDay(thursday, nextWeekLessons, TestSchedules.octoberAizat)
 
     @Test
     fun planStartsOnFirstDay() {
         assertTrue(PlanGenerator.planFor(wednesday, day(wednesday)).isEmpty())
         assertTrue(PlanGenerator.planFor(LocalDate.of(2026, 10, 8), day(LocalDate.of(2026, 10, 8))).isEmpty())
         val monday = LocalDate.of(2026, 10, 12)
-        assertFalse(PlanGenerator.planFor(monday, buildDay(monday, nextWeekLessons, WorkSchedule.default)).isEmpty())
+        assertFalse(PlanGenerator.planFor(monday, buildDay(monday, nextWeekLessons, TestSchedules.octoberAizat)).isEmpty())
         assertFalse(PlanGenerator.planFor(thursday, thursdayItems()).isEmpty())
     }
 

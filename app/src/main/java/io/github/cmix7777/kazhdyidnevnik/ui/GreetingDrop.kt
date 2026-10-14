@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -127,6 +128,20 @@ class GreetingDropState(
         private set
 
     private var job: Job? = null
+    private var hintJob: Job? = null
+
+    /** Подсказка вместо капли (например, телефоны не связаны). Видна несколько секунд. */
+    var hint by mutableStateOf<String?>(null)
+        private set
+
+    fun explain(text: String) {
+        hint = text
+        hintJob?.cancel()
+        hintJob = scope.launch {
+            delay(HINT_MS)
+            hint = null
+        }
+    }
 
     fun start(position: Offset, name: Offset, context: Context) {
         if (phase != Phase.Idle) return
@@ -207,6 +222,7 @@ class GreetingDropState(
     companion object {
         const val GROW_MS = 650
         const val FLY_MS = 550
+        const val HINT_MS = 4_000L
     }
 }
 
@@ -250,14 +266,21 @@ private val HangBelow = 44.dp
 
 /**
  * Имя второго человека в переключателе: обычное нажатие листает страницу, а долгое удержание
- * выращивает каплю привета. [enabled] = false (телефоны не связаны) — только листание.
+ * выращивает каплю привета. Если капле некуда лететь ([enabled] = false, телефоны не связаны),
+ * долгое удержание не молчит, а показывает [disabledHint]: что сделать, чтобы капли ходили.
  */
 @Composable
-fun Modifier.greetingDropSource(state: GreetingDropState, enabled: Boolean, onTap: () -> Unit): Modifier {
+fun Modifier.greetingDropSource(
+    state: GreetingDropState,
+    enabled: Boolean,
+    onTap: () -> Unit,
+    disabledHint: String = "",
+): Modifier {
     val context = LocalContext.current
     val holder = remember { arrayOfNulls<LayoutCoordinates>(1) }
     val hang = with(LocalDensity.current) { HangBelow.toPx() }
-    if (!enabled) return this.clickable(role = Role.Tab, onClick = onTap)
+    val canSend by rememberUpdatedState(enabled)
+    val hintText by rememberUpdatedState(disabledHint)
     fun root(local: Offset): Offset = holder[0]?.takeIf { it.isAttached }?.localToRoot(local) ?: local
     return this
         .onGloballyPositioned { holder[0] = it }
@@ -274,6 +297,10 @@ fun Modifier.greetingDropSource(state: GreetingDropState, enabled: Boolean, onTa
         .pointerInput(state) {
             detectDragGesturesAfterLongPress(
                 onDragStart = { local ->
+                    if (!canSend) {
+                        state.explain(hintText)
+                        return@detectDragGesturesAfterLongPress
+                    }
                     val size = holder[0]?.size
                     val center = if (size != null) root(Offset(size.width / 2f, size.height / 2f)) else root(local)
                     state.start(root(local), center, context)
@@ -345,6 +372,31 @@ fun GreetingDropLayer(state: GreetingDropState, owner: Person) {
                 .padding(top = 64.dp),
         ) {
             UndoPill(text = GreetingDrops.sentText(owner.partner), since = state.waitingSince, color = top, onUndo = state::undo)
+        }
+        // Подсказка, если капле некуда лететь (телефоны не связаны).
+        AnimatedVisibility(
+            visible = state.hint != null && state.phase == GreetingDropState.Phase.Idle,
+            enter = fadeIn() + slideInVertically { -it / 2 },
+            exit = fadeOut() + slideOutVertically { -it / 2 },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 64.dp, start = 20.dp, end = 20.dp),
+        ) {
+            var last by remember { mutableStateOf("") }
+            state.hint?.let { last = it }
+            Text(
+                text = last,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Palette.Text,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .widthIn(max = 340.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Palette.Background.copy(alpha = 0.94f))
+                    .border(1.dp, Palette.BorderStrong, RoundedCornerShape(20.dp))
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+            )
         }
     }
 }

@@ -111,6 +111,19 @@ class AppSettings(context: Context) {
         get() = prefs.getLong(PUBLISHED_AT, 0L)
         set(value) = prefs.edit { putLong(PUBLISHED_AT, value) }
 
+    /**
+     * Что последний обмен узнал о втором человеке: [PartnerHeard.OK] — его дела пришли (время в [partnerHeardMillis]),
+     * [PartnerHeard.NONE] — по этому коду он ещё ничего не отправлял, [PartnerHeard.UNREADABLE] — пришло, но не читается.
+     */
+    var partnerHeardState: String
+        get() = prefs.getString(PARTNER_HEARD_STATE, null).orEmpty()
+        set(value) = prefs.edit { putString(PARTNER_HEARD_STATE, value) }
+
+    /** Когда второй человек последний раз отправлял свои дела (по его часам). */
+    var partnerHeardMillis: Long
+        get() = prefs.getLong(PARTNER_HEARD_AT, 0L)
+        set(value) = prefs.edit { putLong(PARTNER_HEARD_AT, value) }
+
     /** Последняя синхронизация с облаком: когда и чем кончилась (пусто — успешно). */
     val lastSyncMillis: Long get() = prefs.getLong(LAST_SYNC, 0L)
 
@@ -272,6 +285,8 @@ class AppSettings(context: Context) {
         const val PUBLISHED_AT = "publishedAt"
         const val LAST_SYNC = "lastSync"
         const val LAST_SYNC_RESULT = "lastSyncResult"
+        const val PARTNER_HEARD_STATE = "partnerHeardState"
+        const val PARTNER_HEARD_AT = "partnerHeardAt"
         const val CLOUD_ID = "cloudId"
         const val CLOUD_REFRESH = "cloudRefresh"
         const val CLOUD_EXPIRES = "cloudExpires"
@@ -282,4 +297,11 @@ class AppSettings(context: Context) {
 
         fun timeOf(minutes: Int): LocalTime = LocalTime.of((minutes / 60).coerceIn(0, 23), minutes % 60)
     }
+}
+
+/** Что слышно от второго человека после обмена (значения [AppSettings.partnerHeardState]). */
+object PartnerHeard {
+    const val OK = "ok"
+    const val NONE = "none"
+    const val UNREADABLE = "unreadable"
 }

@@ -38,8 +38,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -181,6 +183,8 @@ fun TogetherWeekOverlay(
     diary: DiaryViewModel,
     offset: Int,
     onClose: () -> Unit,
+    /** Насколько совместная неделя проявилась (0–1): страницы под ней гаснут на столько же. */
+    onCover: (Float) -> Unit = {},
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -247,6 +251,10 @@ fun TogetherWeekOverlay(
     // Переливы на склейке: 30 кадров в секунду хватает, чаще только зря грузит телефон.
     val clock = rememberEffectTime(fps = 30, running = animate)
     BackHandler { close() }
+    val backdrop = LocalAccent.current.background
+    // Страницы под совместной неделей гаснут вместе с её появлением: сверху виден только фон-небо.
+    LaunchedEffect(Unit) { snapshotFlow { shown.value }.collect { onCover(it) } }
+    DisposableEffect(Unit) { onDispose { onCover(0f) } }
     // Совместная неделя почти непрозрачна: небо под ней можно не перерисовывать.
     DisposableEffect(Unit) {
         SkyFx.covered = true
@@ -257,7 +265,19 @@ fun TogetherWeekOverlay(
         modifier = Modifier
             .fillMaxSize()
             .graphicsLayer { alpha = shown.value }
-            .background(LocalAccent.current.background.copy(alpha = 0.97f))
+            // Сверху фон плавно проявляется из неба, без чёрной грани под переключателем имён;
+            // ниже, где недели, он почти непрозрачный, чтобы ничего не просвечивало.
+            .drawBehind {
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to backdrop.copy(alpha = 0f),
+                        0.45f to backdrop.copy(alpha = 0.7f),
+                        1f to backdrop.copy(alpha = 0.97f),
+                        startY = 0f,
+                        endY = 150.dp.toPx(),
+                    ),
+                )
+            }
             // Касания не уходят к страницам под совместной неделей.
             .pointerInput(Unit) {
                 awaitEachGesture {

@@ -16,7 +16,7 @@ class DayAndDeadlinesTest {
 
     @Test
     fun tuesdayStartsWithWorkThenLessons() {
-        val day = buildDay(LocalDate.of(2026, 10, 6), lessons, WorkSchedule.default)
+        val day = buildDay(LocalDate.of(2026, 10, 6), lessons, TestSchedules.octoberAizat)
         assertEquals(4, day.size)
         assertTrue(day.first() is DayItem.WorkItem)
         assertEquals(LocalTime.of(8, 0), day.first().start)
@@ -25,13 +25,13 @@ class DayAndDeadlinesTest {
 
     @Test
     fun mondayHasNoWork() {
-        val day = buildDay(LocalDate.of(2026, 10, 5), lessons, WorkSchedule.default)
+        val day = buildDay(LocalDate.of(2026, 10, 5), lessons, TestSchedules.octoberAizat)
         assertTrue(day.all { it is DayItem.LessonItem })
     }
 
     @Test
     fun sundayIsOnlyWork() {
-        val day = buildDay(LocalDate.of(2026, 10, 11), lessons, WorkSchedule.default)
+        val day = buildDay(LocalDate.of(2026, 10, 11), lessons, TestSchedules.octoberAizat)
         assertEquals(1, day.size)
         assertTrue(day.single() is DayItem.WorkItem)
     }

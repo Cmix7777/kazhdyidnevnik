@@ -42,6 +42,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,6 +50,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -124,6 +126,8 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     // Совместная неделя открыта: номер недели относительно текущей, null — закрыта.
     var together by rememberSaveable { mutableStateOf<Int?>(null) }
+    // Насколько совместная неделя закрыла страницы (0 — её нет): страницы под ней гаснут.
+    var togetherCover by remember { mutableFloatStateOf(0f) }
     val pagerState = rememberPagerState(initialPage = owner.ordinal) { Person.entries.size }
     val scope = rememberCoroutineScope()
     val position by remember {
@@ -155,6 +159,11 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                             owner = owner,
                             greeting = greeting,
                             canGreet = sync.paired && !sync.legacy,
+                            greetHint = if (sync.legacy) {
+                                "Чтобы капли ходили, после обновления связь нужно создать заново: Настройки, «Связь с ${owner.partner.instrumental}»."
+                            } else {
+                                "Капли ходят, когда телефоны связаны: Настройки, «Связь с ${owner.partner.instrumental}»."
+                            },
                             onSelect = { person ->
                                 // Чернила потекут сверху, от нажатого имени.
                                 ink.tappedName(if (person.ordinal == 0) 0.27f else 0.68f)
@@ -215,6 +224,7 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                             state = pagerState,
                             modifier = Modifier
                                 .fillMaxSize()
+                                .graphicsLayer { alpha = 1f - togetherCover }
                                 .inkTouchOrigin(ink),
                             beyondViewportPageCount = 1,
                             key = { Person.entries[it].id },
@@ -245,7 +255,7 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                             }
                         }
                         together?.let { offset ->
-                            TogetherWeekOverlay(vm, diary, offset, onClose = { together = null })
+                            TogetherWeekOverlay(vm, diary, offset, onClose = { together = null }, onCover = { togetherCover = it })
                         }
                     }
                 }
@@ -268,6 +278,7 @@ private fun PersonBar(
     canGreet: Boolean,
     onSelect: (Person) -> Unit,
     onOpenSettings: () -> Unit,
+    greetHint: String = "",
 ) {
     Row(
         modifier = Modifier
@@ -284,6 +295,7 @@ private fun PersonBar(
             canGreet = canGreet,
             onSelect = onSelect,
             modifier = Modifier.weight(1f),
+            greetHint = greetHint,
         )
         GlassIconButton(icon = R.drawable.ic_settings, contentDescription = "Настройки", onClick = onOpenSettings)
     }
@@ -298,6 +310,7 @@ private fun PersonSwitch(
     canGreet: Boolean,
     onSelect: (Person) -> Unit,
     modifier: Modifier = Modifier,
+    greetHint: String = "",
 ) {
     val accent = LocalAccent.current
     BoxWithConstraints(
@@ -327,7 +340,12 @@ private fun PersonSwitch(
                 Box(
                     // Имя второго человека: нажатие листает, долгое удержание выращивает каплю привета.
                     modifier = if (person == owner.partner) {
-                        tap.greetingDropSource(greeting, enabled = canGreet, onTap = { onSelect(person) })
+                        tap.greetingDropSource(
+                            greeting,
+                            enabled = canGreet,
+                            onTap = { onSelect(person) },
+                            disabledHint = greetHint,
+                        )
                     } else {
                         tap.clickable(role = Role.Tab) { onSelect(person) }
                     },
