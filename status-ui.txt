@@ -1,0 +1,85 @@
+run=11
+sha=27d5382b71cc69f2b0adac32847f9eadc37cbc8e
+result=success
+time=2026-10-14T15:56:02Z
+--- tests ---
+PASS AppScreensTest.firstLaunchAsksWhoseThePhoneIs
+PASS AppScreensTest.cancelledEditorLeavesNothingBehind
+PASS AppScreensTest.phoneLinkedBeforeEncryptionAsksToLinkAgain
+PASS AppScreensTest.pastingNothingUsefulIsExplained
+PASS AppScreensTest.pastingAnOldStyleCodeIsExplained
+PASS AppScreensTest.bottomTabsOpenTheirScreens
+PASS AppScreensTest.swipingToThePartnerShowsTheirPage
+PASS AppScreensTest.choosingAPhoneOpensTheDiary
+PASS AppScreensTest.settingsOffersTheLinkWithThePartner
+PASS AppScreensTest.addedEventShowsUpInTodayList
+PASS AppScreensTest.themeSwitchChangesAndRemembersTheTheme
+PASS GreetingRealAppTest.withoutLinkHoldingExplainsWhatToDo
+PASS GreetingRealAppTest.holdingThePartnerNameGrowsAndThrowsADrop
+PASS LiveUiShotsTest.greetingArrivalSingle
+PASS LiveUiShotsTest.greetingSend
+PASS LiveUiShotsTest.inkSwipe
+PASS LiveUiShotsTest.greetingArrival
+PASS LiveUiShotsTest.dropRefresh
+PASS LiveUiShotsTest.dayStrip
+PASS SpecialDayShotsTest.birthdayWithAge
+PASS SpecialDayShotsTest.anniversary
+PASS SpecialDayShotsTest.birthdayWithHeart
+PASS SpecialDayShotsTest.newYear
+PASS TogetherWeekShotsTest.gluingWeeksFrames
+PASS WeatherShotsTest.skyDawn
+PASS WeatherShotsTest.skyNightCrescentCloudy
+PASS WeatherShotsTest.skySunset
+PASS WeatherShotsTest.skyDay
+PASS WeatherShotsTest.skyEvening
+PASS WeatherShotsTest.frostWiped
+PASS WeatherShotsTest.rain
+PASS WeatherShotsTest.snow
+PASS WeatherShotsTest.frost
+PASS WeatherShotsTest.heavyRain
+PASS WeatherShotsTest.skyNightFullMoon
+total=35 failed=0
+--- what went wrong ---
+--- errors ---
+BUILD SUCCESSFUL in 4m 31s
+--- tail ---
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics
+> Task :app:processDebugJavaRes
+> Task :app:mergeProjectDexDebug
+> Task :app:mergeDebugJavaResource
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect
+> Task :app:compileDebugAndroidTestKotlin
+> Task :app:compileDebugAndroidTestJavaWithJavac
+> Task :app:dexBuilderDebugAndroidTest
+> Task :app:mergeDebugAndroidTestGlobalSynthetics
+> Task :app:processDebugAndroidTestJavaRes
+> Task :app:mergeProjectDexDebugAndroidTest
+> Task :app:mergeDebugAndroidTestJavaResource
+> Task :app:packageDebugAndroidTest
+> Task :app:createDebugAndroidTestApkListingFileRedirect
+[EmulatorConsole]: Failed to start Emulator console for 5554
+
+> Task :app:connectedDebugAndroidTest
+Starting 35 tests on emulator-5554 - 14
+
+emulator-5554 - 14 Tests 1/35 completed. (0 skipped) (0 failed)
+emulator-5554 - 14 Tests 2/35 completed. (0 skipped) (0 failed)
+emulator-5554 - 14 Tests 4/35 completed. (0 skipped) (0 failed)
+emulator-5554 - 14 Tests 6/35 completed. (0 skipped) (0 failed)
+emulator-5554 - 14 Tests 9/35 completed. (0 skipped) (0 failed)
+emulator-5554 - 14 Tests 11/35 completed. (0 skipped) (0 failed)
+emulator-5554 - 14 Tests 13/35 completed. (0 skipped) (0 failed)
+emulator-5554 - 14 Tests 16/35 completed. (0 skipped) (0 failed)
+emulator-5554 - 14 Tests 19/35 completed. (0 skipped) (0 failed)
+emulator-5554 - 14 Tests 23/35 completed. (0 skipped) (0 failed)
+emulator-5554 - 14 Tests 24/35 completed. (0 skipped) (0 failed)
+emulator-5554 - 14 Tests 28/35 completed. (0 skipped) (0 failed)
+emulator-5554 - 14 Tests 31/35 completed. (0 skipped) (0 failed)
+Finished 35 tests on emulator-5554 - 14
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__reactivecircus_android-emulator-runner-1791993097102.json
+
+BUILD SUCCESSFUL in 4m 31s
+67 actionable tasks: 67 executed
