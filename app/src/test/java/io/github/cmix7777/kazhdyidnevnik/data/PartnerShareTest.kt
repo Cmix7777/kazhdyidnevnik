@@ -90,8 +90,8 @@ class PartnerShareTest {
         assertEquals(2, seen.size)
         assertTrue(seen.all { it is DayItem.EventItem })
         // Пока он не поделился, у Насти виден график из приложения.
-        val before = Person.AIZAT.dayItems(aizatSunday, emptyList(), isOwner = false)
-        assertTrue(before.single() is DayItem.WorkItem)
+        val aizatBefore = Person.AIZAT.dayItems(aizatSunday, emptyList(), isOwner = false)
+        assertTrue(aizatBefore.single() is DayItem.WorkItem)
     }
 
     @Test
