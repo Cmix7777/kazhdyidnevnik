@@ -112,8 +112,8 @@ class AppSettings(context: Context) {
         set(value) = prefs.edit { putLong(PUBLISHED_AT, value) }
 
     /**
-     * Что последний обмен узнал о втором человеке: [PARTNER_HEARD_OK] — его дела пришли (время в [partnerHeardMillis]),
-     * [PARTNER_HEARD_NONE] — по этому коду он ещё ничего не отправлял, [PARTNER_HEARD_UNREADABLE] — пришло, но не читается.
+     * Что последний обмен узнал о втором человеке: [PartnerHeard.OK] — его дела пришли (время в [partnerHeardMillis]),
+     * [PartnerHeard.NONE] — по этому коду он ещё ничего не отправлял, [PartnerHeard.UNREADABLE] — пришло, но не читается.
      */
     var partnerHeardState: String
         get() = prefs.getString(PARTNER_HEARD_STATE, null).orEmpty()
@@ -287,9 +287,6 @@ class AppSettings(context: Context) {
         const val LAST_SYNC_RESULT = "lastSyncResult"
         const val PARTNER_HEARD_STATE = "partnerHeardState"
         const val PARTNER_HEARD_AT = "partnerHeardAt"
-        const val PARTNER_HEARD_OK = "ok"
-        const val PARTNER_HEARD_NONE = "none"
-        const val PARTNER_HEARD_UNREADABLE = "unreadable"
         const val CLOUD_ID = "cloudId"
         const val CLOUD_REFRESH = "cloudRefresh"
         const val CLOUD_EXPIRES = "cloudExpires"
@@ -300,4 +297,11 @@ class AppSettings(context: Context) {
 
         fun timeOf(minutes: Int): LocalTime = LocalTime.of((minutes / 60).coerceIn(0, 23), minutes % 60)
     }
+}
+
+/** Что слышно от второго человека после обмена (значения [AppSettings.partnerHeardState]). */
+object PartnerHeard {
+    const val OK = "ok"
+    const val NONE = "none"
+    const val UNREADABLE = "unreadable"
 }

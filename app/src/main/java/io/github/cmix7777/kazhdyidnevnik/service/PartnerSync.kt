@@ -11,6 +11,7 @@ import io.github.cmix7777.kazhdyidnevnik.data.PartnerShare
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.SharedEvents
 import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
+import io.github.cmix7777.kazhdyidnevnik.notify.PartnerHeard
 import io.github.cmix7777.kazhdyidnevnik.notify.ReminderScheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -59,13 +60,13 @@ object PartnerSync {
      * [stamp] превращает время в «13 окт, 21:40».
      */
     fun partnerNote(info: Info, partner: Person, stamp: (Long) -> String): String? = when (info.partnerState) {
-        AppSettings.PARTNER_HEARD_OK ->
+        PartnerHeard.OK ->
             if (info.partnerMillis > 0) "Последние дела от ${partner.genitive}: ${stamp(info.partnerMillis)}." else null
-        AppSettings.PARTNER_HEARD_NONE ->
+        PartnerHeard.NONE ->
             "От ${partner.genitive} по этому коду пока ничего не приходило. Скорее всего, у ${partner.genitive} " +
                 "другой код или связь не создана заново. Нажми «Отправить код ещё раз», а ${partner.shortName} " +
                 "пусть вставит его у себя в настройках."
-        AppSettings.PARTNER_HEARD_UNREADABLE ->
+        PartnerHeard.UNREADABLE ->
             "Дела от ${partner.genitive} пришли, но не читаются. Скорее всего, у ${partner.genitive} старая " +
                 "версия приложения: пусть обновится."
         else -> null
@@ -220,15 +221,15 @@ object PartnerSync {
         // (например, у него другой код). Запоминаем это, чтобы показать в настройках, а не молчать.
         val remote = cloud.fetch(code, owner.partner)
         if (remote == null) {
-            settings.partnerHeardState = AppSettings.PARTNER_HEARD_NONE
+            settings.partnerHeardState = PartnerHeard.NONE
             return
         }
         val shared = PartnerShare.decode(remote.payload)
         if (shared == null || shared.from != owner.partner) {
-            settings.partnerHeardState = AppSettings.PARTNER_HEARD_UNREADABLE
+            settings.partnerHeardState = PartnerHeard.UNREADABLE
             return
         }
-        settings.partnerHeardState = AppSettings.PARTNER_HEARD_OK
+        settings.partnerHeardState = PartnerHeard.OK
         settings.partnerHeardMillis = maxOf(remote.updatedAt, shared.at)
         val current = PartnerEventsRepository.current(app.filesDir)
         if (current == null || current.from != shared.from || shared.at > current.at) {
