@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.DayAndDeadlinesTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-14T15:36:48.104Z" hostname="runnervmmprz5" time="0.102">
+  <properties/>
+  <testcase name="sundayIsOnlyWork" classname="io.github.cmix7777.kazhdyidnevnik.data.DayAndDeadlinesTest" time="0.065"/>
+  <testcase name="tuesdayStartsWithWorkThenLessons" classname="io.github.cmix7777.kazhdyidnevnik.data.DayAndDeadlinesTest" time="0.009"/>
+  <testcase name="mondayHasNoWork" classname="io.github.cmix7777.kazhdyidnevnik.data.DayAndDeadlinesTest" time="0.007"/>
+  <testcase name="practiceDays" classname="io.github.cmix7777.kazhdyidnevnik.data.DayAndDeadlinesTest" time="0.006"/>
+  <testcase name="russianPluralForLessons" classname="io.github.cmix7777.kazhdyidnevnik.data.DayAndDeadlinesTest" time="0.006"/>
+  <testcase name="russianPluralForDays" classname="io.github.cmix7777.kazhdyidnevnik.data.DayAndDeadlinesTest" time="0.006"/>
+  <testcase name="countdown" classname="io.github.cmix7777.kazhdyidnevnik.data.DayAndDeadlinesTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,33 @@
+run=14
+sha=e814b38b90d06120106545d70934454ff0380dc6
+build=success
+result=success
+time=2026-10-14T15:42:01Z
+--- errors ---
+BUILD SUCCESSFUL in 53s
+--- what went wrong ---
+--- instrument ---
+
+io.github.cmix7777.kazhdyidnevnik.TogetherWeekShotsTest:.
+io.github.cmix7777.kazhdyidnevnik.SpecialDayShotsTest:....
+io.github.cmix7777.kazhdyidnevnik.WeatherShotsTest:...........
+io.github.cmix7777.kazhdyidnevnik.LiveUiShotsTest:......
+io.github.cmix7777.kazhdyidnevnik.GreetingRealAppTest:..
+
+Time: 122.872
+
+OK (24 tests)
+
+
+--- screens ---
+
+io.github.cmix7777.kazhdyidnevnik.AppScreensTest:...........
+
+Time: 87.297
+
+OK (11 tests)
+
+
+--- logcat ---
+10-14 15:38:26.389 E/ActivityManager(  522): ANR in com.google.android.apps.nexuslauncher (com.google.android.apps.nexuslauncher/.NexusLauncherActivity)
+10-14 15:38:26.389 E/ActivityManager(  522): Reason: Input dispatching timed out (Application does not have a focused window)

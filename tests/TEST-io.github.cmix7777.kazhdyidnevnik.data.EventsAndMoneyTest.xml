@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.EventsAndMoneyTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-14T15:36:48.221Z" hostname="runnervmmprz5" time="0.015">
+  <properties/>
+  <testcase name="workEventsCountForTheRoadOthersDoNot" classname="io.github.cmix7777.kazhdyidnevnik.data.EventsAndMoneyTest" time="0.003"/>
+  <testcase name="aizatWeeklyShiftsBecomeHisOwnRepeatingEvents" classname="io.github.cmix7777.kazhdyidnevnik.data.EventsAndMoneyTest" time="0.005"/>
+  <testcase name="moneyText" classname="io.github.cmix7777.kazhdyidnevnik.data.EventsAndMoneyTest" time="0.001"/>
+  <testcase name="weeklyEventsRepeatAndCanSkipADay" classname="io.github.cmix7777.kazhdyidnevnik.data.EventsAndMoneyTest" time="0.001"/>
+  <testcase name="diaryMergeKeepsEverything" classname="io.github.cmix7777.kazhdyidnevnik.data.EventsAndMoneyTest" time="0.0"/>
+  <testcase name="eventsJoinTheDay" classname="io.github.cmix7777.kazhdyidnevnik.data.EventsAndMoneyTest" time="0.001"/>
+  <testcase name="nastyaShiftsBecomeHerOwnEvents" classname="io.github.cmix7777.kazhdyidnevnik.data.EventsAndMoneyTest" time="0.003"/>
+  <testcase name="balanceByDay" classname="io.github.cmix7777.kazhdyidnevnik.data.EventsAndMoneyTest" time="0.0"/>
+  <testcase name="eventReminders" classname="io.github.cmix7777.kazhdyidnevnik.data.EventsAndMoneyTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

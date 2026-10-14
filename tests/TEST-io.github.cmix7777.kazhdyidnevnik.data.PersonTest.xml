@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.PersonTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-14T15:36:48.302Z" hostname="runnervmmprz5" time="0.005">
+  <properties/>
+  <testcase name="nastyaShiftsAreOneOff" classname="io.github.cmix7777.kazhdyidnevnik.data.PersonTest" time="0.0"/>
+  <testcase name="profiles" classname="io.github.cmix7777.kazhdyidnevnik.data.PersonTest" time="0.0"/>
+  <testcase name="partnerReminders" classname="io.github.cmix7777.kazhdyidnevnik.data.PersonTest" time="0.001"/>
+  <testcase name="backupKeepsPartnerAlerts" classname="io.github.cmix7777.kazhdyidnevnik.data.PersonTest" time="0.0"/>
+  <testcase name="nastyaMorningSummary" classname="io.github.cmix7777.kazhdyidnevnik.data.PersonTest" time="0.004"/>
+  <testcase name="nastyaLeavesEighteenMinutesBeforeWork" classname="io.github.cmix7777.kazhdyidnevnik.data.PersonTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

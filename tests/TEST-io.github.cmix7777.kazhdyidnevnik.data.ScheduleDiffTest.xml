@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.ScheduleDiffTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-14T15:36:48.383Z" hostname="runnervmmprz5" time="0.016">
+  <properties/>
+  <testcase name="sameScheduleHasNoChanges" classname="io.github.cmix7777.kazhdyidnevnik.data.ScheduleDiffTest" time="0.004"/>
+  <testcase name="findsChangedRemovedAndAddedLessons" classname="io.github.cmix7777.kazhdyidnevnik.data.ScheduleDiffTest" time="0.003"/>
+  <testcase name="topicAndTeacherChangesAreIgnored" classname="io.github.cmix7777.kazhdyidnevnik.data.ScheduleDiffTest" time="0.002"/>
+  <testcase name="pastDaysAreIgnored" classname="io.github.cmix7777.kazhdyidnevnik.data.ScheduleDiffTest" time="0.003"/>
+  <testcase name="describesEachKindOfChange" classname="io.github.cmix7777.kazhdyidnevnik.data.ScheduleDiffTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

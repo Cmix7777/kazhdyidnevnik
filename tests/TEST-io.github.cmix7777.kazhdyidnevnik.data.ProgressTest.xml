@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.ProgressTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-14T15:36:48.337Z" hostname="runnervmmprz5" time="0.011">
+  <properties/>
+  <testcase name="minutesFormat" classname="io.github.cmix7777.kazhdyidnevnik.data.ProgressTest" time="0.003"/>
+  <testcase name="topicSessionsByWeek" classname="io.github.cmix7777.kazhdyidnevnik.data.ProgressTest" time="0.002"/>
+  <testcase name="storeRoundTrip" classname="io.github.cmix7777.kazhdyidnevnik.data.ProgressTest" time="0.003"/>
+  <testcase name="historyEndsWithToday" classname="io.github.cmix7777.kazhdyidnevnik.data.ProgressTest" time="0.0"/>
+  <testcase name="noStreak" classname="io.github.cmix7777.kazhdyidnevnik.data.ProgressTest" time="0.001"/>
+  <testcase name="minutesOnlyForThisWeek" classname="io.github.cmix7777.kazhdyidnevnik.data.ProgressTest" time="0.0"/>
+  <testcase name="streakCountsConsecutiveDays" classname="io.github.cmix7777.kazhdyidnevnik.data.ProgressTest" time="0.0"/>
+  <testcase name="streakSurvivesIfTodayNotDoneYet" classname="io.github.cmix7777.kazhdyidnevnik.data.ProgressTest" time="0.0"/>
+  <testcase name="brokenKeysAreIgnored" classname="io.github.cmix7777.kazhdyidnevnik.data.ProgressTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

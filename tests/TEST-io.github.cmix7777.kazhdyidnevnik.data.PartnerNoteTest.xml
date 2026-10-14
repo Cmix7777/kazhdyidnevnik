@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.PartnerNoteTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-14T15:36:48.281Z" hostname="runnervmmprz5" time="0.015">
+  <properties/>
+  <testcase name="unreadableAndUnknown" classname="io.github.cmix7777.kazhdyidnevnik.data.PartnerNoteTest" time="0.014"/>
+  <testcase name="saysWhenPartnerLastShared" classname="io.github.cmix7777.kazhdyidnevnik.data.PartnerNoteTest" time="0.001"/>
+  <testcase name="explainsWhenNothingCameForThisCode" classname="io.github.cmix7777.kazhdyidnevnik.data.PartnerNoteTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

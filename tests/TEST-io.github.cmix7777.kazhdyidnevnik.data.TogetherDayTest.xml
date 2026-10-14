@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.TogetherDayTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-14T15:36:48.451Z" hostname="runnervmmprz5" time="0.004">
+  <properties/>
+  <testcase name="windowStartsWhenTheLaterOfTwoFinishes" classname="io.github.cmix7777.kazhdyidnevnik.data.TogetherDayTest" time="0.001"/>
+  <testcase name="emptyDayIsOneLongWindow" classname="io.github.cmix7777.kazhdyidnevnik.data.TogetherDayTest" time="0.0"/>
+  <testcase name="shortGapsAreNotShown" classname="io.github.cmix7777.kazhdyidnevnik.data.TogetherDayTest" time="0.0"/>
+  <testcase name="overlappingBusyTimeIsMerged" classname="io.github.cmix7777.kazhdyidnevnik.data.TogetherDayTest" time="0.001"/>
+  <testcase name="gapOfExactlyTwoHoursCounts" classname="io.github.cmix7777.kazhdyidnevnik.data.TogetherDayTest" time="0.0"/>
+  <testcase name="kindsAreListedOnce" classname="io.github.cmix7777.kazhdyidnevnik.data.TogetherDayTest" time="0.0"/>
+  <testcase name="lateEveningEventDoesNotLeaveAWindowAfterEndOfDay" classname="io.github.cmix7777.kazhdyidnevnik.data.TogetherDayTest" time="0.0"/>
+  <testcase name="otherEventIsShownByItsTitle" classname="io.github.cmix7777.kazhdyidnevnik.data.TogetherDayTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

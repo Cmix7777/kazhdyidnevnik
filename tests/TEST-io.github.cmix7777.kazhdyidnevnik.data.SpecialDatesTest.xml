@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.SpecialDatesTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-14T15:36:48.407Z" hostname="runnervmmprz5" time="0.003">
+  <properties/>
+  <testcase name="anniversaryWinsOverBirthdayAndNewYearComesByItself" classname="io.github.cmix7777.kazhdyidnevnik.data.SpecialDatesTest" time="0.001"/>
+  <testcase name="leapDayFallsOnFebruary28thInOrdinaryYears" classname="io.github.cmix7777.kazhdyidnevnik.data.SpecialDatesTest" time="0.0"/>
+  <testcase name="birthdayIsRemindedOnTheDayAndAWeekBefore" classname="io.github.cmix7777.kazhdyidnevnik.data.SpecialDatesTest" time="0.001"/>
+  <testcase name="occasionSurvivesSavingAndSharingWithoutNotes" classname="io.github.cmix7777.kazhdyidnevnik.data.SpecialDatesTest" time="0.0"/>
+  <testcase name="partnersDatesAreAddedWithoutDuplicates" classname="io.github.cmix7777.kazhdyidnevnik.data.SpecialDatesTest" time="0.001"/>
+  <testcase name="yearsAndTitles" classname="io.github.cmix7777.kazhdyidnevnik.data.SpecialDatesTest" time="0.0"/>
+  <testcase name="specialDateRepeatsEveryYear" classname="io.github.cmix7777.kazhdyidnevnik.data.SpecialDatesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

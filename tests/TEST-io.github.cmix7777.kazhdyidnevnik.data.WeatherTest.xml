@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.WeatherTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-14T15:36:48.458Z" hostname="runnervmmprz5" time="0.093">
+  <properties/>
+  <testcase name="adviceForSnowyWindyDay" classname="io.github.cmix7777.kazhdyidnevnik.data.WeatherTest" time="0.017"/>
+  <testcase name="alerts" classname="io.github.cmix7777.kazhdyidnevnik.data.WeatherTest" time="0.013"/>
+  <testcase name="parsesCurrentHoursAndDays" classname="io.github.cmix7777.kazhdyidnevnik.data.WeatherTest" time="0.007"/>
+  <testcase name="brokenAnswerGivesNothing" classname="io.github.cmix7777.kazhdyidnevnik.data.WeatherTest" time="0.007"/>
+  <testcase name="adviceForOrdinaryDay" classname="io.github.cmix7777.kazhdyidnevnik.data.WeatherTest" time="0.02"/>
+  <testcase name="tripsSkipOnlineLessons" classname="io.github.cmix7777.kazhdyidnevnik.data.WeatherTest" time="0.004"/>
+  <testcase name="temperatureSigns" classname="io.github.cmix7777.kazhdyidnevnik.data.WeatherTest" time="0.004"/>
+  <testcase name="morningSummaryIncludesRoadWeather" classname="io.github.cmix7777.kazhdyidnevnik.data.WeatherTest" time="0.005"/>
+  <testcase name="tomorrowNotification" classname="io.github.cmix7777.kazhdyidnevnik.data.WeatherTest" time="0.004"/>
+  <testcase name="clothingByFeelsLike" classname="io.github.cmix7777.kazhdyidnevnik.data.WeatherTest" time="0.003"/>
+  <testcase name="nearestHour" classname="io.github.cmix7777.kazhdyidnevnik.data.WeatherTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.DayStripTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-14T15:36:48.207Z" hostname="runnervmmprz5" time="0.005">
+  <properties/>
+  <testcase name="hiddenWhenDayIsOverOrEmpty" classname="io.github.cmix7777.kazhdyidnevnik.data.DayStripTest" time="0.001"/>
+  <testcase name="beforeTheDay" classname="io.github.cmix7777.kazhdyidnevnik.data.DayStripTest" time="0.002"/>
+  <testcase name="betweenBlocks" classname="io.github.cmix7777.kazhdyidnevnik.data.DayStripTest" time="0.002"/>
+  <testcase name="currentBlock" classname="io.github.cmix7777.kazhdyidnevnik.data.DayStripTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
