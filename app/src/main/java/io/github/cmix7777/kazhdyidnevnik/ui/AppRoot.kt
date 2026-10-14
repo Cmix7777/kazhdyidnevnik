@@ -159,6 +159,11 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                             owner = owner,
                             greeting = greeting,
                             canGreet = sync.paired && !sync.legacy,
+                            greetHint = if (sync.legacy) {
+                                "Чтобы капли ходили, после обновления связь нужно создать заново: Настройки, «Связь с ${owner.partner.instrumental}»."
+                            } else {
+                                "Капли ходят, когда телефоны связаны: Настройки, «Связь с ${owner.partner.instrumental}»."
+                            },
                             onSelect = { person ->
                                 // Чернила потекут сверху, от нажатого имени.
                                 ink.tappedName(if (person.ordinal == 0) 0.27f else 0.68f)
@@ -273,6 +278,7 @@ private fun PersonBar(
     canGreet: Boolean,
     onSelect: (Person) -> Unit,
     onOpenSettings: () -> Unit,
+    greetHint: String = "",
 ) {
     Row(
         modifier = Modifier
@@ -289,6 +295,7 @@ private fun PersonBar(
             canGreet = canGreet,
             onSelect = onSelect,
             modifier = Modifier.weight(1f),
+            greetHint = greetHint,
         )
         GlassIconButton(icon = R.drawable.ic_settings, contentDescription = "Настройки", onClick = onOpenSettings)
     }
@@ -303,6 +310,7 @@ private fun PersonSwitch(
     canGreet: Boolean,
     onSelect: (Person) -> Unit,
     modifier: Modifier = Modifier,
+    greetHint: String = "",
 ) {
     val accent = LocalAccent.current
     BoxWithConstraints(
@@ -332,7 +340,12 @@ private fun PersonSwitch(
                 Box(
                     // Имя второго человека: нажатие листает, долгое удержание выращивает каплю привета.
                     modifier = if (person == owner.partner) {
-                        tap.greetingDropSource(greeting, enabled = canGreet, onTap = { onSelect(person) })
+                        tap.greetingDropSource(
+                            greeting,
+                            enabled = canGreet,
+                            onTap = { onSelect(person) },
+                            disabledHint = greetHint,
+                        )
                     } else {
                         tap.clickable(role = Role.Tab) { onSelect(person) }
                     },

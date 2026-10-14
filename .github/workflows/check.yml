@@ -60,7 +60,7 @@ jobs:
             adb logcat -c || true
             adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.AppScreensTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > screens.log 2>&1 || true
             adb logcat -d -v time > logcat.txt 2>&1 || true
-            adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.TogetherWeekShotsTest,io.github.cmix7777.kazhdyidnevnik.SpecialDayShotsTest,io.github.cmix7777.kazhdyidnevnik.WeatherShotsTest,io.github.cmix7777.kazhdyidnevnik.LiveUiShotsTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > instrument.log 2>&1 || true
+            adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.TogetherWeekShotsTest,io.github.cmix7777.kazhdyidnevnik.SpecialDayShotsTest,io.github.cmix7777.kazhdyidnevnik.WeatherShotsTest,io.github.cmix7777.kazhdyidnevnik.LiveUiShotsTest,io.github.cmix7777.kazhdyidnevnik.GreetingRealAppTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > instrument.log 2>&1 || true
             adb pull /sdcard/Android/data/io.github.cmix7777.kazhdyidnevnik/files/shots shots || true
 
       - name: Отчёт проверки
