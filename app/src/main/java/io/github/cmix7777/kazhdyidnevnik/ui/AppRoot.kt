@@ -42,6 +42,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,6 +50,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -124,6 +126,8 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
     // Совместная неделя открыта: номер недели относительно текущей, null — закрыта.
     var together by rememberSaveable { mutableStateOf<Int?>(null) }
+    // Насколько совместная неделя закрыла страницы (0 — её нет): страницы под ней гаснут.
+    var togetherCover by remember { mutableFloatStateOf(0f) }
     val pagerState = rememberPagerState(initialPage = owner.ordinal) { Person.entries.size }
     val scope = rememberCoroutineScope()
     val position by remember {
@@ -215,6 +219,7 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                             state = pagerState,
                             modifier = Modifier
                                 .fillMaxSize()
+                                .graphicsLayer { alpha = 1f - togetherCover }
                                 .inkTouchOrigin(ink),
                             beyondViewportPageCount = 1,
                             key = { Person.entries[it].id },
@@ -245,7 +250,7 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                             }
                         }
                         together?.let { offset ->
-                            TogetherWeekOverlay(vm, diary, offset, onClose = { together = null })
+                            TogetherWeekOverlay(vm, diary, offset, onClose = { together = null }, onCover = { togetherCover = it })
                         }
                     }
                 }

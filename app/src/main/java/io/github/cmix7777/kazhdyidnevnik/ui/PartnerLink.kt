@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.formatStamp
+import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
 import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
 
 /**
@@ -63,6 +64,16 @@ fun PartnerLinkCard(owner: Person) {
                 else -> "Обмена ещё не было."
             }
             Text(text = status, style = MaterialTheme.typography.bodySmall, color = Palette.TextFaint)
+            // Что слышно от второго человека: так видно, доходят ли его дела, а не только что облако ответило.
+            if (!info.running) {
+                PartnerSync.partnerNote(info, partner, ::formatStamp)?.let { line ->
+                    Text(
+                        text = line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (info.partnerState == AppSettings.PARTNER_HEARD_OK) Palette.TextMuted else Palette.DangerText,
+                    )
+                }
+            }
             info.problem?.let {
                 Text(
                     text = "Последняя попытка не удалась: $it",

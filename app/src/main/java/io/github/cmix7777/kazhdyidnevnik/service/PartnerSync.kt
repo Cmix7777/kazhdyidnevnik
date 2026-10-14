@@ -46,9 +46,30 @@ object PartnerSync {
         val lastSyncMillis: Long = 0L,
         /** Чем кончилась последняя попытка, если неудачей. */
         val problem: String? = null,
+        /** Что слышно от второго человека: см. [AppSettings.partnerHeardState]. */
+        val partnerState: String = "",
+        /** Когда второй человек последний раз отправлял дела (0 — неизвестно). */
+        val partnerMillis: Long = 0L,
     )
 
     enum class JoinResult { Done, NoCode, OldCode, AlreadyJoined }
+
+    /**
+     * Строка для настроек: что слышно от второго человека. null — ещё не было обмена.
+     * [stamp] превращает время в «13 окт, 21:40».
+     */
+    fun partnerNote(info: Info, partner: Person, stamp: (Long) -> String): String? = when (info.partnerState) {
+        AppSettings.PARTNER_HEARD_OK ->
+            if (info.partnerMillis > 0) "Последние дела от ${partner.genitive}: ${stamp(info.partnerMillis)}." else null
+        AppSettings.PARTNER_HEARD_NONE ->
+            "От ${partner.genitive} по этому коду пока ничего не приходило. Скорее всего, у ${partner.genitive} " +
+                "другой код или связь не создана заново. Нажми «Отправить код ещё раз», а ${partner.shortName} " +
+                "пусть вставит его у себя в настройках."
+        AppSettings.PARTNER_HEARD_UNREADABLE ->
+            "Дела от ${partner.genitive} пришли, но не читаются. Скорее всего, у ${partner.genitive} старая " +
+                "версия приложения: пусть обновится."
+        else -> null
+    }
 
     private val mutableInfo = MutableStateFlow(Info())
     val info: StateFlow<Info> = mutableInfo.asStateFlow()
@@ -70,6 +91,8 @@ object PartnerSync {
                 legacy = settings.hasLegacyPairing,
                 lastSyncMillis = settings.lastSyncMillis,
                 problem = settings.lastSyncResult.ifEmpty { null },
+                partnerState = settings.partnerHeardState,
+                partnerMillis = settings.partnerHeardMillis,
             )
         }
     }
@@ -91,6 +114,8 @@ object PartnerSync {
         val settings = AppSettings(context)
         if (settings.pairCode == code) return JoinResult.AlreadyJoined
         settings.pairCode = code
+        // Новый код: что было слышно по старому, больше не важно.
+        settings.partnerHeardState = ""
         settings.cloudTokens.save(null)
         load(context)
         syncNow(context)
@@ -102,6 +127,7 @@ object PartnerSync {
         val settings = AppSettings(context)
         settings.pairCode = null
         settings.recordSync(0L, "")
+        settings.partnerHeardState = ""
         load(context)
     }
 
@@ -163,7 +189,13 @@ object PartnerSync {
                 settings.recordSync(settings.lastSyncMillis, problem)
             }
             mutableInfo.update {
-                it.copy(running = false, lastSyncMillis = settings.lastSyncMillis, problem = problem)
+                it.copy(
+                    running = false,
+                    lastSyncMillis = settings.lastSyncMillis,
+                    problem = problem,
+                    partnerState = settings.partnerHeardState,
+                    partnerMillis = settings.partnerHeardMillis,
+                )
             }
             problem == null
         }
@@ -184,9 +216,20 @@ object PartnerSync {
             settings.publishedMillis = now
         }
 
-        val remote = cloud.fetch(code, owner.partner) ?: return
+        // Обмен с облаком мог пройти успешно, а от второго человека по этому коду не прийти ничего
+        // (например, у него другой код). Запоминаем это, чтобы показать в настройках, а не молчать.
+        val remote = cloud.fetch(code, owner.partner)
+        if (remote == null) {
+            settings.partnerHeardState = AppSettings.PARTNER_HEARD_NONE
+            return
+        }
         val shared = PartnerShare.decode(remote.payload)
-        if (shared == null || shared.from != owner.partner) return
+        if (shared == null || shared.from != owner.partner) {
+            settings.partnerHeardState = AppSettings.PARTNER_HEARD_UNREADABLE
+            return
+        }
+        settings.partnerHeardState = AppSettings.PARTNER_HEARD_OK
+        settings.partnerHeardMillis = maxOf(remote.updatedAt, shared.at)
         val current = PartnerEventsRepository.current(app.filesDir)
         if (current == null || current.from != shared.from || shared.at > current.at) {
             PartnerEventsRepository.save(app.filesDir, shared)

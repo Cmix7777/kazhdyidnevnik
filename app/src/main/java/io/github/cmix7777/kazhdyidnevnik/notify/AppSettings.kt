@@ -111,6 +111,19 @@ class AppSettings(context: Context) {
         get() = prefs.getLong(PUBLISHED_AT, 0L)
         set(value) = prefs.edit { putLong(PUBLISHED_AT, value) }
 
+    /**
+     * Что последний обмен узнал о втором человеке: [PARTNER_HEARD_OK] — его дела пришли (время в [partnerHeardMillis]),
+     * [PARTNER_HEARD_NONE] — по этому коду он ещё ничего не отправлял, [PARTNER_HEARD_UNREADABLE] — пришло, но не читается.
+     */
+    var partnerHeardState: String
+        get() = prefs.getString(PARTNER_HEARD_STATE, null).orEmpty()
+        set(value) = prefs.edit { putString(PARTNER_HEARD_STATE, value) }
+
+    /** Когда второй человек последний раз отправлял свои дела (по его часам). */
+    var partnerHeardMillis: Long
+        get() = prefs.getLong(PARTNER_HEARD_AT, 0L)
+        set(value) = prefs.edit { putLong(PARTNER_HEARD_AT, value) }
+
     /** Последняя синхронизация с облаком: когда и чем кончилась (пусто — успешно). */
     val lastSyncMillis: Long get() = prefs.getLong(LAST_SYNC, 0L)
 
@@ -272,6 +285,11 @@ class AppSettings(context: Context) {
         const val PUBLISHED_AT = "publishedAt"
         const val LAST_SYNC = "lastSync"
         const val LAST_SYNC_RESULT = "lastSyncResult"
+        const val PARTNER_HEARD_STATE = "partnerHeardState"
+        const val PARTNER_HEARD_AT = "partnerHeardAt"
+        const val PARTNER_HEARD_OK = "ok"
+        const val PARTNER_HEARD_NONE = "none"
+        const val PARTNER_HEARD_UNREADABLE = "unreadable"
         const val CLOUD_ID = "cloudId"
         const val CLOUD_REFRESH = "cloudRefresh"
         const val CLOUD_EXPIRES = "cloudExpires"
