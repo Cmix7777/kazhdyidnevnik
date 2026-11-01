@@ -64,9 +64,8 @@ class ChatCloudTest {
                 val id = update["name"]!!.jsonPrimitive.content.substringAfter("/documents/shares/")
                 if (id.length !in 20..60) return denied()
                 val mustExist = write["currentDocument"]?.jsonObject?.get("exists")?.jsonPrimitive?.boolean
-                if (mustExist == true && id !in staged) {
-                    return HttpReply(404, """{"error":{"code":404,"message":"No document to update","status":"NOT_FOUND"}}""")
-                }
+                // Как в настоящей базе: без документа запись отметки — это создание без payload, его не пускают правила.
+                if (mustExist == true && id !in staged) return denied()
                 val incoming = update["fields"]!!.jsonObject
                 val mask = write["updateMask"]?.jsonObject?.get("fieldPaths")?.jsonArray?.map { it.jsonPrimitive.content }
                 val result = if (mask == null) incoming else applyMask(staged[id] ?: JsonObject(emptyMap()), incoming, mask)

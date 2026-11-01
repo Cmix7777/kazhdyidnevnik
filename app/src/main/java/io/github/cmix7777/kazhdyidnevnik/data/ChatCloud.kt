@@ -101,7 +101,7 @@ class ChatCloud(
         if (reply.code !in 200..299) throw session.failure(reply, "Не удалось отправить сообщение")
     }
 
-    /** Отметить, что сообщения второго человека прочитаны до [upTo]. false — своей головы ещё нет. */
+    /** Отметить, что сообщения второго человека прочитаны до [upTo]. false — своей головы ещё нет (или запись не пустили). */
     fun putRead(code: String, me: Person, upTo: Long): Boolean = putMark(code, me, "r", upTo)
 
     /** «Печатаю»: любое новое число, 0 — перестал. false — своей головы ещё нет. */
@@ -131,7 +131,8 @@ class ChatCloud(
             }
         }.toString()
         val reply = session.commit(body)
-        if (reply.code == 404 || reply.code == 400 && reply.body.contains("NOT_FOUND")) return false
+        // Головы нет: настоящая база отвечает 403 (правила проверяются раньше, чем «документа нет»), подставная — 404.
+        if (reply.code == 403 || reply.code == 404 || reply.code == 400 && reply.body.contains("NOT_FOUND")) return false
         if (reply.code !in 200..299) throw session.failure(reply, "Не удалось отправить отметку")
         return true
     }

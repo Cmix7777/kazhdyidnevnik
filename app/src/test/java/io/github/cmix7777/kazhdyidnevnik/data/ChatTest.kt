@@ -263,6 +263,11 @@ class ChatTest {
         assertTrue(rows[4] is ChatRow.Day)
         assertEquals(ChatTick.PENDING, (rows[5] as ChatRow.Message).tick)
         assertEquals(rows.size, rows.map { it.key }.toSet().size)
+        // Удалённое сообщение пропадает из ленты, а ответ на него — без цитаты.
+        val withDeleted = state.copy(mine = state.mine.map { if (it.seq == 2L) it.asDeleted() else it })
+        val visible = ChatLogic.rows(withDeleted, aizat, zone).filterIsInstance<ChatRow.Message>()
+        assertEquals(3, visible.size)
+        assertNull(visible.first { !it.mine }.reply)
         // На экране список идёт от новых к старым.
         assertTrue(ChatLogic.rows(state, aizat, zone).first() is ChatRow.Message)
     }

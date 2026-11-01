@@ -517,13 +517,14 @@ object ChatSync {
         val upTo = state.value.readUpTo
         if (upTo <= state.value.readSent) return
         var ok = cloud.putRead(code, owner, upTo)
-        if (!ok) {
+        if (!ok && state.value.myVersion == 0L) {
             // Своей головы ещё нет: создаём её и пробуем снова.
             update { it.copy(revision = it.revision + 1) }
             uploadLocked(app, settings, cloud, code, owner)
             ok = cloud.putRead(code, owner, upTo)
         }
-        if (ok) update { it.copy(readSent = maxOf(it.readSent, upTo)) }
+        if (!ok) throw CloudException("Не удалось отметить сообщения прочитанными")
+        update { it.copy(readSent = maxOf(it.readSent, upTo)) }
     }
 
     /** Мгновенный пуш второму телефону о новом сообщении (если пересылка настроена). */

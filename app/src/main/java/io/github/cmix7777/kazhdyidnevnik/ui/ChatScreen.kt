@@ -76,6 +76,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -281,6 +284,7 @@ fun ChatScreen(
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
                     modifier = Modifier
                         .fillMaxSize()
+                        .topFade(18.dp)
                         .testTag("chat-list"),
                 ) {
                     if (status.partnerTyping) {
@@ -321,7 +325,7 @@ fun ChatScreen(
         }
         if (hasPending && status.problem != null) {
             Text(
-                text = "Не отправлено: ${status.problem}. Отправится само, когда появится связь.",
+                text = "Нет связи: неотправленное уйдёт само, когда она появится. Нажми, чтобы попробовать сейчас.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Palette.DangerText,
                 modifier = Modifier
@@ -981,6 +985,17 @@ private fun PhotoViewer(photo: ChatPhoto, onClose: () -> Unit) {
         }
     }
 }
+
+/** Верхний край ленты: пузыри уходят под него плавно, без резкой обрезки и тёмной полосы. */
+private fun Modifier.topFade(height: Dp): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        drawRect(
+            brush = Brush.verticalGradient(listOf(Color.Transparent, Color.Black), startY = 0f, endY = height.toPx()),
+            blendMode = BlendMode.DstIn,
+        )
+    }
 
 private const val THUMB_SIDE = 900
 private const val FULL_SIDE = 2400

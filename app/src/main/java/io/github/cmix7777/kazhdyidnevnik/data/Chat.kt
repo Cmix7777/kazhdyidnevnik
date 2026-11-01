@@ -156,9 +156,12 @@ object ChatLogic {
 
     const val MAX_TEXT = 4000
 
-    /** Голова в облаке не больше этого (в байтах JSON до шифрования): правила базы пускают документы до 300 000 знаков. */
-    const val HEAD_LIMIT_BYTES = 110_000
-    const val HEAD_LIMIT_COUNT = 150
+    /**
+     * Голова в облаке не больше этого (в байтах JSON до шифрования). Правила базы пускают до 300 000 знаков,
+     * но голову скачивают при каждом новом сообщении, поэтому она маленькая: обычно 10–15 КБ.
+     */
+    const val HEAD_LIMIT_BYTES = 60_000
+    const val HEAD_LIMIT_COUNT = 100
 
     /** Сколько последних удалений из архива держать в голове. */
     const val KEEP_DELETED = 400
@@ -436,14 +439,15 @@ object ChatLogic {
      */
     fun rows(state: ChatState, me: Person, zone: ZoneId = ZoneId.systemDefault()): List<ChatRow> {
         data class Item(val message: ChatMessage, val mine: Boolean, val earlier: Boolean)
+        // Удалённые сообщения исчезают совсем, как будто их и не было.
         val items = buildList {
-            state.earlier.forEach { add(Item(it, it.from == me.id, true)) }
-            state.mine.forEach { add(Item(it, true, false)) }
-            state.theirs.forEach { add(Item(it, false, false)) }
+            state.earlier.forEach { if (!it.deleted) add(Item(it, it.from == me.id, true)) }
+            state.mine.forEach { if (!it.deleted) add(Item(it, true, false)) }
+            state.theirs.forEach { if (!it.deleted) add(Item(it, false, false)) }
         }.sortedWith(compareBy<Item>({ !it.earlier }, { it.message.at }, { it.message.from }, { it.message.seq }))
         val byKey = HashMap<String, ChatMessage>(state.mine.size + state.theirs.size)
-        state.mine.forEach { byKey[it.key] = it }
-        state.theirs.forEach { byKey[it.key] = it }
+        state.mine.forEach { if (!it.deleted) byKey[it.key] = it }
+        state.theirs.forEach { if (!it.deleted) byKey[it.key] = it }
 
         val out = ArrayList<ChatRow>(items.size + 16)
         var previousDay: LocalDate? = null
