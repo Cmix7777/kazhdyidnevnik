@@ -117,6 +117,17 @@ object Haptics {
         }
     }
 
+    /** Лёгкий щелчок: сообщение ушло, свайп дотянул до ответа. */
+    fun tick(context: Context) = play(context) { vibrator ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            vibrator.areAllPrimitivesSupported(VibrationEffect.Composition.PRIMITIVE_TICK)
+        ) {
+            VibrationEffect.startComposition().addPrimitive(VibrationEffect.Composition.PRIMITIVE_TICK, 0.6f).compose()
+        } else {
+            VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
+        }
+    }
+
     private fun vibrator(context: Context): Vibrator? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager)?.defaultVibrator

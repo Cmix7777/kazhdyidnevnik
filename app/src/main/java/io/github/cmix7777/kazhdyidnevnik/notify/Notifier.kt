@@ -78,6 +78,7 @@ object Notifier {
                     "Свои дела",
                     NotificationManager.IMPORTANCE_HIGH,
                 ).apply { description = "Напоминания о делах, которые добавлены в приложении: работа, вождение и другое" },
+                ChatNotifier.channel(),
                 NotificationChannel(
                     CHANNEL_UPDATES,
                     "Обновления приложения",

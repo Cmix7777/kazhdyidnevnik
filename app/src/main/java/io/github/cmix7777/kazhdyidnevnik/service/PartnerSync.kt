@@ -120,6 +120,7 @@ object PartnerSync {
         settings.cloudTokens.save(null)
         load(context)
         syncNow(context)
+        ChatSync.loadAsync(context)
         return JoinResult.Done
     }
 
@@ -130,6 +131,7 @@ object PartnerSync {
         settings.recordSync(0L, "")
         settings.partnerHeardState = ""
         load(context)
+        ChatSync.loadAsync(context)
     }
 
     /** Обменяться сразу (в фоне приложения). */

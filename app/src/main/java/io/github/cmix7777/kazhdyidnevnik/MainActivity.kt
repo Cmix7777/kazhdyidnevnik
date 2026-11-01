@@ -22,12 +22,12 @@ class MainActivity : ComponentActivity() {
         EffectsSettings.load(AppSettings(this))
         val systemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
-        applyChrome(ThemeSettings.mode.isDark(systemDark))
+        applyAppChrome(ThemeSettings.mode.isDark(systemDark))
         setContent {
             // Значки в строке состояния и цвет окна следуют за выбранной темой.
             val dark = ThemeSettings.isDark()
             DisposableEffect(dark) {
-                applyChrome(dark)
+                applyAppChrome(dark)
                 onDispose { }
             }
             AppTheme {
@@ -35,21 +35,21 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
 
-    /** Строка состояния и навигации: светлые значки на тёмной теме, тёмные на светлой; фон окна под цвет экрана. */
-    private fun applyChrome(dark: Boolean) {
-        enableEdgeToEdge(
-            statusBarStyle = if (dark) {
-                SystemBarStyle.dark(Color.TRANSPARENT)
-            } else {
-                SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
-            },
-            navigationBarStyle = if (dark) {
-                SystemBarStyle.dark(Color.TRANSPARENT)
-            } else {
-                SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
-            },
-        )
-        window.setBackgroundDrawable(ColorDrawable(if (dark) 0xFF0A0610.toInt() else 0xFFF6F2FC.toInt()))
-    }
+/** Строка состояния и навигации: светлые значки на тёмной теме, тёмные на светлой; фон окна под цвет экрана. */
+internal fun ComponentActivity.applyAppChrome(dark: Boolean) {
+    enableEdgeToEdge(
+        statusBarStyle = if (dark) {
+            SystemBarStyle.dark(Color.TRANSPARENT)
+        } else {
+            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        },
+        navigationBarStyle = if (dark) {
+            SystemBarStyle.dark(Color.TRANSPARENT)
+        } else {
+            SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        },
+    )
+    window.setBackgroundDrawable(ColorDrawable(if (dark) 0xFF0A0610.toInt() else 0xFFF6F2FC.toInt()))
 }

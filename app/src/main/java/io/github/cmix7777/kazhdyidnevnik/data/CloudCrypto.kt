@@ -19,6 +19,18 @@ class CloudKeys internal constructor(private val docPrefix: String, internal val
     /** Имя документа этого человека внутри пары. Правила базы требуют длину от 20 до 60 знаков. */
     fun docId(person: Person): String = docPrefix + "-" + person.id
 
+    /** Переписка [person]: последние сообщения и отметки «прочитано» и «печатает». */
+    fun chatHead(person: Person): String = "$docPrefix-c-${person.id}"
+
+    /** Архивная страница переписки [person] номер [index] (с нуля). */
+    fun chatPage(person: Person, index: Int): String = "$docPrefix-c-${person.id}-$index"
+
+    /** Фото из переписки. */
+    fun chatFile(id: String): String = "$docPrefix-f-$id"
+
+    /** Короткий отпечаток пары: по нему телефон замечает, что код связи сменился. Код по нему не восстановить. */
+    val pairTag: String get() = docPrefix.take(12)
+
     override fun toString(): String = "CloudKeys(скрыто)"
 }
 
@@ -51,6 +63,36 @@ object CloudCrypto {
         cipher.updateAAD(docId.toByteArray(Charsets.UTF_8))
         val body = cipher.doFinal(plain.toByteArray(Charsets.UTF_8))
         return PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(nonce + body)
+    }
+
+    /** Зашифровать байты (фото) для документа [docId]: строка KE2:... как у текста, но без лишнего перевода в текст. */
+    fun sealBytes(keys: CloudKeys, docId: String, plain: ByteArray, random: Random = SecureRandom()): String {
+        val nonce = ByteArray(NONCE_BYTES).also { random.nextBytes(it) }
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(keys.aesKey, "AES"), GCMParameterSpec(TAG_BITS, nonce))
+        cipher.updateAAD(docId.toByteArray(Charsets.UTF_8))
+        return PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(nonce + cipher.doFinal(plain))
+    }
+
+    /** Расшифровать байты. null — не тот код или данные повреждены. */
+    fun openBytes(keys: CloudKeys, docId: String, sealed: String): ByteArray? {
+        if (!sealed.startsWith(PREFIX)) return null
+        return try {
+            val raw = Base64.getUrlDecoder().decode(sealed.removePrefix(PREFIX))
+            if (raw.size < NONCE_BYTES + TAG_BITS / 8) return null
+            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipher.init(
+                Cipher.DECRYPT_MODE,
+                SecretKeySpec(keys.aesKey, "AES"),
+                GCMParameterSpec(TAG_BITS, raw.copyOfRange(0, NONCE_BYTES)),
+            )
+            cipher.updateAAD(docId.toByteArray(Charsets.UTF_8))
+            cipher.doFinal(raw, NONCE_BYTES, raw.size - NONCE_BYTES)
+        } catch (e: GeneralSecurityException) {
+            null
+        } catch (e: IllegalArgumentException) {
+            null
+        }
     }
 
     /** Расшифровать. null — не тот код, данные изменены или это вообще не наша строка. */

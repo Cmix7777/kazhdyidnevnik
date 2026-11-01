@@ -96,6 +96,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("androidx.work:work-runtime-ktx:2.10.1")
 
+    // Мгновенные уведомления о сообщениях. Firebase включается, только если настроена пересылка (push/README.md),
+    // ключа проекта в приложении нет.
+    implementation("com.google.firebase:firebase-messaging:24.1.0")
+
     testImplementation("junit:junit:4.13.2")
 
     // Тесты экранов на эмуляторе (запускаются отдельно от сборки, см. .github/workflows/ui-tests.yml)
