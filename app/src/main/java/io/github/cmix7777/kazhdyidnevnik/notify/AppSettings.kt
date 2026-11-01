@@ -124,6 +124,27 @@ class AppSettings(context: Context) {
         get() = prefs.getLong(PARTNER_HEARD_AT, 0L)
         set(value) = prefs.edit { putLong(PARTNER_HEARD_AT, value) }
 
+    /**
+     * Мгновенные уведомления о сообщениях: ссылка на бесплатную пересылку (Google Apps Script), номер
+     * приложения в Firebase, который она сообщила, и свой токен пушей. null — не настроено.
+     */
+    var pushHook: String?
+        get() = prefs.getString(PUSH_HOOK, null)
+        set(value) = prefs.edit { if (value == null) remove(PUSH_HOOK) else putString(PUSH_HOOK, value) }
+
+    var pushAppId: String?
+        get() = prefs.getString(PUSH_APP_ID, null)
+        set(value) = prefs.edit { if (value == null) remove(PUSH_APP_ID) else putString(PUSH_APP_ID, value) }
+
+    var pushToken: String?
+        get() = prefs.getString(PUSH_TOKEN, null)
+        set(value) = prefs.edit { if (value == null) remove(PUSH_TOKEN) else putString(PUSH_TOKEN, value) }
+
+    /** Что пошло не так при настройке пушей (пусто — всё хорошо). */
+    var pushProblem: String
+        get() = prefs.getString(PUSH_PROBLEM, null).orEmpty()
+        set(value) = prefs.edit { putString(PUSH_PROBLEM, value) }
+
     /** Последняя синхронизация с облаком: когда и чем кончилась (пусто — успешно). */
     val lastSyncMillis: Long get() = prefs.getLong(LAST_SYNC, 0L)
 
@@ -291,6 +312,10 @@ class AppSettings(context: Context) {
         const val CLOUD_REFRESH = "cloudRefresh"
         const val CLOUD_EXPIRES = "cloudExpires"
         const val AUTO_BACKUP_URI = "autoBackupUri"
+        const val PUSH_HOOK = "pushHook"
+        const val PUSH_APP_ID = "pushAppId"
+        const val PUSH_TOKEN = "pushToken"
+        const val PUSH_PROBLEM = "pushProblem"
         const val LAST_AUTO_BACKUP = "lastAutoBackup"
 
         fun minutesOf(time: LocalTime): Int = time.hour * 60 + time.minute

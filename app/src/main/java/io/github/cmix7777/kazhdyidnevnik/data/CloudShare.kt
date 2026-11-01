@@ -1,6 +1,5 @@
 package io.github.cmix7777.kazhdyidnevnik.data
 
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -90,31 +89,30 @@ class CloudException(message: String, val code: Int = 0, cause: Throwable? = nul
  * ([CloudCrypto]), вход анонимный, без паролей.
  */
 class CloudShares(
-    private val http: HttpTransport,
-    private val tokens: TokenStore,
-    private val now: () -> Long = { System.currentTimeMillis() },
-    private val projectId: String = CloudConfig.PROJECT_ID,
-    private val apiKey: String = CloudConfig.API_KEY,
+    http: HttpTransport,
+    tokens: TokenStore,
+    now: () -> Long = { System.currentTimeMillis() },
+    projectId: String = CloudConfig.PROJECT_ID,
+    apiKey: String = CloudConfig.API_KEY,
 ) {
 
     /** Что лежит в облаке: набор дел (уже расшифрованный) в виде строки и время, когда его положили. */
     data class Remote(val payload: String, val updatedAt: Long)
 
-    private val json = Json { ignoreUnknownKeys = true }
-    private val database = "projects/$projectId/databases/(default)/documents"
+    private val session = FirestoreSession(http, tokens, now, projectId, apiKey)
+    private val json = session.json
 
     /** Положить (или заменить) дела [owner] в паре [code]. */
     fun publish(code: String, owner: Person, payload: String, updatedAt: Long) {
         require(PairCode.isValid(code)) { "Неверный код связи" }
         val keys = CloudCrypto.derive(code)
         val docId = keys.docId(owner)
-        val name = "$database/shares/$docId"
         val sealed = CloudCrypto.seal(keys, docId, payload)
         val body = buildJsonObject {
             put("writes", buildJsonArray {
                 add(buildJsonObject {
                     put("update", buildJsonObject {
-                        put("name", name)
+                        put("name", session.shareName(docId))
                         put("fields", buildJsonObject {
                             put("payload", buildJsonObject { put("stringValue", sealed) })
                             put("updatedAt", buildJsonObject { put("integerValue", updatedAt.toString()) })
@@ -123,15 +121,8 @@ class CloudShares(
                 })
             })
         }.toString()
-        val reply = authorized { token ->
-            http.post(
-                "https://firestore.googleapis.com/v1/$database:commit",
-                body,
-                JSON,
-                mapOf("Authorization" to "Bearer $token"),
-            )
-        }
-        if (reply.code !in 200..299) throw failure(reply, "Не удалось отправить дела")
+        val reply = session.commit(body)
+        if (reply.code !in 200..299) throw session.failure(reply, "Не удалось отправить дела")
     }
 
     /** Забрать дела [person] из пары [code]. null — он ещё ничего не отправлял. */
@@ -139,14 +130,9 @@ class CloudShares(
         require(PairCode.isValid(code)) { "Неверный код связи" }
         val keys = CloudCrypto.derive(code)
         val docId = keys.docId(person)
-        val reply = authorized { token ->
-            http.get(
-                "https://firestore.googleapis.com/v1/$database/shares/$docId",
-                mapOf("Authorization" to "Bearer $token"),
-            )
-        }
+        val reply = session.getShare(docId)
         if (reply.code == 404) return null
-        if (reply.code !in 200..299) throw failure(reply, "Не удалось получить дела")
+        if (reply.code !in 200..299) throw session.failure(reply, "Не удалось получить дела")
         val fields = runCatching { json.parseToJsonElement(reply.body).jsonObject["fields"]?.jsonObject }.getOrNull()
             ?: throw CloudException("Облако ответило непонятно", reply.code)
         val sealed = fields.stringOf("payload", "stringValue") ?: throw CloudException("В облаке нет дел", reply.code)
@@ -156,85 +142,6 @@ class CloudShares(
         return Remote(payload, updated)
     }
 
-    /** Выполнить запрос с пропуском; если пропуск не принят (ответ 401), входим заново и повторяем один раз. */
-    private fun authorized(request: (String) -> HttpReply): HttpReply {
-        val first = request(token(forceNew = false))
-        if (first.code != UNAUTHORIZED) return first
-        tokens.save(null)
-        return request(token(forceNew = true))
-    }
-
-    private fun token(forceNew: Boolean): String {
-        val saved = if (forceNew) null else tokens.load()
-        if (saved != null && saved.expiresAtMillis - now() > MARGIN_MS) return saved.idToken
-        if (saved != null) {
-            val refreshed = runCatching { refresh(saved) }.getOrNull()
-            if (refreshed != null) {
-                tokens.save(refreshed)
-                return refreshed.idToken
-            }
-        }
-        val created = signUp()
-        tokens.save(created)
-        return created.idToken
-    }
-
-    private fun signUp(): CloudToken {
-        val reply = http.post(
-            "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=$apiKey",
-            """{"returnSecureToken":true}""",
-            JSON,
-        )
-        if (reply.code !in 200..299) throw failure(reply, "Не удалось войти в облако")
-        val obj = parse(reply)
-        val id = obj.string("idToken")
-        val refresh = obj.string("refreshToken")
-        val seconds = obj.string("expiresIn")?.toLongOrNull() ?: DEFAULT_SECONDS
-        if (id == null || refresh == null) throw CloudException("Облако не выдало вход", reply.code)
-        return CloudToken(id, refresh, now() + seconds * 1000)
-    }
-
-    private fun refresh(old: CloudToken): CloudToken? {
-        val reply = http.post(
-            "https://securetoken.googleapis.com/v1/token?key=$apiKey",
-            "grant_type=refresh_token&refresh_token=" + java.net.URLEncoder.encode(old.refreshToken, "UTF-8"),
-            FORM,
-        )
-        if (reply.code !in 200..299) return null
-        val obj = parse(reply)
-        val id = obj.string("id_token") ?: return null
-        val refresh = obj.string("refresh_token") ?: old.refreshToken
-        val seconds = obj.string("expires_in")?.toLongOrNull() ?: DEFAULT_SECONDS
-        return CloudToken(id, refresh, now() + seconds * 1000)
-    }
-
-    private fun parse(reply: HttpReply): JsonObject =
-        runCatching { json.parseToJsonElement(reply.body).jsonObject }.getOrElse {
-            throw CloudException("Облако ответило непонятно", reply.code, it)
-        }
-
-    private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
-
     private fun JsonObject.stringOf(field: String, type: String): String? =
         runCatching { this[field]?.jsonObject?.get(type)?.jsonPrimitive?.contentOrNull }.getOrNull()
-
-    private fun failure(reply: HttpReply, what: String): CloudException {
-        val reason = runCatching { json.parseToJsonElement(reply.body).jsonObject["error"]?.jsonObject?.get("message") }
-            .getOrNull()?.jsonPrimitive?.contentOrNull
-        val tail = when (reply.code) {
-            403 -> ": доступ закрыт правилами базы"
-            429 -> ": слишком много запросов, попробуй позже"
-            in 500..599 -> ": у Google сбой, попробуй позже"
-            else -> if (reason != null) ": $reason" else ""
-        }
-        return CloudException("$what (${reply.code})$tail", reply.code)
-    }
-
-    private companion object {
-        const val JSON = "application/json"
-        const val FORM = "application/x-www-form-urlencoded"
-        const val UNAUTHORIZED = 401
-        const val MARGIN_MS = 60_000L
-        const val DEFAULT_SECONDS = 3600L
-    }
 }

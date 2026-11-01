@@ -12,12 +12,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.formatStamp
 import io.github.cmix7777.kazhdyidnevnik.notify.PartnerHeard
+import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
+import io.github.cmix7777.kazhdyidnevnik.service.ChatPush
+import io.github.cmix7777.kazhdyidnevnik.service.ChatSync
 import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
+import kotlinx.coroutines.launch
 
 /**
  * Связь с телефоном второго человека (Настройки). Один раз создаётся код и вставляется на втором
@@ -54,7 +59,7 @@ fun PartnerLinkCard(owner: Person) {
         } else {
             Text(
                 text = "Телефоны связаны: твои дела уходят ${partner.instrumental} сами, а дела " +
-                    "${partner.genitive} приходят сюда.",
+                    "${partner.genitive} приходят сюда. По этой же связи работает переписка.",
                 style = MaterialTheme.typography.titleSmall,
                 color = Palette.Text,
             )
@@ -142,3 +147,73 @@ fun PartnerLinkCard(owner: Person) {
         note?.let { Text(text = it, style = MaterialTheme.typography.bodySmall, color = Palette.Lavender) }
     }
 }
+
+/**
+ * Мгновенные уведомления о сообщениях (Настройки → Сообщения). Без них новые сообщения при закрытом
+ * приложении проверяются примерно раз в 15 минут; с бесплатной пересылкой на Google Apps Script приходят сразу.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ChatPushCard(owner: Person) {
+    val context = LocalContext.current
+    val partner = owner.partner
+    val scope = rememberCoroutineScope()
+    val settings = remember { AppSettings(context) }
+    val info by PartnerSync.info.collectAsState()
+    val chat by ChatSync.state.collectAsState()
+    var hook by remember { mutableStateOf(settings.pushHook) }
+    var note by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+
+    GlassCard(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+            text = "Переписка открывается кнопкой с облачком наверху, рядом с настройками. Сообщения шифруются кодом " +
+                "связи на телефоне и лежат в том же бесплатном облаке, что и дела.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Palette.TextMuted,
+        )
+        val problem = settings.pushProblem
+        val status = when {
+            !info.paired -> "Сначала свяжите телефоны (раздел выше)."
+            hook == null -> "Когда приложение закрыто, новые сообщения проверяются примерно раз в 15 минут. Чтобы " +
+                "уведомления приходили сразу, один раз настрой бесплатную пересылку (кнопка «Как настроить») и вставь " +
+                "сюда ссылку на неё. Достаточно на одном телефоне, второй подхватит сам."
+            problem.isNotEmpty() -> "Мгновенные уведомления не работают: $problem"
+            settings.pushToken == null -> "Мгновенные уведомления включаются…"
+            chat.theirPush == null -> "Мгновенные уведомления включены. У ${partner.genitive} они включатся сами, " +
+                "когда ${partner.shortName} откроет новую версию приложения."
+            else -> "Мгновенные уведомления включены на обоих телефонах."
+        }
+        Text(
+            text = status,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (problem.isNotEmpty() && hook != null) Palette.DangerText else Palette.TextFaint,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            GhostButton(
+                text = "Как настроить",
+                onClick = {
+                    val open = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(PUSH_GUIDE))
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    runCatching { context.startActivity(open) }
+                },
+            )
+            GhostButton(
+                text = if (hook == null) "Вставить ссылку" else "Вставить другую ссылку",
+                enabled = info.paired && !busy,
+                onClick = {
+                    busy = true
+                    scope.launch {
+                        note = ChatPush.configure(context, clipboardText(context))
+                        hook = settings.pushHook
+                        busy = false
+                    }
+                },
+            )
+        }
+        note?.let { Text(text = it, style = MaterialTheme.typography.bodySmall, color = Palette.Lavender) }
+    }
+}
+
+/** Инструкция по мгновенным уведомлениям в README на GitHub. */
+private const val PUSH_GUIDE = "https://github.com/Cmix7777/kazhdyidnevnik/blob/main/push/README.md"

@@ -1,6 +1,7 @@
 package io.github.cmix7777.kazhdyidnevnik.ui
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.BackHandler
@@ -64,7 +65,9 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.cmix7777.kazhdyidnevnik.R
+import io.github.cmix7777.kazhdyidnevnik.data.ChatLogic
 import io.github.cmix7777.kazhdyidnevnik.data.Person
+import io.github.cmix7777.kazhdyidnevnik.service.ChatSync
 import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.InkOrigin
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.inkPage
@@ -146,6 +149,14 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
     // Капля привета: зажать имя второго человека, чтобы вырастить и бросить каплю.
     val greeting = rememberGreetingDrop()
     val sync by PartnerSync.info.collectAsState()
+    // Переписка: значок непрочитанного наверху; пока приложение открыто, новые сообщения проверяются раз в 20 секунд.
+    val context = LocalContext.current
+    val chat by ChatSync.state.collectAsState()
+    val unread = remember(chat) { ChatLogic.unread(chat) }
+    LifecycleResumeEffect(owner) {
+        val stop = ChatSync.watchMain(context)
+        onPauseOrDispose { stop() }
+    }
 
     AccentTheme(chrome) {
         GlowBackground(sky = sky) {
@@ -170,6 +181,8 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                                 scope.launch { pagerState.animateScrollToPage(person.ordinal) }
                             },
                             onOpenSettings = { settingsOpen = true },
+                            unread = unread,
+                            onOpenChat = { context.startActivity(Intent(context, ChatActivity::class.java)) },
                         )
                     }
                 },
@@ -279,6 +292,8 @@ private fun PersonBar(
     onSelect: (Person) -> Unit,
     onOpenSettings: () -> Unit,
     greetHint: String = "",
+    unread: Int = 0,
+    onOpenChat: () -> Unit = {},
 ) {
     Row(
         modifier = Modifier
@@ -297,7 +312,38 @@ private fun PersonBar(
             modifier = Modifier.weight(1f),
             greetHint = greetHint,
         )
+        ChatButton(unread = unread, onClick = onOpenChat)
         GlassIconButton(icon = R.drawable.ic_settings, contentDescription = "Настройки", onClick = onOpenSettings)
+    }
+}
+
+/** Кнопка переписки: облачко, а если есть непрочитанное — число в кружке. */
+@Composable
+private fun ChatButton(unread: Int, onClick: () -> Unit) {
+    Box {
+        GlassIconButton(
+            icon = R.drawable.ic_chat,
+            contentDescription = if (unread > 0) "Переписка, новых: $unread" else "Переписка",
+            onClick = onClick,
+        )
+        if (unread > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 3.dp, y = (-3).dp)
+                    .size(19.dp)
+                    .clip(CircleShape)
+                    .background(Brush.linearGradient(listOf(Palette.Violet, Palette.VioletDeep)))
+                    .border(1.5.dp, Palette.Background, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = if (unread > 9) "9+" else unread.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                )
+            }
+        }
     }
 }
 
