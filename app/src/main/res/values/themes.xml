@@ -5,4 +5,10 @@
         <item name="android:windowBackground">@color/window_background</item>
         <item name="android:colorBackground">@color/window_background</item>
     </style>
+    <!-- Переписка: прозрачное окно, чтобы она открывалась каплей поверх дневника и схлопывалась обратно -->
+    <style name="Theme.Kazhdyidnevnik.Chat" parent="Theme.Kazhdyidnevnik">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>

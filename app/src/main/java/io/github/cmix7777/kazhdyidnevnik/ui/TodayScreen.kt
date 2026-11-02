@@ -54,6 +54,7 @@ import io.github.cmix7777.kazhdyidnevnik.ui.fx.DropRefreshIndicator
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.EffectsSettings
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.dropShift
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.moving
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.SkyFx
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberEffectTime
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberDropRefresh
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.weatherGlass
@@ -100,7 +101,7 @@ fun TodayScreen(
     val animate = EffectsSettings.animate(LocalContext.current)
     val clock = rememberEffectTime(
         fps = if (glass.moving()) 30 else 20,
-        running = active && animate && (glass.moving() || strip != null),
+        running = active && animate && !SkyFx.covered && (glass.moving() || strip != null),
     )
 
     // Обновление каплей: капля тянется из края страницы, кольцом крутится, пока идёт загрузка,
@@ -136,7 +137,7 @@ fun TodayScreen(
                 .fillMaxSize()
                 .dropShift(pullState)
                 .weatherGlass(glass, clock, active),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp + LocalNavInset.current),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             // Шапка: чей день и дата крупно в две строки.

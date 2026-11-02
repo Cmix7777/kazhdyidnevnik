@@ -54,7 +54,21 @@ object ChatFiles {
         mutableVersion.update { it + 1 }
     }
 
-    private fun newId(): String {
+    /** Файла больше нет в облаке (стёрт после доставки), а на телефоне его не было. */
+    fun gone(context: Context, id: String): Boolean = id.isNotEmpty() && File(dir(context), "$id.gone").exists()
+
+    fun markGone(context: Context, id: String) {
+        runCatching { File(dir(context), "$id.gone").writeText("") }
+        mutableVersion.update { it + 1 }
+    }
+
+    /** Сколько места занимают фото, голосовые и кружочки на телефоне. */
+    fun usedBytes(context: Context): Long = dir(context).listFiles()?.sumOf { it.length() } ?: 0L
+
+    /** Все файлы переписки на телефоне (для архива). */
+    fun all(context: Context): List<File> = dir(context).listFiles()?.filter { it.name.endsWith(".jpg") }.orEmpty()
+
+    fun newId(): String {
         val bytes = ByteArray(8).also { random.nextBytes(it) }
         return bytes.joinToString("") { "%02x".format(it) }
     }

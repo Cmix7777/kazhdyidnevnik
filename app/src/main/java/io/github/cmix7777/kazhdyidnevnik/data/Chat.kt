@@ -23,12 +23,59 @@ data class ChatMessage(
     @SerialName("r") val replyTo: String? = null,
     @SerialName("d") val deleted: Boolean = false,
     @SerialName("p") val photo: ChatPhoto? = null,
+    /** Эффект на всю переписку, когда сообщение появляется: hearts, night, sun, fire. */
+    @SerialName("e") val effect: String? = null,
+    /** Невидимые чернила: текст под блёстками, пока его не сотрёшь пальцем. */
+    @SerialName("x") val secret: Boolean = false,
+    /** Записка почерком отправителя. */
+    @SerialName("w") val hand: Boolean = false,
+    @SerialName("v") val voice: ChatVoice? = null,
+    @SerialName("c") val circle: ChatCircle? = null,
+    @SerialName("k") val sticker: ChatSticker? = null,
 ) {
     val key: String get() = "$from:$seq"
 
-    /** Удалённое сообщение: текст и фото стираются, остаётся только место в переписке. */
-    fun asDeleted(): ChatMessage = copy(text = "", photo = null, replyTo = null, deleted = true)
+    /** Удалённое сообщение: текст и вложения стираются, остаётся только место в переписке. */
+    fun asDeleted(): ChatMessage = copy(
+        text = "", photo = null, replyTo = null, deleted = true,
+        effect = null, secret = false, hand = false, voice = null, circle = null, sticker = null,
+    )
+
+    /** Файлы сообщения в облаке: номер и сколько у него частей. */
+    val files: List<Pair<String, Int>>
+        get() = buildList {
+            photo?.let { add(it.id to 1) }
+            voice?.let { add(it.id to it.parts) }
+            circle?.let { add(it.id to it.parts) }
+            sticker?.let { add(it.id to 1) }
+        }
+
+    /** Есть ли во что-то кроме текста (фото, голос, кружочек, стикер). */
+    val hasMedia: Boolean get() = photo != null || voice != null || circle != null || sticker != null
 }
+
+/** Голосовое: звук лежит отдельным файлом (если длинный — несколькими частями). [wave] — громкость по кусочкам, 0..9. */
+@Serializable
+data class ChatVoice(
+    @SerialName("i") val id: String,
+    @SerialName("ms") val durationMs: Long,
+    @SerialName("n") val parts: Int = 1,
+    @SerialName("wf") val wave: String = "",
+)
+
+/** Кружочек: короткое видео с фронтальной камеры. */
+@Serializable
+data class ChatCircle(
+    @SerialName("i") val id: String,
+    @SerialName("ms") val durationMs: Long,
+    @SerialName("n") val parts: Int = 1,
+)
+
+/** Стикер: картинка без пузыря. */
+@Serializable
+data class ChatSticker(
+    @SerialName("i") val id: String,
+)
 
 /** Фото в сообщении: само оно лежит отдельным документом (зашифрованное), здесь только номер и размеры. */
 @Serializable
@@ -57,6 +104,10 @@ data class ChatHead(
     @SerialName("push") val push: String? = null,
     /** Ссылка на бесплатную пересылку пушей (Google Apps Script). */
     @SerialName("hook") val hook: String? = null,
+    /** Реакции этого человека: ключ сообщения → смайлик. */
+    @SerialName("rx") val reactions: Map<String, String> = emptyMap(),
+    /** Его почерк для записок (номер файла). */
+    @SerialName("hf") val font: String? = null,
 ) {
     /** Номер первого сообщения головы. */
     val first: Long get() = messages.firstOrNull()?.seq ?: (last + 1)
@@ -81,6 +132,8 @@ data class ChatPreview(
     @SerialName("a") val at: Long,
     @SerialName("t") val text: String = "",
     @SerialName("p") val photo: Boolean = false,
+    /** Что за сообщение без текста: x — секрет, v — голосовое, c — кружочек, k — стикер, w — записка. */
+    @SerialName("k") val kind: String? = null,
 )
 
 /** Переписка на этом телефоне: свои сообщения, сообщения второго человека и служебные отметки. */
@@ -123,6 +176,16 @@ data class ChatState(
     /** Какой свой токен пушей и какую ссылку пересылки уже положил в голову. */
     val pushPublished: String? = null,
     val hookPublished: String? = null,
+    /** Мои реакции на сообщения (ключ → смайлик) и реакции второго человека. */
+    val myReactions: Map<String, String> = emptyMap(),
+    val theirReactions: Map<String, String> = emptyMap(),
+    /** Секреты под невидимыми чернилами, уже проявленные на этом телефоне. */
+    val opened: List<String> = emptyList(),
+    /** Мой почерк (номер файла в облаке) и почерк второго человека. */
+    val myFont: String? = null,
+    val theirFont: String? = null,
+    /** Сообщения, эффект которых уже сыграл: при следующем открытии он не повторяется. */
+    val played: List<String> = emptyList(),
 )
 
 /** Как отмечено своё сообщение: ещё в телефоне, ушло, прочитано. */
@@ -146,6 +209,8 @@ sealed interface ChatRow {
         /** На что это ответ (если сообщение ещё есть). */
         val reply: ChatMessage?,
         val earlier: Boolean = false,
+        val myReaction: String? = null,
+        val theirReaction: String? = null,
     ) : ChatRow {
         override val key: String get() = (if (earlier) "old-" else "") + message.key + "-" + message.at
     }
@@ -165,6 +230,20 @@ object ChatLogic {
 
     /** Сколько последних удалений из архива держать в голове. */
     const val KEEP_DELETED = 400
+
+    /** Сколько последних реакций держать в голове. */
+    const val KEEP_REACTIONS = 300
+
+    /** Сколько отметок «секрет проявлен» и «эффект сыграл» помнить. */
+    const val KEEP_MARKS = 300
+
+    /** Часть файла в облаке: в зашифрованном виде проходит правила базы. */
+    const val FILE_PART_BYTES = 215_000
+
+    /** Номера частей файла: первая под самим номером, дальше «номер-1», «номер-2»… */
+    fun partIds(id: String, parts: Int): List<String> = (0 until parts.coerceAtLeast(1)).map { if (it == 0) id else "$id-$it" }
+
+    fun partsFor(bytes: Int): Int = ((bytes + FILE_PART_BYTES - 1) / FILE_PART_BYTES).coerceAtLeast(1)
 
     /** Сообщения подряд от одного человека группируются, если между ними меньше этого. */
     private const val GROUP_MS = 5 * 60_000L
@@ -210,9 +289,16 @@ object ChatLogic {
         now: Long,
         replyTo: String? = null,
         photo: ChatPhoto? = null,
+        effect: String? = null,
+        secret: Boolean = false,
+        hand: Boolean = false,
+        voice: ChatVoice? = null,
+        circle: ChatCircle? = null,
+        sticker: ChatSticker? = null,
     ): ChatState {
         val clean = text.trim().take(MAX_TEXT)
-        if (clean.isEmpty() && photo == null) return state
+        val media = photo != null || voice != null || circle != null || sticker != null
+        if (clean.isEmpty() && !media) return state
         val message = ChatMessage(
             from = me.id,
             seq = lastSeq(state.mine) + 1,
@@ -220,12 +306,64 @@ object ChatLogic {
             text = clean,
             replyTo = replyTo,
             photo = photo,
+            effect = effect,
+            secret = secret && clean.isNotEmpty(),
+            hand = hand && clean.isNotEmpty(),
+            voice = voice,
+            circle = circle,
+            sticker = sticker,
         )
         return state.copy(
             mine = state.mine + message,
             revision = state.revision + 1,
-            pendingFiles = if (photo != null) state.pendingFiles + photo.id else state.pendingFiles,
+            pendingFiles = state.pendingFiles + message.files.map { it.first },
+            // Свой эффект уже сыграл при отправке.
+            played = if (effect != null) (state.played + message.key).takeLast(KEEP_MARKS) else state.played,
         )
+    }
+
+    /** Поставить или снять свою реакцию. Тот же смайлик второй раз снимает её. */
+    fun react(state: ChatState, key: String, emoji: String?): ChatState {
+        val next = if (emoji == null || state.myReactions[key] == emoji) null else emoji
+        if (next == null && key !in state.myReactions) return state
+        val map = LinkedHashMap(state.myReactions)
+        map.remove(key)
+        if (next != null) map[key] = next
+        val trimmed = if (map.size > KEEP_REACTIONS) map.entries.toList().takeLast(KEEP_REACTIONS).associate { it.key to it.value } else map
+        return state.copy(myReactions = trimmed, revision = state.revision + 1)
+    }
+
+    /** Секрет проявлен на этом телефоне. */
+    fun open(state: ChatState, key: String): ChatState =
+        if (key in state.opened) state else state.copy(opened = (state.opened + key).takeLast(KEEP_MARKS))
+
+    /** Эффект сообщения сыграл. */
+    fun played(state: ChatState, key: String): ChatState =
+        if (key in state.played) state else state.copy(played = (state.played + key).takeLast(KEEP_MARKS))
+
+    /** Новый почерк: старый файл стирается в облаке, новый уходит туда. */
+    fun newFont(state: ChatState, id: String): ChatState {
+        val old = state.myFont
+        val oldPending = old != null && old in state.pendingFiles
+        return state.copy(
+            myFont = id,
+            revision = state.revision + 1,
+            pendingFiles = (if (old != null && oldPending) state.pendingFiles - old else state.pendingFiles) + id,
+            wipeFiles = if (old != null && !oldPending) state.wipeFiles + old else state.wipeFiles,
+        )
+    }
+
+    /** Эффект по словам: «люблю» — сердечки, «спокойной ночи» — звёзды и так далее. */
+    fun detectEffect(text: String): String? {
+        val t = " " + text.lowercase().replace('ё', 'е') + " "
+        fun has(word: String) = Regex("[^а-яa-z]$word[^а-яa-z]").containsMatchIn(t)
+        return when {
+            "спокойной ночи" in t || "сладких снов" in t || has("споки") -> "night"
+            "доброе утро" in t || "доброго утра" in t || has("утречко") -> "sun"
+            "люблю" in t -> "hearts"
+            "с днем рождения" in t || "с праздником" in t || has("с др") || Regex("[^а-я]ура+[^а-я]").containsMatchIn(t) -> "fire"
+            else -> null
+        }
     }
 
     /** Удалить своё сообщение у обоих. */
@@ -234,15 +372,17 @@ object ChatLogic {
         if (target.deleted) return state
         val inPage = seq < state.headStart && state.pageStarts.isNotEmpty()
         val page = if (inPage) state.pageStarts.indexOfLast { it <= seq }.takeIf { it >= 0 } else null
-        val photo = target.photo?.id
-        val notUploaded = photo != null && photo in state.pendingFiles
+        val files = target.files
+        val notUploaded = files.filter { it.first in state.pendingFiles }
+        val toWipe = (files - notUploaded.toSet()).flatMap { (id, parts) -> partIds(id, parts) }
         return state.copy(
             mine = state.mine.map { if (it.seq == seq) it.asDeleted() else it },
             revision = state.revision + 1,
             dirtyPages = if (page != null) (state.dirtyPages + page).distinct() else state.dirtyPages,
             deletedInPages = if (page != null) (state.deletedInPages + seq).takeLast(KEEP_DELETED) else state.deletedInPages,
-            pendingFiles = if (photo != null) state.pendingFiles - photo else state.pendingFiles,
-            wipeFiles = if (photo != null && !notUploaded) state.wipeFiles + photo else state.wipeFiles,
+            pendingFiles = state.pendingFiles - notUploaded.map { it.first }.toSet(),
+            wipeFiles = state.wipeFiles + toWipe,
+            myReactions = state.myReactions - target.key,
         )
     }
 
@@ -292,6 +432,8 @@ object ChatLogic {
             deletedInPages = state.deletedInPages.takeLast(KEEP_DELETED),
             push = push,
             hook = hook,
+            reactions = state.myReactions,
+            font = state.myFont,
         )
         return Upload(pages, head, headStart, pageStarts)
     }
@@ -338,6 +480,8 @@ object ChatLogic {
             notifiedUpTo = maxOf(state.notifiedUpTo, mark.read),
             pushPublished = head.push,
             hookPublished = head.hook,
+            myReactions = head.reactions,
+            myFont = head.font ?: state.myFont,
         )
     }
 
@@ -352,7 +496,13 @@ object ChatLogic {
         }
         val missing = if (head.first > known + 1 && head.pages > 0) known + 1 else null
         return Merge(
-            withDeletes.copy(theirVersion = version, theirPush = head.push, theirHook = head.hook ?: state.theirHook),
+            withDeletes.copy(
+                theirVersion = version,
+                theirPush = head.push,
+                theirHook = head.hook ?: state.theirHook,
+                theirReactions = head.reactions,
+                theirFont = head.font ?: state.theirFont,
+            ),
             missing,
         )
     }
@@ -420,17 +570,46 @@ object ChatLogic {
     /** Текст для уведомления и ответа: фото подписывается словом. */
     fun shortText(message: ChatMessage): String = when {
         message.deleted -> "Сообщение удалено"
+        message.secret -> "Секрет под невидимыми чернилами"
+        message.voice != null -> "Голосовое"
+        message.circle != null -> "Кружочек"
+        message.sticker != null -> "Стикер"
         message.photo != null && message.text.isNotBlank() -> "Фото: ${message.text}"
         message.photo != null -> "Фото"
+        message.hand -> "Записка: ${message.text}"
         else -> message.text
     }
 
+    /** Вид сообщения для пуша (текст секрета в пуш не попадает). */
+    fun kindOf(message: ChatMessage): String? = when {
+        message.secret -> "x"
+        message.voice != null -> "v"
+        message.circle != null -> "c"
+        message.sticker != null -> "k"
+        message.hand -> "w"
+        else -> null
+    }
+
+    /** Сообщение из короткой копии в пуше: только чтобы показать уведомление. */
+    fun fromPreview(from: String, preview: ChatPreview): ChatMessage = ChatMessage(
+        from = from,
+        seq = preview.seq,
+        at = preview.at,
+        text = preview.text,
+        photo = if (preview.photo) ChatPhoto("", 1, 1) else null,
+        secret = preview.kind == "x",
+        hand = preview.kind == "w",
+        voice = if (preview.kind == "v") ChatVoice("", 0) else null,
+        circle = if (preview.kind == "c") ChatCircle("", 0) else null,
+        sticker = if (preview.kind == "k") ChatSticker("") else null,
+    )
+
     /** Копия для пуша: не длиннее [maxBytes] байт текста, чтобы пуш уложился в 4 КБ. */
     fun preview(message: ChatMessage, maxBytes: Int = 1500): ChatPreview {
-        var text = message.text
+        var text = if (message.secret) "" else message.text
         while (text.toByteArray(Charsets.UTF_8).size > maxBytes) text = text.dropLast(maxOf(1, text.length / 10))
-        if (text.length < message.text.length) text = text.trimEnd() + "…"
-        return ChatPreview(seq = message.seq, at = message.at, text = text, photo = message.photo != null)
+        if (!message.secret && text.length < message.text.length) text = text.trimEnd() + "…"
+        return ChatPreview(seq = message.seq, at = message.at, text = text, photo = message.photo != null, kind = kindOf(message))
     }
 
     /**
@@ -471,6 +650,8 @@ object ChatLogic {
                 tick = if (item.earlier) ChatTick.NONE else tick(state, item.message, item.mine),
                 reply = if (item.earlier) null else item.message.replyTo?.let { byKey[it] },
                 earlier = item.earlier,
+                myReaction = if (item.earlier) null else state.myReactions[item.message.key],
+                theirReaction = if (item.earlier) null else state.theirReactions[item.message.key],
             )
         }
         return out.asReversed()

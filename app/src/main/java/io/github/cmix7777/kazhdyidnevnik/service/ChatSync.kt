@@ -2,8 +2,11 @@ package io.github.cmix7777.kazhdyidnevnik.service
 
 import android.content.Context
 import android.net.Uri
+import io.github.cmix7777.kazhdyidnevnik.data.ChatCircle
 import io.github.cmix7777.kazhdyidnevnik.data.ChatCloud
 import io.github.cmix7777.kazhdyidnevnik.data.ChatLogic
+import io.github.cmix7777.kazhdyidnevnik.data.ChatSticker
+import io.github.cmix7777.kazhdyidnevnik.data.ChatVoice
 import io.github.cmix7777.kazhdyidnevnik.data.ChatMessage
 import io.github.cmix7777.kazhdyidnevnik.data.ChatPhoto
 import io.github.cmix7777.kazhdyidnevnik.data.ChatPreviewSeal
@@ -233,15 +236,25 @@ object ChatSync {
 
     // ---- действия ----
 
-    /** Отправить текст. [replyTo] — ключ сообщения, на которое ответ. */
-    fun send(context: Context, text: String, replyTo: String? = null) {
+    /**
+     * Отправить текст. [replyTo] — ключ сообщения, на которое ответ, [effect] — эффект на всю переписку,
+     * [secret] — под невидимыми чернилами, [hand] — запиской своим почерком.
+     */
+    fun send(
+        context: Context,
+        text: String,
+        replyTo: String? = null,
+        effect: String? = null,
+        secret: Boolean = false,
+        hand: Boolean = false,
+    ) {
         val app = context.applicationContext
         val settings = AppSettings(app)
         val owner = settings.owner ?: return
         if (settings.pairCode == null || text.isBlank()) return
         scope.launch(writer) {
             ensureLoaded(app)
-            update { ChatLogic.append(it, owner, text, System.currentTimeMillis(), replyTo) }
+            update { ChatLogic.append(it, owner, text, System.currentTimeMillis(), replyTo, effect = effect, secret = secret, hand = hand) }
             lastActivity = System.currentTimeMillis()
             uploadNow(app)
         }
@@ -266,6 +279,66 @@ object ChatSync {
                 update { ChatLogic.append(it, owner, caption, System.currentTimeMillis(), replyTo, prepared.photo) }
             }
             lastActivity = System.currentTimeMillis()
+            uploadNow(app)
+        }
+    }
+
+    /** Голосовое: файл уже записан, здесь он копируется к остальным и уходит в облако. */
+    fun sendVoice(context: Context, bytes: ByteArray, durationMs: Long, wave: String, replyTo: String? = null) =
+        sendFile(context, bytes, replyTo) { state, id, parts -> ChatLogic.append(state, owner(context), "", System.currentTimeMillis(), replyTo, voice = ChatVoice(id, durationMs, parts, wave)) }
+
+    /** Кружочек. */
+    fun sendCircle(context: Context, bytes: ByteArray, durationMs: Long, replyTo: String? = null) =
+        sendFile(context, bytes, replyTo) { state, id, parts -> ChatLogic.append(state, owner(context), "", System.currentTimeMillis(), replyTo, circle = ChatCircle(id, durationMs, parts)) }
+
+    /** Стикер: у каждого отправленного свой номер, второй телефон стирает его в облаке, когда скачает. */
+    fun sendSticker(context: Context, bytes: ByteArray) =
+        sendFile(context, bytes, null) { state, id, _ -> ChatLogic.append(state, owner(context), "", System.currentTimeMillis(), sticker = ChatSticker(id)) }
+
+    private fun owner(context: Context): Person = AppSettings(context.applicationContext).owner ?: Person.AIZAT
+
+    private fun sendFile(context: Context, bytes: ByteArray, @Suppress("UNUSED_PARAMETER") replyTo: String?, add: (ChatState, String, Int) -> ChatState) {
+        val app = context.applicationContext
+        val settings = AppSettings(app)
+        if (settings.owner == null || settings.pairCode == null || bytes.isEmpty()) return
+        scope.launch {
+            ensureLoaded(app)
+            val id = ChatFiles.newId()
+            ChatFiles.save(app, id, bytes)
+            val parts = ChatLogic.partsFor(bytes.size)
+            withContext(writer) { update { add(it, id, parts) } }
+            lastActivity = System.currentTimeMillis()
+            uploadNow(app)
+        }
+    }
+
+    /** Реакция на сообщение (тот же смайлик второй раз снимает её). */
+    fun react(context: Context, key: String, emoji: String?) {
+        val app = context.applicationContext
+        scope.launch(writer) {
+            update { ChatLogic.react(it, key, emoji) }
+            uploadNow(app)
+        }
+    }
+
+    /** Секрет проявлен (только на этом телефоне). */
+    fun openSecret(key: String) {
+        scope.launch(writer) { update { ChatLogic.open(it, key) } }
+    }
+
+    /** Эффект сообщения сыграл, больше не повторять. */
+    fun markPlayed(key: String) {
+        scope.launch(writer) { update { ChatLogic.played(it, key) } }
+    }
+
+    /** Сохранить свой почерк: файл уходит в облако, второй телефон подхватит его по голове. */
+    fun saveFont(context: Context, bytes: ByteArray) {
+        val app = context.applicationContext
+        scope.launch {
+            ensureLoaded(app)
+            val id = ChatFiles.newId()
+            ChatFiles.save(app, id, bytes)
+            withContext(writer) { update { ChatLogic.newFont(it, id) } }
             uploadNow(app)
         }
     }
@@ -443,6 +516,8 @@ object ChatSync {
                     theirVersion = merged.theirVersion,
                     theirPush = merged.theirPush,
                     theirHook = merged.theirHook,
+                    theirReactions = merged.theirReactions,
+                    theirFont = merged.theirFont,
                 )
             }
             if (ChatLogic.lastSeq(merged.theirs) > before) {
@@ -493,7 +568,15 @@ object ChatSync {
         restoreIfNeeded(cloud, code, owner)
         for (id in state.value.pendingFiles.toList()) {
             val bytes = ChatFiles.read(app, id)
-            if (bytes != null) cloud.putFile(code, id, bytes, System.currentTimeMillis())
+            if (bytes != null) {
+                // Большие файлы (голосовые, кружочки) уходят частями: каждая проходит правила базы.
+                val parts = ChatLogic.partsFor(bytes.size)
+                ChatLogic.partIds(id, parts).forEachIndexed { index, partId ->
+                    val from = index * ChatLogic.FILE_PART_BYTES
+                    val to = minOf(bytes.size, from + ChatLogic.FILE_PART_BYTES)
+                    cloud.putFile(code, partId, bytes.copyOfRange(from, to), System.currentTimeMillis())
+                }
+            }
             update { it.copy(pendingFiles = it.pendingFiles - id) }
         }
         for (id in state.value.wipeFiles.toList()) {
@@ -541,10 +624,14 @@ object ChatSync {
 
     // ---- фото ----
 
-    /** Скачать фото второго человека, если его ещё нет на телефоне. */
-    fun ensureFile(context: Context, id: String) {
+    /**
+     * Скачать файл (фото, голосовое, кружочек, стикер, почерк), если его ещё нет на телефоне.
+     * Облако для вложений — почтовый ящик: файлы второго человека после скачивания стираются там
+     * ([wipe]), а на телефонах остаются. Сохранить их насовсем можно архивом переписки.
+     */
+    fun ensureFile(context: Context, id: String, parts: Int = 1, wipe: Boolean = false) {
         val app = context.applicationContext
-        if (id.isEmpty() || ChatFiles.exists(app, id)) return
+        if (id.isEmpty() || ChatFiles.exists(app, id) || ChatFiles.gone(app, id)) return
         val failedAt = fileFailures[id]
         if (failedAt != null && System.currentTimeMillis() - failedAt < FILE_RETRY_MS) return
         scope.launch {
@@ -553,8 +640,20 @@ object ChatSync {
                 val settings = AppSettings(app)
                 val code = settings.pairCode ?: return@withLock
                 try {
-                    val bytes = cloud(settings).file(code, id)
-                    if (bytes == null) fileFailures[id] = System.currentTimeMillis() else ChatFiles.save(app, id, bytes)
+                    val cloud = cloud(settings)
+                    val ids = ChatLogic.partIds(id, parts)
+                    // Вложение второго человека стирается в облаке после скачивания, кто бы ни попросил файл.
+                    val wipeAfter = wipe || state.value.theirs.any { m -> m.files.any { it.first == id } }
+                    val chunks = ids.map { cloud.file(code, it) }
+                    if (chunks.any { it == null }) {
+                        // Файл уже стёрт после доставки (или не дошёл): дальше показывается заглушка.
+                        if (chunks.first() == null) ChatFiles.markGone(app, id) else fileFailures[id] = System.currentTimeMillis()
+                    } else {
+                        val out = java.io.ByteArrayOutputStream(chunks.sumOf { it!!.size })
+                        chunks.forEach { out.write(it!!) }
+                        ChatFiles.save(app, id, out.toByteArray())
+                        if (wipeAfter) ids.forEach { runCatching { cloud.wipeFile(code, it, System.currentTimeMillis()) } }
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -564,12 +663,20 @@ object ChatSync {
         }
     }
 
+    /** Файлы сообщения: свои не стираются в облаке (их стирает второй телефон), чужие — после скачивания. */
+    fun ensureFiles(context: Context, message: ChatMessage, mine: Boolean) {
+        message.files.forEach { (id, parts) -> ensureFile(context, id, parts, wipe = !mine) }
+    }
+
     private fun downloadMissing(app: Context) {
-        state.value.theirs.asReversed().asSequence()
-            .mapNotNull { message -> message.photo?.id?.takeIf { !message.deleted } }
-            .filter { !ChatFiles.exists(app, it) }
+        val current = state.value
+        current.theirFont?.let { ensureFile(app, it) }
+        current.theirs.asReversed().asSequence()
+            .filter { !it.deleted && it.hasMedia }
+            .flatMap { it.files.asSequence() }
+            .filter { (id, _) -> !ChatFiles.exists(app, id) && !ChatFiles.gone(app, id) }
             .take(12)
-            .forEach { ensureFile(app, it) }
+            .forEach { (id, parts) -> ensureFile(app, id, parts, wipe = true) }
     }
 
     // ---- фоновые задачи и уведомления ----
@@ -586,13 +693,7 @@ object ChatSync {
         if (preview != null && !visible) {
             val current = state.value
             if (preview.seq > current.readUpTo && preview.seq > current.notifiedUpTo && current.theirs.none { it.seq == preview.seq }) {
-                val message = ChatMessage(
-                    from = owner.partner.id,
-                    seq = preview.seq,
-                    at = preview.at,
-                    text = preview.text,
-                    photo = if (preview.photo) ChatPhoto("", 1, 1) else null,
-                )
+                val message = ChatLogic.fromPreview(owner.partner.id, preview)
                 ChatNotifier.show(app, owner, ChatLogic.unreadMessages(current) + message)
                 update { it.copy(notifiedUpTo = maxOf(it.notifiedUpTo, preview.seq)) }
             }

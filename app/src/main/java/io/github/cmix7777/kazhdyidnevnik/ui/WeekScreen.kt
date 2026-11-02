@@ -125,7 +125,7 @@ fun WeekScreen(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp + LocalNavInset.current),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (week == null) {

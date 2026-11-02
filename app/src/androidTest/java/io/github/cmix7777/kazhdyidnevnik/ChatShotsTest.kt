@@ -23,6 +23,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.cmix7777.kazhdyidnevnik.data.ChatLogic
 import io.github.cmix7777.kazhdyidnevnik.data.ChatMessage
 import io.github.cmix7777.kazhdyidnevnik.data.ChatPhoto
+import io.github.cmix7777.kazhdyidnevnik.data.ChatVoice
 import io.github.cmix7777.kazhdyidnevnik.data.ChatState
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.service.ChatSync
@@ -200,5 +201,54 @@ class ChatShotsTest {
         compose.onNodeWithTag("chat-send").performClick()
         compose.waitForIdle()
         assertEquals("Очень" to "${Person.NASTYA.id}:4", sent.last())
+    }
+
+    /** Новое в переписке: секрет под чернилами, крупные смайлики, записка, голосовое и реакции. */
+    private fun rich(owner: Person): ChatState {
+        val me = owner.id
+        val other = owner.partner.id
+        val mine = listOf(
+            ChatMessage(me, 1, at(0, 9, 0), "Это секрет", secret = true),
+            ChatMessage(me, 2, at(0, 9, 1), "\u2764\uFE0F"),
+            ChatMessage(me, 3, at(0, 9, 2), "Скучаю по тебе", hand = true),
+            ChatMessage(me, 4, at(0, 9, 3), "", voice = ChatVoice("v-test", 12_000, 1, "135798642135798642135798642135798642135798642135")),
+        )
+        val theirs = listOf(
+            ChatMessage(other, 1, at(0, 9, 10), "Билеты в кино на субботу", secret = true),
+            ChatMessage(other, 2, at(0, 9, 11), "\uD83D\uDE02\uD83D\uDD25"),
+            ChatMessage(other, 3, at(0, 9, 12), "Ты лучший"),
+        )
+        return ChatState(
+            pair = "x", mine = mine, theirs = theirs, restored = true, uploaded = 4, theirRead = 3, readUpTo = 3,
+            myReactions = mapOf("$other:3" to "\u2764\uFE0F"),
+            theirReactions = mapOf("$me:2" to "\uD83D\uDE02"),
+        )
+    }
+
+    @Test
+    fun richMessages() {
+        compose.setContent { Screen(Person.AIZAT, dark = true, state = rich(Person.AIZAT)) }
+        compose.mainClock.advanceTimeBy(600)
+        save("chat_9_rich")
+    }
+
+    @Test
+    fun heartsEffect() {
+        compose.setContent { Screen(Person.AIZAT, dark = true, state = sample(Person.AIZAT), initialText = "Люблю тебя") }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("chat-send").performClick()
+        compose.mainClock.advanceTimeBy(1600)
+        save("chat_10_hearts")
+    }
+
+    @Test
+    fun sunriseEffect() {
+        compose.setContent { Screen(Person.NASTYA, dark = true, state = sample(Person.NASTYA), initialText = "Доброе утро") }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("chat-send").performClick()
+        compose.mainClock.advanceTimeBy(2600)
+        save("chat_11_sunrise")
     }
 }
