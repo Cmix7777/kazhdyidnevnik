@@ -203,10 +203,15 @@ class ChatActivity : ComponentActivity() {
             }
             AppTheme {
                 val scope = rememberCoroutineScope()
-                val reveal = remember { Animatable(if (animate) 0f else 1f) }
+                // Капля: сначала растёт из кнопки и заливает экран цветом, потом тает и открывает переписку.
+                val ink = remember { Animatable(if (animate) 0f else 1f) }
+                val veil = remember { Animatable(if (animate) 1f else 0f) }
                 var closing by remember { mutableStateOf(false) }
                 LaunchedEffect(Unit) {
-                    if (animate) reveal.animateTo(1f, tween(560, easing = FastOutSlowInEasing))
+                    if (animate) {
+                        ink.animateTo(1f, tween(460, easing = FastOutSlowInEasing))
+                        veil.animateTo(0f, tween(280))
+                    }
                     // Переписка закрыла дневник целиком: его небо можно не перерисовывать.
                     SkyFx.covered = true
                 }
@@ -219,32 +224,39 @@ class ChatActivity : ComponentActivity() {
                             finish()
                         } else {
                             scope.launch {
-                                reveal.animateTo(0f, tween(380, easing = FastOutSlowInEasing))
+                                veil.animateTo(1f, tween(150))
+                                ink.animateTo(0f, tween(340, easing = FastOutSlowInEasing))
                                 finish()
                             }
                         }
                     }
                 }
                 BackHandler { close() }
-                val drop = if (owner != null) Accents.of(owner, dark).primary else Palette.Violet
-                val drops = remember { List(9) { Triple(it / 9f * 6.283f + Random.nextFloat() * 0.5f, 0.82f + Random.nextFloat() * 0.45f, 4f + Random.nextFloat() * 9f) } }
+                val accent = owner?.let { Accents.of(it, dark) }
+                val inkTop = accent?.primary ?: Palette.Violet
+                val inkBottom = accent?.deep ?: Palette.VioletDeep
+                val splashes = remember { List(10) { Triple(it / 10f * 6.283f + Random.nextFloat() * 0.4f, 0.94f + Random.nextFloat() * 0.3f, 3f + Random.nextFloat() * 6f) } }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .drawWithContent {
-                            val p = reveal.value
-                            if (p >= 1f) {
-                                drawContent()
-                                return@drawWithContent
-                            }
+                            val p = ink.value
+                            val v = veil.value
+                            // Пока капля не залила экран, переписка не рисуется вовсе: под каплей виден дневник.
+                            if (p >= 1f) drawContent()
+                            if (v <= 0f) return@drawWithContent
                             val o = origin ?: Offset(size.width - 80.dp.toPx(), 48.dp.toPx())
-                            val maxR = hypot(max(o.x, size.width - o.x), max(o.y, size.height - o.y)) * 1.08f
+                            val maxR = hypot(max(o.x, size.width - o.x), max(o.y, size.height - o.y)) * 1.04f
                             val r = maxR * p
-                            revealClip(o, r) { this@drawWithContent.drawContent() }
-                            val fade = (1f - p).coerceIn(0f, 1f)
-                            for ((angle, dist, radius) in drops) {
-                                val c = Offset(o.x + cos(angle) * r * dist, o.y + sin(angle) * r * dist)
-                                drawCircle(drop, radius * density * fade, c, alpha = fade)
+                            if (r > 0.5f) {
+                                drawCircle(Brush.radialGradient(listOf(inkTop, inkBottom), center = o, radius = r), radius = r, center = o, alpha = v)
+                                val fade = (1f - p) * v
+                                if (fade > 0.01f) {
+                                    for ((angle, dist, radius) in splashes) {
+                                        val c = Offset(o.x + cos(angle) * r * dist, o.y + sin(angle) * r * dist)
+                                        drawCircle(inkTop, radius * density * (0.4f + 0.6f * (1f - p)), c, alpha = fade)
+                                    }
+                                }
                             }
                         },
                 ) {
@@ -547,6 +559,7 @@ fun ChatScreen(
     val written = remember { HashSet<String>() }
     val keyboard = LocalSoftwareKeyboardController.current
     val densityNow = LocalDensity.current
+    val zoomDensity = remember(densityNow, zoom) { Density(densityNow.density * zoom, densityNow.fontScale) }
 
     // Запись голосового или кружочка.
     var circleMode by rememberSaveable { mutableStateOf(false) }
@@ -646,7 +659,7 @@ fun ChatScreen(
             mine = colors.mineTop,
             theirs = colors.theirBorder,
             background = Accents.of(owner, dark).background,
-            running = animate,
+            running = animate && circle == null,
             modifier = Modifier.matchParentSize(),
         )
         Column(
@@ -677,7 +690,7 @@ fun ChatScreen(
                         title = if (status.restoring) "Забираю переписку…" else "Здесь будет ваша переписка",
                         text = "Только на двоих: сообщения шифруются кодом связи прямо на телефоне, прочитать их можете только вы с ${partner.instrumental}.",
                     )
-                    else -> CompositionLocalProvider(LocalDensity provides Density(densityNow.density * zoom, densityNow.fontScale)) {
+                    else -> CompositionLocalProvider(LocalDensity provides zoomDensity) {
                         LazyColumn(
                             state = listState,
                             reverseLayout = true,
@@ -1347,26 +1360,22 @@ private fun BigEmojiText(text: String, count: Int, bounce: Boolean) {
     val appear = remember { Animatable(if (bounce) 0.3f else 1f) }
     LaunchedEffect(Unit) { if (bounce) appear.animateTo(1f, spring(dampingRatio = 0.42f, stiffness = 320f)) }
     val heart = BigEmoji.isHeart(text) && !EffectsSettings.reduced
-    val beat = if (heart) {
-        val transition = rememberInfiniteTransition(label = "beat")
-        transition.animateFloat(
-            initialValue = 1f,
-            targetValue = 1f,
-            animationSpec = infiniteRepeatable(
-                keyframes {
-                    durationMillis = 1400
-                    1f at 0
-                    1.14f at 120
-                    1f at 260
-                    1.1f at 380
-                    1f at 560
-                },
-            ),
-            label = "heart",
-        ).value
-    } else {
-        1f
-    }
+    // Бьются только сердечки: у остальных смайликов бесконечной анимации нет вовсе.
+    val beat = if (!heart) null else rememberInfiniteTransition(label = "beat").animateFloat(
+        initialValue = 1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            keyframes {
+                durationMillis = 1400
+                1f at 0
+                1.14f at 120
+                1f at 260
+                1.1f at 380
+                1f at 560
+            },
+        ),
+        label = "heart",
+    )
     Text(
         text = text.trim(),
         fontSize = when (count) {
@@ -1377,7 +1386,7 @@ private fun BigEmojiText(text: String, count: Int, bounce: Boolean) {
         modifier = Modifier
             .padding(horizontal = 4.dp, vertical = 2.dp)
             .graphicsLayer {
-                val s = appear.value * beat
+                val s = appear.value * (beat?.value ?: 1f)
                 scaleX = s
                 scaleY = s
             },
