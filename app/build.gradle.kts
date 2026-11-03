@@ -100,6 +100,12 @@ dependencies {
     // ключа проекта в приложении нет.
     implementation("com.google.firebase:firebase-messaging:24.1.0")
 
+    // Кружочки в переписке: фронтальная камера и запись видео
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-video:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
+
     testImplementation("junit:junit:4.13.2")
 
     // Тесты экранов на эмуляторе (запускаются отдельно от сборки, см. .github/workflows/ui-tests.yml)

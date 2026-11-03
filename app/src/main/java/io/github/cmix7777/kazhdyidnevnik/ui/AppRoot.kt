@@ -33,9 +33,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,6 +58,30 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import io.github.cmix7777.kazhdyidnevnik.data.ChatMessage
+import kotlinx.coroutines.delay
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -153,12 +174,24 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
     val context = LocalContext.current
     val chat by ChatSync.state.collectAsState()
     val unread = remember(chat) { ChatLogic.unread(chat) }
+    // Последнее её непрочитанное: выезжает таблеткой из кнопки переписки.
+    val latest = remember(chat) { chat.theirs.lastOrNull { !it.deleted && it.seq > chat.readUpTo } }
+    var navHidden by remember { mutableStateOf(false) }
+    val navScroll = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (consumed.y < -6f) navHidden = true else if (consumed.y > 6f) navHidden = false
+                return Offset.Zero
+            }
+        }
+    }
     LifecycleResumeEffect(owner) {
         val stop = ChatSync.watchMain(context)
         onPauseOrDispose { stop() }
     }
 
     AccentTheme(chrome) {
+      CompositionLocalProvider(LocalNavInset provides 104.dp) {
         GlowBackground(sky = sky) {
             Scaffold(
                 containerColor = Color.Transparent,
@@ -182,43 +215,9 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                             },
                             onOpenSettings = { settingsOpen = true },
                             unread = unread,
-                            onOpenChat = { context.startActivity(Intent(context, ChatActivity::class.java)) },
+                            onOpenChat = { origin -> ChatActivity.open(context, origin) },
+                            peek = latest,
                         )
-                    }
-                },
-                bottomBar = {
-                    val navLine = Palette.Border
-                    NavigationBar(
-                        modifier = Modifier.drawBehind {
-                            drawLine(
-                                color = navLine,
-                                start = Offset(0f, 0f),
-                                end = Offset(size.width, 0f),
-                                strokeWidth = 1.dp.toPx(),
-                            )
-                        },
-                        containerColor = Palette.Background.copy(alpha = 0.92f),
-                        tonalElevation = 0.dp,
-                    ) {
-                        Tab.entries.forEach { tab ->
-                            NavigationBarItem(
-                                selected = current == tab && !settingsOpen,
-                                onClick = {
-                                    current = tab
-                                    settingsOpen = false
-                                    together = null
-                                },
-                                icon = { Icon(painterResource(tab.icon), contentDescription = null) },
-                                label = { Text(tab.title, style = MaterialTheme.typography.labelMedium) },
-                                colors = NavigationBarItemDefaults.colors(
-                                    selectedIconColor = Palette.NavSelected,
-                                    selectedTextColor = Palette.Lavender,
-                                    indicatorColor = Palette.Violet.copy(alpha = 0.3f),
-                                    unselectedIconColor = Palette.TextFaint,
-                                    unselectedTextColor = Palette.TextFaint,
-                                ),
-                            )
-                        }
                     }
                 },
             ) { padding ->
@@ -231,7 +230,8 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                     Box(
                         modifier = Modifier
                             .padding(padding)
-                            .fillMaxSize(),
+                            .fillMaxSize()
+                            .nestedScroll(navScroll),
                     ) {
                         HorizontalPager(
                             state = pagerState,
@@ -273,12 +273,26 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                     }
                 }
             }
+            // Плавающая нижняя панель: прячется, когда листаешь вниз, и возвращается, когда листаешь вверх.
+            FloatingNav(
+                current = current,
+                settingsOpen = settingsOpen,
+                hidden = navHidden,
+                onSelect = { tab ->
+                    current = tab
+                    settingsOpen = false
+                    together = null
+                    navHidden = false
+                },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
             // Особый день (годовщина, день рождения, Новый год): анимация один раз за день поверх всего.
             SpecialDayHost(diary)
             // Капля привета: своя в полёте и чужая, если второй человек думал о тебе.
             GreetingDropLayer(greeting, owner)
             GreetingArrivalHost(diary, owner)
         }
+      }
     }
 }
 
@@ -293,13 +307,18 @@ private fun PersonBar(
     onOpenSettings: () -> Unit,
     greetHint: String = "",
     unread: Int = 0,
-    onOpenChat: () -> Unit = {},
+    onOpenChat: (Offset?) -> Unit = {},
+    peek: ChatMessage? = null,
 ) {
-    Row(
+    var chatCenter by remember { mutableStateOf<Offset?>(null) }
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
             .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 2.dp),
+    ) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -312,15 +331,172 @@ private fun PersonBar(
             modifier = Modifier.weight(1f),
             greetHint = greetHint,
         )
-        ChatButton(unread = unread, onClick = onOpenChat)
+        ChatButton(
+            unread = unread,
+            onClick = { onOpenChat(chatCenter) },
+            modifier = Modifier.onGloballyPositioned { chatCenter = it.boundsInWindow().center },
+        )
         GlassIconButton(icon = R.drawable.ic_settings, contentDescription = "Настройки", onClick = onOpenSettings)
+    }
+    PeekPill(
+        message = peek,
+        partner = owner.partner,
+        onClick = { onOpenChat(chatCenter) },
+        modifier = Modifier
+            .align(Alignment.CenterEnd)
+            .padding(end = 56.dp),
+    )
+    }
+}
+
+/**
+ * Живая кнопка переписки: когда приходит её сообщение, из кнопки выезжает таблетка с началом текста,
+ * а через несколько секунд втягивается обратно. Нажатие открывает переписку.
+ */
+@Composable
+private fun PeekPill(message: ChatMessage?, partner: Person, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    var shownKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var open by remember { mutableStateOf(false) }
+    val key = message?.key
+    LaunchedEffect(key) {
+        if (key == null || key == shownKey) {
+            open = false
+            return@LaunchedEffect
+        }
+        shownKey = key
+        delay(350)
+        open = true
+        delay(6_000)
+        open = false
+    }
+    val width by animateDpAsState(if (open) 240.dp else 44.dp, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow), label = "peek")
+    val textAlpha by animateFloatAsState(if (open) 1f else 0f, tween(if (open) 260 else 120, delayMillis = if (open) 180 else 0), label = "peekText")
+    if (width <= 44.5.dp && !open) return
+    val accent = Accents.of(partner, LocalDark.current)
+    Row(
+        modifier = modifier
+            .width(width)
+            .height(44.dp)
+            .shadow(14.dp, CircleShape, ambientColor = accent.primary, spotColor = accent.primary)
+            .clip(CircleShape)
+            .background(Brush.linearGradient(listOf(accent.primary, accent.light)))
+            .clickable(role = Role.Button) {
+                open = false
+                onClick()
+            }
+            .padding(start = 5.dp, end = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.22f)),
+            contentAlignment = Alignment.Center,
+        ) { Text(partner.shortName.take(1), style = MaterialTheme.typography.titleSmall, color = Color.White) }
+        Text(
+            text = message?.let { "${partner.shortName}: ${ChatLogic.shortText(it)}" }.orEmpty(),
+            style = MaterialTheme.typography.bodySmall,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.graphicsLayer { alpha = textAlpha },
+        )
+    }
+}
+
+/** Сколько места снизу занимает плавающая панель: экраны добавляют это к нижнему отступу списков. */
+val LocalNavInset = staticCompositionLocalOf { 0.dp }
+
+/**
+ * Плавающая нижняя панель: стеклянная таблетка над краем экрана, подсветка вкладки перетекает
+ * с пружинкой. Когда листаешь вниз, уезжает за край.
+ */
+@Composable
+private fun FloatingNav(current: Tab, settingsOpen: Boolean, hidden: Boolean, onSelect: (Tab) -> Unit, modifier: Modifier = Modifier) {
+    val shift by animateFloatAsState(if (hidden) 1f else 0f, tween(380), label = "navShift")
+    val index = Tab.entries.indexOf(current)
+    val blob by animateFloatAsState(index.toFloat(), spring(dampingRatio = 0.62f, stiffness = 380f), label = "navBlob")
+    val shape = RoundedCornerShape(32.dp)
+    val glow = Palette.Violet
+    val glowDeep = Palette.VioletDeep
+    val fadeColor = Palette.Background
+    Box(modifier = modifier.fillMaxWidth()) {
+    // Под панелью лента плавно растворяется в фоне, чтобы текст не просвечивал сквозь стекло.
+    Box(
+        modifier = Modifier
+            .matchParentSize()
+            .graphicsLayer { alpha = 1f - shift }
+            .background(Brush.verticalGradient(0f to Color.Transparent, 0.45f to fadeColor.copy(alpha = 0.88f), 1f to fadeColor)),
+    )
+    Box(
+        modifier = Modifier
+            .padding(top = 30.dp)
+            .navigationBarsPadding()
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .fillMaxWidth()
+            .height(64.dp)
+            .graphicsLayer { translationY = shift * (size.height + 40.dp.toPx()) }
+            .shadow(18.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
+            .clip(shape)
+            .background(Palette.Background.copy(alpha = 0.93f))
+            .border(1.dp, Color.White.copy(alpha = 0.12f), shape),
+    ) {
+        Canvas(modifier = Modifier.matchParentSize()) {
+            if (settingsOpen) return@Canvas
+            val pad = 8.dp.toPx()
+            val w = (size.width - pad * 2) / Tab.entries.size
+            val cx = pad + w * (blob + 0.5f)
+            // Пока подсветка едет, она чуть вытягивается, как капля.
+            val stretch = 1f + kotlin.math.min(0.35f, abs(blob - index) * 0.6f)
+            val bw = w * stretch
+            drawRoundRect(
+                brush = Brush.radialGradient(
+                    listOf(glow.copy(alpha = 0.6f), glowDeep.copy(alpha = 0.22f), Color.Transparent),
+                    center = Offset(cx, size.height * 0.42f),
+                    radius = bw * 0.75f,
+                ),
+                topLeft = Offset(cx - bw / 2f, pad),
+                size = Size(bw, size.height - pad * 2),
+                cornerRadius = CornerRadius(24.dp.toPx()),
+            )
+        }
+        Row(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
+            Tab.entries.forEach { tab ->
+                val selected = tab == current && !settingsOpen
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(24.dp))
+                        .clickable(role = Role.Tab) { onSelect(tab) },
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Icon(
+                        painterResource(tab.icon),
+                        contentDescription = null,
+                        tint = if (selected) Palette.NavSelected else Palette.TextFaint,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Text(
+                        tab.title,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (selected) Palette.Lavender else Palette.TextFaint,
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
     }
 }
 
 /** Кнопка переписки: облачко, а если есть непрочитанное — число в кружке. */
 @Composable
-private fun ChatButton(unread: Int, onClick: () -> Unit) {
-    Box {
+private fun ChatButton(unread: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Box(modifier = modifier) {
         GlassIconButton(
             icon = R.drawable.ic_chat,
             contentDescription = if (unread > 0) "Переписка, новых: $unread" else "Переписка",
