@@ -352,6 +352,7 @@ fun ChatRoot(onBack: () -> Unit) {
     }
     var viewing by remember { mutableStateOf<ChatPhoto?>(null) }
     var archive by remember { mutableStateOf(false) }
+    var fontEditor by remember { mutableStateOf(false) }
     val rootScope = rememberCoroutineScope()
     var saving by remember { mutableStateOf<ChatFile?>(null) }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -449,11 +450,7 @@ fun ChatRoot(onBack: () -> Unit) {
                 },
                 onMenu = { item ->
                     when (item) {
-                        "hand" -> hand = HandRequest(
-                            HandFonts.COMMON.map { it.toString() }.filter { HandFonts.glyph(myFont, it[0]) == null }.ifEmpty { HandFonts.COMMON.map { it.toString() } },
-                            null,
-                            null,
-                        )
+                        "hand" -> fontEditor = true
                         "archive" -> archive = true
                     }
                 },
@@ -475,6 +472,16 @@ fun ChatRoot(onBack: () -> Unit) {
             )
         }
         if (archive) ArchiveDialog(onClose = { archive = false })
+        if (fontEditor) {
+            HandFontDialog(
+                font = myFont,
+                onRedraw = { letters ->
+                    fontEditor = false
+                    hand = HandRequest(letters, null, null)
+                },
+                onClose = { fontEditor = false },
+            )
+        }
         hand?.let { request ->
             HandPadDialog(
                 letters = request.letters,
@@ -483,8 +490,13 @@ fun ChatRoot(onBack: () -> Unit) {
                     ChatSync.saveFont(context, HandFonts.encode(font))
                     request.text?.let { ChatSync.send(context, it, request.replyTo, hand = true) }
                     hand = null
+                    // Переписывал буквы из окна «Мой почерк» — возвращаемся туда и видим, что вышло.
+                    if (request.text == null) fontEditor = true
                 },
-                onCancel = { hand = null },
+                onCancel = {
+                    if (request.text == null) fontEditor = true
+                    hand = null
+                },
             )
         }
     }

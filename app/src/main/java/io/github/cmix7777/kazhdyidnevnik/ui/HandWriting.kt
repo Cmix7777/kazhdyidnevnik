@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -122,6 +124,9 @@ internal object HandFonts {
 
     /** Самые нужные буквы, если человек хочет дописать почерк заранее. */
     const val COMMON = "оеаинтсрвлкмдпуяыьгзбчйхжшюцщэфъ"
+
+    /** Весь алфавит и цифры: так они показаны в окне «Мой почерк». */
+    const val ALPHABET = "абвгдеёжзийклмнопрстуфхцчшщъыьэюя0123456789"
 }
 
 private val INK = Color(0xFF26358C)
@@ -298,11 +303,18 @@ internal fun HandPadDialog(letters: List<String>, start: HandFont?, onDone: (Han
                             .size(36.dp)
                             .clip(RoundedCornerShape(9.dp))
                             .background(if (done) PAPER else Palette.Chip)
-                            .border(1.dp, if (i == index) Palette.Violet else Palette.Border, RoundedCornerShape(9.dp)),
+                            .border(1.dp, if (i == index) Palette.Violet else Palette.Border, RoundedCornerShape(9.dp))
+                            .clickable {
+                                // Нажал на букву в очереди — пишешь её заново, остальные не трогаются.
+                                if (i != index) {
+                                    strokes.clear()
+                                    index = i
+                                }
+                            },
                         contentAlignment = Alignment.Center,
                     ) {
                         val glyph = glyphs[letter]
-                        if (done && glyph != null) {
+                        if (i != index && glyph != null) {
                             GlyphThumb(glyph, Modifier.size(28.dp))
                         } else {
                             Text(letter, style = TextStyle(fontFamily = FontFamily.Cursive, fontSize = MaterialTheme.typography.titleMedium.fontSize), color = if (i == index) Palette.Text else Palette.TextFaint)
@@ -518,6 +530,65 @@ internal fun HandNote(
                 }
             }
             meta()
+        }
+    }
+}
+
+/**
+ * Мой почерк: все буквы клетками. Нажал на букву — переписываешь только её, остальные остаются как были.
+ * Пустые клетки — букв ещё нет, их можно дописать разом.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun HandFontDialog(font: HandFont?, onRedraw: (List<String>) -> Unit, onClose: () -> Unit) {
+    val letters = HandFonts.ALPHABET.map { it.toString() }
+    val missing = letters.filter { it != "ё" && font?.glyphs?.get(it) == null }
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp)
+                .clip(RoundedCornerShape(26.dp))
+                .background(Palette.Background)
+                .border(1.dp, Palette.BorderStrong, RoundedCornerShape(26.dp))
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("Мой почерк", style = MaterialTheme.typography.titleMedium, color = Palette.Text)
+            Text(
+                "Нажми на букву, чтобы переписать только её. Пустые клетки — буквы, которых ещё нет: вместо них в записке будет обычный рукописный шрифт.",
+                style = MaterialTheme.typography.bodySmall,
+                color = Palette.TextMuted,
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                letters.forEach { letter ->
+                    val glyph = font?.glyphs?.get(letter)
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (glyph != null) PAPER else Palette.Chip)
+                            .border(1.dp, Palette.Border, RoundedCornerShape(10.dp))
+                            .clickable { onRedraw(listOf(letter)) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (glyph != null) {
+                            GlyphThumb(glyph, Modifier.size(34.dp))
+                        } else {
+                            Text(letter, style = TextStyle(fontFamily = FontFamily.Cursive, fontSize = MaterialTheme.typography.titleMedium.fontSize), color = Palette.TextFaint)
+                        }
+                    }
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                GhostButton("Закрыть", onClick = onClose, small = true)
+                if (missing.isNotEmpty()) PillButton("Дописать недостающие: ${missing.size}", onClick = { onRedraw(missing) })
+            }
         }
     }
 }
