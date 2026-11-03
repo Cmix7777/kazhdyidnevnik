@@ -191,7 +191,7 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
     }
 
     AccentTheme(chrome) {
-      CompositionLocalProvider(LocalNavInset provides 88.dp) {
+      CompositionLocalProvider(LocalNavInset provides 104.dp) {
         GlowBackground(sky = sky) {
             Scaffold(
                 containerColor = Color.Transparent,
@@ -421,8 +421,18 @@ private fun FloatingNav(current: Tab, settingsOpen: Boolean, hidden: Boolean, on
     val shape = RoundedCornerShape(32.dp)
     val glow = Palette.Violet
     val glowDeep = Palette.VioletDeep
+    val fadeColor = Palette.Background
+    Box(modifier = modifier.fillMaxWidth()) {
+    // Под панелью лента плавно растворяется в фоне, чтобы текст не просвечивал сквозь стекло.
     Box(
-        modifier = modifier
+        modifier = Modifier
+            .matchParentSize()
+            .graphicsLayer { alpha = 1f - shift }
+            .background(Brush.verticalGradient(0f to Color.Transparent, 0.45f to fadeColor.copy(alpha = 0.88f), 1f to fadeColor)),
+    )
+    Box(
+        modifier = Modifier
+            .padding(top = 30.dp)
             .navigationBarsPadding()
             .padding(horizontal = 14.dp, vertical = 10.dp)
             .fillMaxWidth()
@@ -479,6 +489,7 @@ private fun FloatingNav(current: Tab, settingsOpen: Boolean, hidden: Boolean, on
                 }
             }
         }
+    }
     }
 }
 
