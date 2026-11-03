@@ -95,7 +95,7 @@ import kotlin.math.sqrt
 // ---------- голосовые ----------
 
 /** Запись голосового: AAC 32 кбит/с, моно. Не длиннее трёх минут. */
-internal class VoiceRecorder(private val context: Context) {
+class VoiceRecorder(private val context: Context) {
     class Result(val bytes: ByteArray, val durationMs: Long, val wave: String)
 
     private var recorder: MediaRecorder? = null
