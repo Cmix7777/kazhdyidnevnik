@@ -87,7 +87,7 @@ float noise(float2 p) {
 float fbm(float2 p) {
     float v = 0.0;
     float a = 0.5;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 3; i++) {
         v += a * noise(p);
         p = p * 2.03 + float2(1.7, 9.2);
         a *= 0.5;
@@ -110,7 +110,7 @@ half4 main(float2 fc) {
 
 /**
  * Дымок за сообщениями: медленно плывёт, слева в цветах второго человека, справа — в своих.
- * Рисуется в четверть размера и растягивается (дым и так размытый), 20 раз в секунду.
+ * Рисуется в четверть размера отдельным слоем и растягивается (дым и так размытый), 15 раз в секунду.
  * На телефонах до Android 13 ничего не рисует: остаётся обычный фон.
  */
 @Composable
@@ -123,7 +123,7 @@ internal fun ChatSmoke(mine: Color, theirs: Color, background: Color, running: B
 @Composable
 private fun SmokeLayer(mine: Color, theirs: Color, background: Color, running: Boolean, modifier: Modifier) {
     val shader = remember { runCatching { RuntimeShader(SMOKE_AGSL) }.getOrNull() } ?: return
-    val time = rememberEffectTime(fps = 20, running = running)
+    val time = rememberEffectTime(fps = 15, running = running)
     val scale = 4f
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         Canvas(
@@ -133,6 +133,9 @@ private fun SmokeLayer(mine: Color, theirs: Color, background: Color, running: B
                     transformOrigin = TransformOrigin(0f, 0f)
                     scaleX = scale
                     scaleY = scale
+                    // Обязательно отдельным слоем: дым считается в четверть размера и растягивается готовой картинкой.
+                    // Без этого шейдер считался бы для каждой точки экрана и переписка вставала колом.
+                    compositingStrategy = CompositingStrategy.Offscreen
                 },
         ) {
             try {
