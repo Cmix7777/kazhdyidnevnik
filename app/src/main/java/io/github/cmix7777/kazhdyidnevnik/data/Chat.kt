@@ -32,13 +32,15 @@ data class ChatMessage(
     @SerialName("v") val voice: ChatVoice? = null,
     @SerialName("c") val circle: ChatCircle? = null,
     @SerialName("k") val sticker: ChatSticker? = null,
+    /** Любой файл: документ, архив, таблица. */
+    @SerialName("fl") val file: ChatFile? = null,
 ) {
     val key: String get() = "$from:$seq"
 
     /** Удалённое сообщение: текст и вложения стираются, остаётся только место в переписке. */
     fun asDeleted(): ChatMessage = copy(
         text = "", photo = null, replyTo = null, deleted = true,
-        effect = null, secret = false, hand = false, voice = null, circle = null, sticker = null,
+        effect = null, secret = false, hand = false, voice = null, circle = null, sticker = null, file = null,
     )
 
     /** Файлы сообщения в облаке: номер и сколько у него частей. */
@@ -48,10 +50,11 @@ data class ChatMessage(
             voice?.let { add(it.id to it.parts) }
             circle?.let { add(it.id to it.parts) }
             sticker?.let { add(it.id to 1) }
+            file?.let { add(it.id to it.parts) }
         }
 
     /** Есть ли во что-то кроме текста (фото, голос, кружочек, стикер). */
-    val hasMedia: Boolean get() = photo != null || voice != null || circle != null || sticker != null
+    val hasMedia: Boolean get() = photo != null || voice != null || circle != null || sticker != null || file != null
 }
 
 /** Голосовое: звук лежит отдельным файлом (если длинный — несколькими частями). [wave] — громкость по кусочкам, 0..9. */
@@ -69,6 +72,16 @@ data class ChatCircle(
     @SerialName("i") val id: String,
     @SerialName("ms") val durationMs: Long,
     @SerialName("n") val parts: Int = 1,
+)
+
+/** Файл: имя, размер и тип, сам он лежит в облаке частями до доставки. */
+@Serializable
+data class ChatFile(
+    @SerialName("i") val id: String,
+    @SerialName("n") val name: String,
+    @SerialName("b") val size: Long,
+    @SerialName("m") val mime: String = "",
+    @SerialName("p") val parts: Int = 1,
 )
 
 /** Стикер: картинка без пузыря. */
@@ -295,9 +308,10 @@ object ChatLogic {
         voice: ChatVoice? = null,
         circle: ChatCircle? = null,
         sticker: ChatSticker? = null,
+        file: ChatFile? = null,
     ): ChatState {
         val clean = text.trim().take(MAX_TEXT)
-        val media = photo != null || voice != null || circle != null || sticker != null
+        val media = photo != null || voice != null || circle != null || sticker != null || file != null
         if (clean.isEmpty() && !media) return state
         val message = ChatMessage(
             from = me.id,
@@ -312,6 +326,7 @@ object ChatLogic {
             voice = voice,
             circle = circle,
             sticker = sticker,
+            file = file,
         )
         return state.copy(
             mine = state.mine + message,
@@ -574,6 +589,7 @@ object ChatLogic {
         message.voice != null -> "Голосовое"
         message.circle != null -> "Кружочек"
         message.sticker != null -> "Стикер"
+        message.file != null -> "Файл: ${message.file.name}"
         message.photo != null && message.text.isNotBlank() -> "Фото: ${message.text}"
         message.photo != null -> "Фото"
         message.hand -> "Записка: ${message.text}"
@@ -586,6 +602,7 @@ object ChatLogic {
         message.voice != null -> "v"
         message.circle != null -> "c"
         message.sticker != null -> "k"
+        message.file != null -> "f"
         message.hand -> "w"
         else -> null
     }
@@ -602,13 +619,15 @@ object ChatLogic {
         voice = if (preview.kind == "v") ChatVoice("", 0) else null,
         circle = if (preview.kind == "c") ChatCircle("", 0) else null,
         sticker = if (preview.kind == "k") ChatSticker("") else null,
+        file = if (preview.kind == "f") ChatFile("", preview.text, 0) else null,
     )
 
     /** Копия для пуша: не длиннее [maxBytes] байт текста, чтобы пуш уложился в 4 КБ. */
     fun preview(message: ChatMessage, maxBytes: Int = 1500): ChatPreview {
-        var text = if (message.secret) "" else message.text
+        var text = if (message.secret) "" else message.file?.name ?: message.text
         while (text.toByteArray(Charsets.UTF_8).size > maxBytes) text = text.dropLast(maxOf(1, text.length / 10))
-        if (!message.secret && text.length < message.text.length) text = text.trimEnd() + "…"
+        val full = message.file?.name ?: message.text
+        if (!message.secret && text.length < full.length) text = text.trimEnd() + "…"
         return ChatPreview(seq = message.seq, at = message.at, text = text, photo = message.photo != null, kind = kindOf(message))
     }
 

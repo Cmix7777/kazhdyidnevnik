@@ -101,4 +101,17 @@ class ChatExtrasTest {
         assertNull(PartnerNow.line(Person.NASTYA, listOf(lesson), LocalTime.of(11, 0)))
         assertFalse(PartnerNow.line(Person.NASTYA, emptyList(), LocalTime.NOON) != null)
     }
+
+    @Test
+    fun filesShowTheirName() {
+        var state = ChatState(restored = true)
+        state = ChatLogic.append(state, aizat, "", 1, file = ChatFile("f9", "отчёт по практике.pdf", 1_200_000, "application/pdf", parts = 6))
+        val message = state.mine.last()
+        assertEquals("Файл: отчёт по практике.pdf", ChatLogic.shortText(message))
+        assertEquals(listOf("f9" to 6), message.files)
+        val preview = ChatLogic.preview(message)
+        assertEquals("f", preview.kind)
+        assertEquals("отчёт по практике.pdf", preview.text)
+        assertEquals("Файл: отчёт по практике.pdf", ChatLogic.shortText(ChatLogic.fromPreview("aizat", preview)))
+    }
 }

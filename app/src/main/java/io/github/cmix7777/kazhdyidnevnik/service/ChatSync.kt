@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import io.github.cmix7777.kazhdyidnevnik.data.ChatCircle
 import io.github.cmix7777.kazhdyidnevnik.data.ChatCloud
+import io.github.cmix7777.kazhdyidnevnik.data.ChatFile
 import io.github.cmix7777.kazhdyidnevnik.data.ChatLogic
 import io.github.cmix7777.kazhdyidnevnik.data.ChatSticker
 import io.github.cmix7777.kazhdyidnevnik.data.ChatVoice
@@ -294,6 +295,38 @@ object ChatSync {
     /** Стикер: у каждого отправленного свой номер, второй телефон стирает его в облаке, когда скачает. */
     fun sendSticker(context: Context, bytes: ByteArray) =
         sendFile(context, bytes, null) { state, id, _ -> ChatLogic.append(state, owner(context), "", System.currentTimeMillis(), sticker = ChatSticker(id)) }
+
+    /**
+     * Отправить любой файл. Он уходит в облако частями и стирается там, когда второй телефон его скачает.
+     * Возвращает, что не так (слишком большой, не открылся), или null — файл в очереди на отправку.
+     */
+    suspend fun sendDocument(context: Context, uri: Uri, replyTo: String? = null): String? = withContext(Dispatchers.IO) {
+        val app = context.applicationContext
+        val resolver = app.contentResolver
+        var name = "файл"
+        var size = -1L
+        runCatching {
+            resolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME, android.provider.OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    cursor.getString(0)?.let { name = it }
+                    if (!cursor.isNull(1)) size = cursor.getLong(1)
+                }
+            }
+        }
+        if (size > MAX_FILE_BYTES) return@withContext "Файл больше ${MAX_FILE_BYTES / 1_000_000} МБ: такой в переписку не пролезет"
+        val bytes = runCatching { resolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+            ?: return@withContext "Файл не открылся"
+        if (bytes.size > MAX_FILE_BYTES) return@withContext "Файл больше ${MAX_FILE_BYTES / 1_000_000} МБ: такой в переписку не пролезет"
+        if (bytes.isEmpty()) return@withContext "Файл пустой"
+        val mime = resolver.getType(uri).orEmpty()
+        sendFile(app, bytes, replyTo) { state, id, parts ->
+            ChatLogic.append(state, owner(app), "", System.currentTimeMillis(), replyTo, file = ChatFile(id, name.take(120), bytes.size.toLong(), mime, parts))
+        }
+        null
+    }
+
+    /** Файлы в переписке не больше этого: в облаке они идут частями по 215 КБ. */
+    const val MAX_FILE_BYTES = 25_000_000
 
     private fun owner(context: Context): Person = AppSettings(context.applicationContext).owner ?: Person.AIZAT
 

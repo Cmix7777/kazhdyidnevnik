@@ -11,6 +11,7 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -137,6 +138,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.applyAppChrome
+import io.github.cmix7777.kazhdyidnevnik.data.ChatFile
 import io.github.cmix7777.kazhdyidnevnik.data.ChatLogic
 import io.github.cmix7777.kazhdyidnevnik.data.ChatMessage
 import io.github.cmix7777.kazhdyidnevnik.data.ChatPhoto
@@ -338,6 +340,28 @@ fun ChatRoot(onBack: () -> Unit) {
     }
     var viewing by remember { mutableStateOf<ChatPhoto?>(null) }
     var archive by remember { mutableStateOf(false) }
+    val rootScope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf<ChatFile?>(null) }
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        val reply = photoReply
+        photoReply = null
+        if (uri != null) {
+            rootScope.launch {
+                val problem = ChatSync.sendDocument(context, uri, reply)
+                if (problem != null) Toast.makeText(context, problem, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    val fileSaver = rememberLauncherForActivityResult(SaveAs()) { uri ->
+        val file = saving
+        saving = null
+        if (uri != null && file != null) {
+            rootScope.launch {
+                val ok = withContext(Dispatchers.IO) { saveChatFile(context, file, uri) }
+                Toast.makeText(context, if (ok) "Файл сохранён" else "Не получилось сохранить файл", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
     var hand by remember { mutableStateOf<HandRequest?>(null) }
 
     PersonTheme(owner) {
@@ -399,6 +423,17 @@ fun ChatRoot(onBack: () -> Unit) {
                     val id = message.sticker?.id
                     val bytes = id?.let { ChatFiles.read(context, it) }
                     if (bytes != null) StickerStore.add(context, bytes)
+                },
+                onFile = { reply ->
+                    photoReply = reply
+                    filePicker.launch(arrayOf("*/*"))
+                },
+                onOpenFile = { message -> message.file?.let { openChatFile(context, it) } },
+                onSaveFile = { message ->
+                    message.file?.let {
+                        saving = it
+                        fileSaver.launch(it.name to saveMime(it))
+                    }
                 },
                 onMenu = { item ->
                     when (item) {
@@ -478,6 +513,9 @@ fun ChatScreen(
     onCircle: (ByteArray, Long, String?) -> Unit = { _, _, _ -> },
     onEnsureFiles: (ChatMessage, Boolean) -> Unit = { _, _ -> },
     onSaveSticker: (ChatMessage) -> Unit = {},
+    onFile: (replyTo: String?) -> Unit = {},
+    onOpenFile: (ChatMessage) -> Unit = {},
+    onSaveFile: (ChatMessage) -> Unit = {},
     onMenu: (String) -> Unit = {},
 ) {
     val partner = owner.partner
@@ -691,6 +729,8 @@ fun ChatScreen(
                                                 onOpenSecret = { onOpenSecret(message.key) },
                                                 onEnsureFiles = { onEnsureFiles(message, row.mine) },
                                                 onSaveSticker = { onSaveSticker(message) },
+                                                onOpenFile = { onOpenFile(message) },
+                                                onSaveFile = { onSaveFile(message) },
                                             )
                                         }
                                     }
@@ -781,6 +821,10 @@ fun ChatScreen(
                 },
                 onCamera = {
                     onCamera(replyKey)
+                    replyKey = null
+                },
+                onFile = {
+                    onFile(replyKey)
                     replyKey = null
                 },
                 onTogglePanel = {
@@ -990,6 +1034,8 @@ private fun MessageBubble(
     onOpenSecret: () -> Unit,
     onEnsureFiles: () -> Unit,
     onSaveSticker: () -> Unit,
+    onOpenFile: () -> Unit,
+    onSaveFile: () -> Unit,
 ) {
     val message = row.message
     val context = LocalContext.current
@@ -1059,6 +1105,7 @@ private fun MessageBubble(
             when {
                 failed -> onRetry()
                 message.photo != null -> onOpenPhoto(message.photo)
+                message.file != null -> onOpenFile()
             }
         },
         onDoubleClick = { onHeart(bounds.center) },
@@ -1170,6 +1217,13 @@ private fun MessageBubble(
                             }
                         }
                     }
+                    val file = message.file
+                    if (file != null) {
+                        Column(horizontalAlignment = Alignment.End) {
+                            FileBubble(file, mine = row.mine, accent = colors.theirAccent, onReady = onEnsureFiles)
+                            Box(modifier = Modifier.padding(end = 10.dp, bottom = 7.dp)) { Meta(message, row.tick, failed, metaColor, zone, reactions) }
+                        }
+                    }
                     val voice = message.voice
                     if (voice != null) {
                         Row(verticalAlignment = Alignment.Bottom) {
@@ -1241,6 +1295,16 @@ private fun MessageBubble(
                             menu = false
                             context.getSystemService(ClipboardManager::class.java)
                                 ?.setPrimaryClip(ClipData.newPlainText("Сообщение", message.text))
+                        },
+                    )
+                }
+                if (message.file != null) {
+                    DropdownMenuItem(
+                        text = { Text("Сохранить на телефон") },
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_download), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        onClick = {
+                            menu = false
+                            onSaveFile()
                         },
                     )
                 }
@@ -1501,6 +1565,7 @@ private fun InputBar(
     onSpecial: (String) -> Unit,
     onGallery: () -> Unit,
     onCamera: () -> Unit,
+    onFile: () -> Unit,
     onTogglePanel: () -> Unit,
     onToggleMode: () -> Unit,
     onRecordStart: () -> Boolean,
@@ -1521,7 +1586,7 @@ private fun InputBar(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box {
-            GlassIconButton(icon = R.drawable.ic_photo, contentDescription = "Фото или камера", onClick = { attach = true }, enabled = enabled && !recording)
+            GlassIconButton(icon = R.drawable.ic_attach, contentDescription = "Вложение: фото, камера или файл", onClick = { attach = true }, enabled = enabled && !recording)
             DropdownMenu(expanded = attach, onDismissRequest = { attach = false }) {
                 DropdownMenuItem(
                     text = { Text("Камера") },
@@ -1537,6 +1602,14 @@ private fun InputBar(
                     onClick = {
                         attach = false
                         onGallery()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Файл") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_file), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    onClick = {
+                        attach = false
+                        onFile()
                     },
                 )
             }
