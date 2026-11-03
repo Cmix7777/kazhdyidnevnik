@@ -49,6 +49,8 @@ import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberEffectTime
 import kotlin.math.PI
@@ -174,10 +176,17 @@ private fun mix(a: Color, b: Color, t: Float, alpha: Float = 1f) = Color(
     alpha = alpha,
 )
 
-/** Один эффект: живёт, пока [step] возвращает true. */
+/**
+ * Один эффект. Время идёт по кадрам ([update]), а рисуется он отдельно ([draw]): так эффект не замедляется,
+ * если какой-то кадр не нарисовался, и в тестах кадр в нужную секунду совпадает с телефоном.
+ */
 internal abstract class WordEffect {
     var done = false
-    abstract fun step(scope: DrawScope, dt: Float): Boolean
+
+    /** Продвинуть эффект на [dt] секунд. false — он закончился. */
+    abstract fun update(dt: Float): Boolean
+
+    abstract fun draw(scope: DrawScope)
 }
 
 private class NightFx(private val w: Float, private val h: Float, private val dp: Float) : WordEffect() {
@@ -186,9 +195,13 @@ private class NightFx(private val w: Float, private val h: Float, private val dp
     private var age = 0f
     private val duration = 3.9f
 
-    override fun step(scope: DrawScope, dt: Float): Boolean = with(scope) {
+    override fun update(dt: Float): Boolean {
         age += dt
-        if (age > duration) return false
+        return age <= duration
+    }
+
+    override fun draw(scope: DrawScope): Unit = with(scope) {
+        if (age > duration) return
         val env = min(1f, age / 0.5f) * min(1f, (duration - age) / 0.9f)
         drawRect(Color(0xFF040310), alpha = 0.66f * env)
         for (s in stars) {
@@ -223,7 +236,6 @@ private class NightFx(private val w: Float, private val h: Float, private val dp
                 Offset(tx, ty), Offset(hx, hy), strokeWidth = 2f * dp, cap = StrokeCap.Round,
             )
         }
-        true
     }
 }
 
@@ -275,9 +287,13 @@ private class SunFx(private val w: Float, private val h: Float, private val dp: 
         drawPath(path, brush)
     }
 
-    override fun step(scope: DrawScope, dt: Float): Boolean = with(scope) {
+    override fun update(dt: Float): Boolean {
         age += dt
-        if (age > duration) return false
+        return age <= duration
+    }
+
+    override fun draw(scope: DrawScope): Unit = with(scope) {
+        if (age > duration) return
         val env = min(1f, age / 0.6f) * min(1f, (duration - age) / 1.1f)
         val k = ((age - 0.35f) / 3.1f).coerceIn(0f, 1f)
         val rise = if (k < 0.5f) 2f * k * k else 1f - (-2f * k + 2f).pow(2) / 2f
@@ -352,7 +368,6 @@ private class SunFx(private val w: Float, private val h: Float, private val dp: 
             drawPath(bird, Color(0xE61C1030), style = Stroke(width = 1.7f * dp, cap = StrokeCap.Round))
         }
         drawIntoCanvas { it.restore() }
-        true
     }
 }
 
@@ -376,24 +391,23 @@ private class HeartsFx(private val w: Float, private val h: Float, private val d
     }
     private var age = 0f
 
-    override fun step(scope: DrawScope, dt: Float): Boolean {
+    private val end = hearts.maxOf { it.d + it.life }
+
+    override fun update(dt: Float): Boolean {
         age += dt
-        var alive = false
+        return age < end
+    }
+
+    override fun draw(scope: DrawScope) {
         for (k in hearts) {
             val t = age - k.d
-            if (t < 0f) {
-                alive = true
-                continue
-            }
-            if (t > k.life) continue
-            alive = true
+            if (t < 0f || t > k.life) continue
             val y = k.y0 - k.vy * t
             if (y < -40f * dp) continue
             val x = k.x + sin(k.ph + t * 2.2f) * k.sw
             val a = min(1f, t / 0.3f) * min(1f, (k.life - t) / 1f)
             scope.heart(x, y, k.s, k.rot + sin(t * 2f + k.ph) * 0.15f, k.c, a)
         }
-        return alive
     }
 }
 
@@ -413,7 +427,7 @@ private class FireFx(private val w: Float, private val h: Float, private val dp:
     private val parts = ArrayList<Part>()
     private var age = 0f
 
-    override fun step(scope: DrawScope, dt: Float): Boolean {
+    override fun update(dt: Float): Boolean {
         age += dt
         for (b in plan) {
             if (!b.done && age >= b.t) {
@@ -431,6 +445,13 @@ private class FireFx(private val w: Float, private val h: Float, private val dp:
             p.vy = p.vy * (1f - 1.5f * dt) + 130f * dp * dt
             p.x += p.vx * dt
             p.y += p.vy * dt
+        }
+        parts.removeAll { it.age > it.life }
+        return age < 2.2f || parts.isNotEmpty()
+    }
+
+    override fun draw(scope: DrawScope) {
+        for (p in parts) {
             scope.drawLine(
                 p.c,
                 Offset(p.x - p.vx * 0.045f, p.y - p.vy * 0.045f),
@@ -441,8 +462,6 @@ private class FireFx(private val w: Float, private val h: Float, private val dp:
                 blendMode = androidx.compose.ui.graphics.BlendMode.Plus,
             )
         }
-        parts.removeAll { it.age > it.life }
-        return age < 2.2f || parts.isNotEmpty()
     }
 }
 
@@ -456,7 +475,7 @@ private class PopFx(x: Float, y: Float, private val dp: Float) : WordEffect() {
     }
     private var age = 0f
 
-    override fun step(scope: DrawScope, dt: Float): Boolean {
+    override fun update(dt: Float): Boolean {
         age += dt
         if (age > 0.8f) return false
         for (p in parts) {
@@ -464,9 +483,12 @@ private class PopFx(x: Float, y: Float, private val dp: Float) : WordEffect() {
             p.vy *= 1f - 3f * dt
             p.x += p.vx * dt
             p.y += p.vy * dt
-            scope.heart(p.x, p.y, p.s, 0f, p.c, 1f - age / 0.8f)
         }
         return true
+    }
+
+    override fun draw(scope: DrawScope) {
+        for (p in parts) scope.heart(p.x, p.y, p.s, 0f, p.c, 1f - age / 0.8f)
     }
 }
 
@@ -487,7 +509,8 @@ internal class WordFxState {
     private val recent = HashMap<String, Long>()
     internal var count by mutableIntStateOf(0)
     internal var tick by mutableLongStateOf(0L)
-    internal var dt by mutableFloatStateOf(0f)
+    internal var width = 0f
+    internal var height = 0f
 
     fun play(name: String, at: Offset? = null) {
         val now = System.currentTimeMillis()
@@ -514,7 +537,10 @@ internal class WordFxState {
         pending.clear()
     }
 
-    internal fun sweep() {
+    /** Один кадр: новые эффекты появляются, у остальных идёт время, закончившиеся убираются. */
+    internal fun advance(dt: Float, dp: Float) {
+        if (width > 0f) spawn(width, height, dp)
+        for (effect in items) if (!effect.done && !effect.update(dt)) effect.done = true
         if (items.removeAll { it.done }) count = items.size + pending.size
     }
 }
@@ -523,25 +549,28 @@ internal class WordFxState {
 @Composable
 internal fun WordFxLayer(state: WordFxState, modifier: Modifier = Modifier) {
     val active = state.count > 0
+    val dp = LocalDensity.current.density
     LaunchedEffect(active) {
         if (!active) return@LaunchedEffect
         var last = withFrameNanos { it }
         while (state.count > 0) {
             val now = withFrameNanos { it }
-            state.dt = ((now - last) / 1_000_000_000f).coerceIn(0f, 0.05f)
+            state.advance(((now - last) / 1_000_000_000f).coerceIn(0f, 0.05f), dp)
             last = now
-            state.sweep()
             state.tick = state.tick + 1
         }
     }
     if (!active) return
-    Canvas(modifier = modifier.fillMaxSize()) {
+    Canvas(
+        modifier = modifier
+            .fillMaxSize()
+            .onSizeChanged {
+                state.width = it.width.toFloat()
+                state.height = it.height.toFloat()
+            },
+    ) {
         state.tick
-        state.spawn(size.width, size.height, density)
-        val dt = state.dt
-        for (effect in state.items) {
-            if (!effect.done && !effect.step(this, dt)) effect.done = true
-        }
+        for (effect in state.items) if (!effect.done) effect.draw(this)
     }
 }
 
@@ -648,16 +677,14 @@ internal class DustState {
     private val items = ArrayList<Dust>()
     internal var count by mutableIntStateOf(0)
     internal var tick by mutableLongStateOf(0L)
-    internal var dt by mutableFloatStateOf(0f)
 
     fun add(bitmap: ImageBitmap, origin: Offset, dp: Float) {
         items += Dust(bitmap, origin, dp)
         count = items.size
     }
 
-    internal fun step(scope: DrawScope, dt: Float) {
+    internal fun draw(scope: DrawScope) {
         for (d in items) {
-            d.age += dt
             for (i in 0 until d.count) {
                 val t = d.age - d.delay[i]
                 val c = Color(d.color[i])
@@ -674,7 +701,8 @@ internal class DustState {
         }
     }
 
-    internal fun sweep() {
+    internal fun advance(dt: Float) {
+        for (d in items) d.age += dt
         if (items.removeAll { it.age > 1.5f }) count = items.size
     }
 }
@@ -687,16 +715,15 @@ internal fun DustLayer(state: DustState, modifier: Modifier = Modifier) {
         var last = withFrameNanos { it }
         while (state.count > 0) {
             val now = withFrameNanos { it }
-            state.dt = ((now - last) / 1_000_000_000f).coerceIn(0f, 0.05f)
+            state.advance(((now - last) / 1_000_000_000f).coerceIn(0f, 0.05f))
             last = now
-            state.sweep()
             state.tick = state.tick + 1
         }
     }
     if (!active) return
     Canvas(modifier = modifier.fillMaxSize()) {
         state.tick
-        state.step(this, state.dt)
+        state.draw(this)
     }
 }
 

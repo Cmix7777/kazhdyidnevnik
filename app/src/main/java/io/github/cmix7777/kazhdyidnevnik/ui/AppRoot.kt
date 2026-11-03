@@ -430,7 +430,7 @@ private fun FloatingNav(current: Tab, settingsOpen: Boolean, hidden: Boolean, on
             .graphicsLayer { translationY = shift * (size.height + 40.dp.toPx()) }
             .shadow(18.dp, shape, ambientColor = Color.Black, spotColor = Color.Black)
             .clip(shape)
-            .background(Palette.Background.copy(alpha = 0.78f))
+            .background(Palette.Background.copy(alpha = 0.93f))
             .border(1.dp, Color.White.copy(alpha = 0.12f), shape),
     ) {
         Canvas(modifier = Modifier.matchParentSize()) {
