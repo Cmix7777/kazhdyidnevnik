@@ -170,6 +170,7 @@ fun SettingsScreen(
                         ),
                     )
                 }
+                EffectsWhy()
             }
         }
 
@@ -514,4 +515,24 @@ private fun ActionCard(text: String, button: String, onClick: () -> Unit, danger
         )
         PillButton(text = button, onClick = onClick)
     }
+}
+
+/** Почему на этом телефоне не видно живого неба и погоды: чтобы не гадать, когда у одного есть, а у другого нет. */
+@Composable
+private fun EffectsWhy() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val text = when {
+        EffectsSettings.reduced -> "Живые эффекты выключены этим переключателем."
+        EffectsSettings.systemAnimationsOff(context) ->
+            "Анимации выключены в самом телефоне (специальные возможности, «Убрать анимацию» или экономия заряда), поэтому небо и погода не двигаются."
+        !EffectsSettings.shadersSupported -> "На этом телефоне Android ниже 13: живое небо и погода на стекле не показываются."
+        !LocalDark.current -> "Живое небо с облаками и звёздами есть только в тёмной теме. Дождь, снег и иней на стекле — когда они есть в прогнозе."
+        else -> "Живое небо включено. Дождь, снег и иней на стекле появляются, когда они есть в прогнозе."
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = Palette.TextFaint,
+        modifier = Modifier.padding(top = 8.dp),
+    )
 }

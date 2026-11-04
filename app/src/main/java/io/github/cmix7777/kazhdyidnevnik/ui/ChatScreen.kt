@@ -1187,7 +1187,7 @@ private fun MessageBubble(
                             animate = writeNow,
                             maxWidth = maxWidth,
                             onWritten = onWritten,
-                        ) { Meta(message, row.tick, failed, Color(0x9926358C), zone, reactions) }
+                        ) { Meta(message, row.tick, failed, Color(0x9926358C), zone) }
                         else -> BigEmojiText(message.text, emojiCount, animate && System.currentTimeMillis() - message.at < 60_000L)
                     }
                     if (!message.hand) {
@@ -1197,7 +1197,7 @@ private fun MessageBubble(
                                 .clip(CircleShape)
                                 .background(Color.Black.copy(alpha = 0.32f))
                                 .padding(horizontal = 8.dp, vertical = 3.dp),
-                        ) { Meta(message, row.tick, failed, Color.White.copy(alpha = 0.85f), zone, reactions) }
+                        ) { Meta(message, row.tick, failed, Color.White.copy(alpha = 0.85f), zone) }
                     }
                 }
             } else {
@@ -1238,7 +1238,7 @@ private fun MessageBubble(
                                         .clip(CircleShape)
                                         .background(Color.Black.copy(alpha = 0.45f))
                                         .padding(horizontal = 8.dp, vertical = 3.dp),
-                                ) { Meta(message, row.tick, failed, Color.White, zone, reactions) }
+                                ) { Meta(message, row.tick, failed, Color.White, zone) }
                             }
                         }
                     }
@@ -1246,14 +1246,14 @@ private fun MessageBubble(
                     if (file != null) {
                         Column(horizontalAlignment = Alignment.End) {
                             FileBubble(file, mine = row.mine, accent = colors.theirAccent, onReady = onEnsureFiles)
-                            Box(modifier = Modifier.padding(end = 10.dp, bottom = 7.dp)) { Meta(message, row.tick, failed, metaColor, zone, reactions) }
+                            Box(modifier = Modifier.padding(end = 10.dp, bottom = 7.dp)) { Meta(message, row.tick, failed, metaColor, zone) }
                         }
                     }
                     val voice = message.voice
                     if (voice != null) {
                         Row(verticalAlignment = Alignment.Bottom) {
                             VoiceBubble(voice, mine = row.mine, accent = colors.theirAccent, onReady = onEnsureFiles)
-                            Box(modifier = Modifier.padding(end = 10.dp, bottom = 8.dp)) { Meta(message, row.tick, failed, metaColor, zone, reactions) }
+                            Box(modifier = Modifier.padding(end = 10.dp, bottom = 8.dp)) { Meta(message, row.tick, failed, metaColor, zone) }
                         }
                     }
                     if (message.deleted || message.text.isNotEmpty()) {
@@ -1263,7 +1263,7 @@ private fun MessageBubble(
                                 style = MaterialTheme.typography.bodyLarge.let { if (message.deleted) it.copy(fontStyle = FontStyle.Italic) else it },
                                 color = if (message.deleted) metaColor else textColor,
                                 modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
-                            ) { Meta(message, row.tick, failed, metaColor, zone, reactions) }
+                            ) { Meta(message, row.tick, failed, metaColor, zone) }
                             if (covered) {
                                 InkCover(
                                     cover = if (row.mine) colors.mineBottom else colors.theirBottom,
@@ -1284,6 +1284,17 @@ private fun MessageBubble(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                     )
                 }
+            }
+            // Реакции висят на нижнем краю пузыря, слева: не залезают в текст и не закрывают время.
+            if (reactions.isNotEmpty()) {
+                ReactionChip(
+                    reactions = reactions,
+                    border = if (row.mine) colors.mineTop else colors.theirBorder,
+                    modifier = Modifier
+                        .align(Alignment.Start)
+                        .padding(start = 10.dp)
+                        .offset(y = (-9).dp),
+                )
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 Row(
@@ -1403,6 +1414,33 @@ private fun BigEmojiText(text: String, count: Int, bounce: Boolean) {
                 scaleY = s
             },
     )
+}
+
+/** Реакции под пузырём: смайлики обоих; если оба поставили одинаковый — он один с цифрой 2. */
+@Composable
+private fun ReactionChip(reactions: List<String>, border: Color, modifier: Modifier = Modifier) {
+    val pop = remember { Animatable(0.4f) }
+    LaunchedEffect(reactions) {
+        pop.snapTo(0.6f)
+        pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 420f))
+    }
+    val same = reactions.size == 2 && reactions[0] == reactions[1]
+    Row(
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = pop.value
+                scaleY = pop.value
+            }
+            .clip(CircleShape)
+            .background(Palette.Background.copy(alpha = 0.96f))
+            .border(1.dp, border.copy(alpha = 0.55f), CircleShape)
+            .padding(horizontal = 7.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(text = if (same) reactions[0] else reactions.joinToString(""), fontSize = 14.sp)
+        if (same) Text(text = "2", style = MaterialTheme.typography.labelSmall, color = Palette.TextMuted)
+    }
 }
 
 /** Время, реакции и отметка «ушло / прочитано» в углу пузыря. */

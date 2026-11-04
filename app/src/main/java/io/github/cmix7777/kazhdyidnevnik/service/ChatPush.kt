@@ -94,9 +94,15 @@ object ChatPush {
             }
             FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
                 if (task.isSuccessful) {
+                    retries = 0
                     tokenChanged(app, task.result)
                 } else {
-                    settings.pushProblem = "Firebase не выдал токен: ${task.exception?.message ?: "нет Google Play или сети"}"
+                    val reason = task.exception?.message.orEmpty()
+                    // Токен уже есть и второй телефон его знает: неудачная проверка его не ломает, уведомления идут.
+                    if (settings.pushToken == null) {
+                        settings.pushProblem = explain(reason)
+                        retryLater(app)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -107,10 +113,39 @@ object ChatPush {
     fun tokenChanged(context: Context, token: String?) {
         if (token.isNullOrBlank()) return
         val settings = AppSettings(context)
+        // Ошибка прошлой попытки больше не правда, даже если токен тот же.
+        settings.pushProblem = ""
         if (settings.pushToken == token) return
         settings.pushToken = token
-        settings.pushProblem = ""
         ChatSync.pushChanged(context)
+    }
+
+    @Volatile private var retries = 0
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /** Повторить через 30 секунд, 2, 5, 10 и 20 минут, пока приложение живо. Потом — при следующем запуске. */
+    private fun retryLater(app: Context) {
+        val delays = longArrayOf(30_000, 120_000, 300_000, 600_000, 1_200_000)
+        val attempt = retries
+        if (attempt >= delays.size) return
+        retries = attempt + 1
+        handler.postDelayed({ init(app) }, delays[attempt])
+    }
+
+    /** Проверить ещё раз прямо сейчас (кнопка в настройках). */
+    fun retryNow(context: Context) {
+        retries = 0
+        init(context.applicationContext)
+    }
+
+    /** Почему нет токена, человеческими словами. */
+    private fun explain(reason: String): String = when {
+        "SERVICE_NOT_AVAILABLE" in reason || "TIMEOUT" in reason ->
+            "телефон не достучался до серверов уведомлений Google. Чаще всего мешает включённый VPN или слабая сеть. " +
+                "Выключи VPN и нажми «Проверить ещё раз», приложение и само попробует снова через пару минут."
+        "AUTHENTICATION_FAILED" in reason || "PHONE_REGISTRATION_ERROR" in reason ->
+            "Google Play на этом телефоне не пускает уведомления. Проверь, что вход в аккаунт Google есть и Google Play обновлён."
+        else -> "Firebase не выдал токен: ${reason.ifEmpty { "нет Google Play или сети" }}"
     }
 
     /** Отправить пуш через пересылку. */

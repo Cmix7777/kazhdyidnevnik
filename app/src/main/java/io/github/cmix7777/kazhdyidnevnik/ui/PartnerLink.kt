@@ -163,6 +163,7 @@ fun ChatPushCard(owner: Person) {
     val chat by ChatSync.state.collectAsState()
     var hook by remember { mutableStateOf(settings.pushHook) }
     var note by remember { mutableStateOf<String?>(null) }
+    var checked by remember { mutableStateOf(0) }
     var busy by remember { mutableStateOf(false) }
 
     GlassCard(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -172,13 +173,13 @@ fun ChatPushCard(owner: Person) {
             style = MaterialTheme.typography.bodyMedium,
             color = Palette.TextMuted,
         )
-        val problem = settings.pushProblem
+        val problem = remember(checked, hook) { settings.pushProblem }
         val status = when {
             !info.paired -> "Сначала свяжите телефоны (раздел выше)."
             hook == null -> "Когда приложение закрыто, новые сообщения проверяются примерно раз в 15 минут. Чтобы " +
                 "уведомления приходили сразу, один раз настрой бесплатную пересылку (кнопка «Как настроить») и вставь " +
                 "сюда ссылку на неё. Достаточно на одном телефоне, второй подхватит сам."
-            problem.isNotEmpty() -> "Мгновенные уведомления не работают: $problem"
+            problem.isNotEmpty() -> "Мгновенные уведомления пока не работают: $problem"
             settings.pushToken == null -> "Мгновенные уведомления включаются…"
             chat.theirPush == null -> "Мгновенные уведомления включены. У ${partner.genitive} они включатся сами, " +
                 "когда ${partner.shortName} откроет новую версию приложения."
@@ -210,6 +211,22 @@ fun ChatPushCard(owner: Person) {
                     }
                 },
             )
+            if (problem.isNotEmpty() && hook != null) {
+                GhostButton(
+                    text = "Проверить ещё раз",
+                    enabled = !busy,
+                    onClick = {
+                        busy = true
+                        ChatPush.retryNow(context)
+                        scope.launch {
+                            kotlinx.coroutines.delay(4_000)
+                            checked++
+                            busy = false
+                            note = if (settings.pushProblem.isEmpty()) "Получилось: уведомления включены." else "Пока не вышло. Если включён VPN, выключи его на минуту."
+                        }
+                    },
+                )
+            }
         }
         note?.let { Text(text = it, style = MaterialTheme.typography.bodySmall, color = Palette.Lavender) }
     }

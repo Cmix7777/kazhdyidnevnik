@@ -27,6 +27,10 @@ class ChatCheckWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
     override suspend fun doWork(): Result {
         runCatching { ChatSync.backgroundCheck(applicationContext) }
+        // Токена для мгновенных уведомлений ещё нет (не пустил VPN или сеть): пробуем снова.
+        runCatching {
+            if (AppSettings(applicationContext).pushToken == null) io.github.cmix7777.kazhdyidnevnik.service.ChatPush.init(applicationContext)
+        }
         return Result.success()
     }
 
