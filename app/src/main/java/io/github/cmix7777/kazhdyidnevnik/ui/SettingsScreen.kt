@@ -170,7 +170,7 @@ fun SettingsScreen(
                         ),
                     )
                 }
-                EffectsWhy()
+                EffectsWhy(extras.forecast, extras.weatherUpdatedMillis)
             }
         }
 
@@ -517,20 +517,34 @@ private fun ActionCard(text: String, button: String, onClick: () -> Unit, danger
     }
 }
 
-/** Почему на этом телефоне не видно живого неба и погоды: чтобы не гадать, когда у одного есть, а у другого нет. */
+/** Почему на этом телефоне не видно живого неба и погоды и что сейчас на стекле: чтобы не гадать, когда у одного есть, а у другого нет. */
 @Composable
-private fun EffectsWhy() {
+private fun EffectsWhy(forecast: io.github.cmix7777.kazhdyidnevnik.data.Forecast?, updatedMillis: Long) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val text = when {
+    val why = when {
         EffectsSettings.reduced -> "Живые эффекты выключены этим переключателем."
         EffectsSettings.systemAnimationsOff(context) ->
             "Анимации выключены в самом телефоне (специальные возможности, «Убрать анимацию» или экономия заряда), поэтому небо и погода не двигаются."
         !EffectsSettings.shadersSupported -> "На этом телефоне Android ниже 13: живое небо и погода на стекле не показываются."
-        !LocalDark.current -> "Живое небо с облаками и звёздами есть только в тёмной теме. Дождь, снег и иней на стекле — когда они есть в прогнозе."
-        else -> "Живое небо включено. Дождь, снег и иней на стекле появляются, когда они есть в прогнозе."
+        io.github.cmix7777.kazhdyidnevnik.ui.fx.SkyFx.glassBroken -> "Погода на стекле не заработала на этом телефоне: напиши об этом, разберёмся."
+        !LocalDark.current -> "Живое небо с облаками и звёздами есть только в тёмной теме."
+        else -> null
+    }
+    val glass = io.github.cmix7777.kazhdyidnevnik.data.GlassWeather.from(forecast, java.time.LocalDateTime.now())
+    val onGlass = when (glass.mode) {
+        io.github.cmix7777.kazhdyidnevnik.data.GlassMode.RAIN -> if (glass.strength < 0.5f) "морось" else "дождь"
+        io.github.cmix7777.kazhdyidnevnik.data.GlassMode.SNOW -> "снег"
+        io.github.cmix7777.kazhdyidnevnik.data.GlassMode.FROST -> "иней"
+        io.github.cmix7777.kazhdyidnevnik.data.GlassMode.NONE -> "ничего, осадков по прогнозу нет"
+    }
+    val updated = if (updatedMillis > 0) {
+        val t = java.time.Instant.ofEpochMilli(updatedMillis).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+        ", погода обновлена в %d:%02d".format(t.hour, t.minute)
+    } else {
+        ", погода ещё не загружалась"
     }
     Text(
-        text = text,
+        text = listOfNotNull(why, "Сейчас на стекле: $onGlass$updated.").joinToString(" "),
         style = MaterialTheme.typography.bodySmall,
         color = Palette.TextFaint,
         modifier = Modifier.padding(top = 8.dp),

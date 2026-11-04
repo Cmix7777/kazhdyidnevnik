@@ -113,10 +113,23 @@ data class GlassWeather(val mode: GlassMode, val strength: Float) {
 
         /** По погоде сейчас: дождь и морось, снег, мороз или ничего. Сила зависит от того, насколько сильные осадки. */
         fun from(forecast: Forecast?, now: LocalDateTime): GlassWeather {
-            val current = forecast?.current
+            // «Сейчас» из прогноза верно только, пока свежее: морось то начинается, то кончается,
+            // поэтому берём ещё и прогноз на этот час, и если осадки есть хоть там, хоть там — они на стекле.
+            val current = forecast?.current?.takeIf { kotlin.math.abs(java.time.Duration.between(it.time, now).toMinutes()) <= 30 }
             val hour = forecast?.hourAt(now)
-            val code = current?.code ?: hour?.code ?: return NONE
-            val temperature = current?.temperature ?: hour?.temperature
+            val byNow = current?.let { of(it.code, it.temperature) } ?: NONE
+            val byHour = hour?.let { of(it.code, it.temperature) } ?: NONE
+            return when {
+                byNow.mode == GlassMode.NONE -> byHour
+                byHour.mode == GlassMode.NONE -> byNow
+                byNow.mode == GlassMode.FROST && byHour.mode != GlassMode.FROST -> byHour
+                byHour.mode == GlassMode.FROST -> byNow
+                byHour.strength > byNow.strength -> byHour
+                else -> byNow
+            }
+        }
+
+        private fun of(code: Int, temperature: Double?): GlassWeather {
             return when (code) {
                 51, 53, 55, 56, 57 -> GlassWeather(GlassMode.RAIN, 0.35f)
                 61, 80, 66 -> GlassWeather(GlassMode.RAIN, 0.55f)

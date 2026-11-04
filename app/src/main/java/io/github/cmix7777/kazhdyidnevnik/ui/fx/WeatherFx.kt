@@ -97,7 +97,10 @@ private const val WIPE_FADE_MS = 3_000L
 private fun weatherGlassLayer(glass: GlassWeather, clock: () -> Float): Modifier {
     val shader = remember { runCatching { RuntimeShader(WEATHER_GLASS_AGSL) }.getOrNull() }
     var failed by remember { mutableStateOf(false) }
-    if (shader == null || failed) return Modifier
+    if (shader == null || failed) {
+        SideEffect { SkyFx.glassBroken = true }
+        return Modifier
+    }
     val density = LocalDensity.current.density
     val appear = remember(glass.mode) { Animatable(0f) }
     LaunchedEffect(glass.mode) { appear.animateTo(1f, tween(1500)) }
@@ -178,6 +181,9 @@ object SkyFx {
     var broken by mutableStateOf(false)
 
     val supported: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !broken
+
+    /** Погода на стекле не заработала на этом телефоне (шейдер не собрался). */
+    var glassBroken by mutableStateOf(false)
 
     /** Небо закрыто чем-то почти непрозрачным (совместная неделя): перерисовывать его незачем. */
     var covered by mutableStateOf(false)
