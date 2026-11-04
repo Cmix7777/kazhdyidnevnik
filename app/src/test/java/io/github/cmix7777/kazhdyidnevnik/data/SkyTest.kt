@@ -89,4 +89,19 @@ class SkyTest {
         assertEquals(78, forecast.current!!.cloudCover)
         assertEquals(listOf(70, 100), forecast.hours.map { it.cloudCover })
     }
+
+    @Test
+    fun drizzleShowsByHourWhenNowIsOld() {
+        val now = LocalDateTime.of(2026, 11, 4, 14, 10)
+        // Снимок «сейчас» двухчасовой давности без осадков, а на этот час по прогнозу морось — на стекле морось.
+        val forecast = Forecast(
+            current = CurrentWeather(time = now.minusHours(2), temperature = 4.0, feelsLike = 2.0, code = 3, wind = 1.0, gusts = 2.0, isDay = true),
+            hours = listOf(HourWeather(time = now.withMinute(0), temperature = 4.0, feelsLike = 2.0, precipitationChance = 70, precipitation = 0.2, code = 53, wind = 1.0, gusts = 2.0, isDay = true)),
+            days = emptyList(),
+        )
+        assertEquals(GlassMode.RAIN, GlassWeather.from(forecast, now).mode)
+        // Свежий снимок с моросью тоже даёт морось, даже если по часам её нет.
+        val fresh = forecast.copy(current = forecast.current!!.copy(time = now, code = 51), hours = emptyList())
+        assertEquals(GlassMode.RAIN, GlassWeather.from(fresh, now).mode)
+    }
 }

@@ -150,6 +150,11 @@ class ExtrasViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Обновить погоду, если она старше [maxAgeMs]: морось и дождь меняются быстро. */
+    fun refreshWeatherIfOld(maxAgeMs: Long = 30 * 60_000L) {
+        if (System.currentTimeMillis() - weatherUpdatedMillis > maxAgeMs) refreshWeather()
+    }
+
     fun refreshWeather() {
         if (weatherLoading) return
         weatherLoading = true

@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -95,6 +96,8 @@ fun TodayScreen(
     val forecast = extras.forecast
     // Погода на стекле: дождь, снег или мороз по прогнозу на сейчас.
     val glass = remember(forecast, now) { GlassWeather.from(forecast, now) }
+    // Пока приложение открыто, погода обновляется раз в полчаса, чтобы дождь на стекле был у обоих сразу.
+    LaunchedEffect(now.hour, now.minute / 10) { extras.refreshWeatherIfOld() }
     // Живая полоска дня: пока день идёт, видно, где ты сейчас и что дальше.
     val strip = DayStrip.build(todayItems, now.toLocalTime())
     // Одни часы на страницу для стекла и полоски: картинка обновляется один раз за тик.
