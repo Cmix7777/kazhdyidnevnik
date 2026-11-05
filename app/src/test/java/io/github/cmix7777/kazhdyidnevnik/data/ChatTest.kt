@@ -191,6 +191,26 @@ class ChatTest {
     }
 
     @Test
+    fun restartedNumberingLowersReadMarksSoNewMessagesAreNotReadAtOnce() {
+        // Здесь прочитано всё до 5-го, а второй телефон начал заново и прислал только 1-е и 2-е.
+        val state = ChatState(theirs = (1..5).map { theirs(it) }, readUpTo = 5, notifiedUpTo = 5, readSent = 5)
+        val head = ChatHead(from = "nastya", last = 2, messages = listOf(theirs(1, at = 900_000, text = "новое 1"), theirs(2, at = 900_500, text = "новое 2")))
+        val merge = ChatLogic.mergeTheirs(state, head, 7)
+        assertTrue(merge.restarted)
+        assertEquals(listOf("новое 1", "новое 2"), merge.state.theirs.map { it.text })
+        assertEquals(5, merge.state.earlier.size)
+        assertEquals(2L, merge.state.readUpTo)
+        assertEquals(2L, merge.state.notifiedUpTo)
+        assertEquals(-1L, merge.state.readSent)
+        // Следующее его сообщение — непрочитанное, о нём будет уведомление, и у него не будет «прочитано».
+        val next = ChatLogic.mergeTheirs(merge.state, head.copy(last = 3, messages = head.messages + theirs(3, at = 901_000)), 8)
+        assertFalse(next.restarted)
+        assertEquals(1, ChatLogic.unread(next.state))
+        assertEquals(listOf(3L), ChatLogic.toNotify(next.state).map { it.seq })
+        assertEquals(ChatTick.SENT, ChatLogic.tick(ChatState(mine = listOf(mine(3)), uploaded = 3, theirRead = 2), mine(3), true))
+    }
+
+    @Test
     fun unreadAndNotificationsCountOnlyNewMessagesOfTheOther() {
         val state = ChatState(
             mine = listOf(mine(1)),
