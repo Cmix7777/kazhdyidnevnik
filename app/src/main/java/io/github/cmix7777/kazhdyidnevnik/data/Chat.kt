@@ -501,12 +501,36 @@ object ChatLogic {
         )
     }
 
-    /** Итог чтения головы второго человека. [missingFrom] — с какого номера нужен архив (сообщения пропущены). */
-    data class Merge(val state: ChatState, val missingFrom: Long?)
+    /**
+     * Итог чтения головы второго человека. [missingFrom] — с какого номера нужен архив (сообщения пропущены).
+     * [restarted] — второй телефон начал нумерацию заново, отметки «прочитано» опущены.
+     */
+    data class Merge(val state: ChatState, val missingFrom: Long?, val restarted: Boolean = false)
+
+    /**
+     * Второй телефон начал нумерацию заново (переустановка, сброс): его голова кончается раньше, чем то, что уже есть.
+     * Сообщения с большими номерами — из прежней нумерации, они уходят в «раньше». Отметки «прочитано»
+     * опускаются до его последнего номера: иначе каждое новое сообщение сразу считалось бы прочитанным,
+     * у него стояло бы «прочитано», а здесь не было бы ни уведомления, ни счётчика.
+     */
+    private fun afterRestart(state: ChatState, head: ChatHead): ChatState? {
+        if (head.last >= lastSeq(state.theirs)) return null
+        val stale = state.theirs.filter { it.seq > head.last }
+        return state.copy(
+            theirs = state.theirs.filter { it.seq <= head.last },
+            earlier = (state.earlier + stale.filter { !it.deleted }).distinctBy { Triple(it.from, it.seq, it.at) }.sortedBy { it.at },
+            readUpTo = minOf(state.readUpTo, head.last),
+            notifiedUpTo = minOf(state.notifiedUpTo, head.last),
+            // Опущенную отметку надо отправить заново, даже если она меньше уже отправленной.
+            readSent = -1,
+        )
+    }
 
     fun mergeTheirs(state: ChatState, head: ChatHead, version: Long): Merge {
-        val known = lastSeq(state.theirs)
-        val merged = mergeMessages(state, head.from, head.messages)
+        val reset = afterRestart(state, head)
+        val base = reset ?: state
+        val known = lastSeq(base.theirs)
+        val merged = mergeMessages(base, head.from, head.messages)
         val withDeletes = head.deletedInPages.toSet().let { gone ->
             if (gone.isEmpty()) merged else merged.copy(theirs = merged.theirs.map { if (it.seq in gone && !it.deleted) it.asDeleted() else it })
         }
@@ -520,6 +544,7 @@ object ChatLogic {
                 theirFont = head.font ?: state.theirFont,
             ),
             missing,
+            restarted = reset != null,
         )
     }
 

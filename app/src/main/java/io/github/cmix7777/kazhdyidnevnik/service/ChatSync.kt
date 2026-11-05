@@ -395,9 +395,21 @@ object ChatSync {
         scope.launch { if (!upload(app)) ChatSendWorker.enqueue(app) }
     }
 
-    /** Отметить всё полученное прочитанным (экран переписки открыт). */
+    /**
+     * Переписка правда перед глазами: экран открыт, телефон не погас и не заблокирован.
+     * Только тогда пришедшее считается прочитанным.
+     */
+    private fun seen(app: Context): Boolean {
+        if (!visible) return false
+        val awake = runCatching { app.getSystemService(android.os.PowerManager::class.java)?.isInteractive }.getOrNull() ?: true
+        val locked = runCatching { app.getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked }.getOrNull() ?: false
+        return awake && !locked
+    }
+
+    /** Отметить всё полученное прочитанным (экран переписки открыт и на виду). */
     fun markRead(context: Context) {
         val app = context.applicationContext
+        if (!seen(app)) return
         val last = ChatLogic.lastSeq(state.value.theirs)
         if (last > state.value.readUpTo) {
             update { it.copy(readUpTo = maxOf(it.readUpTo, last), notifiedUpTo = maxOf(it.notifiedUpTo, last)) }
@@ -543,7 +555,7 @@ object ChatSync {
                 }
             }
             update {
-                it.copy(
+                val next = it.copy(
                     theirs = merged.theirs,
                     earlier = merged.earlier,
                     theirVersion = merged.theirVersion,
@@ -551,6 +563,11 @@ object ChatSync {
                     theirHook = merged.theirHook,
                     theirReactions = merged.theirReactions,
                     theirFont = merged.theirFont,
+                )
+                if (!merge.restarted) next else next.copy(
+                    readUpTo = minOf(it.readUpTo, merged.readUpTo),
+                    notifiedUpTo = minOf(it.notifiedUpTo, merged.notifiedUpTo),
+                    readSent = -1,
                 )
             }
             if (ChatLogic.lastSeq(merged.theirs) > before) {
@@ -562,7 +579,8 @@ object ChatSync {
             val hook = merged.theirHook
             if (settings.pushHook == null && hook != null) scope.launch { ChatPush.adopt(app, hook) }
         }
-        update { it.copy(theirRead = maxOf(it.theirRead, mark.read)) }
+        // Отметка второго телефона как есть: после сброса нумерации она может стать меньше, и это правда.
+        if (mark.read != state.value.theirRead) update { it.copy(theirRead = mark.read) }
         observeTyping(mark.typing)
         afterArrival(app, owner)
     }
@@ -584,7 +602,7 @@ object ChatSync {
 
     private fun afterArrival(app: Context, owner: Person) {
         val current = state.value
-        if (visible) {
+        if (seen(app)) {
             val last = ChatLogic.lastSeq(current.theirs)
             if (last > current.readUpTo) {
                 update { it.copy(readUpTo = maxOf(it.readUpTo, last), notifiedUpTo = maxOf(it.notifiedUpTo, last)) }
