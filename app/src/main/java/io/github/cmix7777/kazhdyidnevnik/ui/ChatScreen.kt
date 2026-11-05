@@ -565,7 +565,7 @@ fun ChatScreen(
     val dust = remember { DustState() }
     var rootOffset by remember { mutableStateOf(Offset.Zero) }
     val prefs = remember { context.getSharedPreferences("chat-ui", Context.MODE_PRIVATE) }
-    var zoom by remember { mutableFloatStateOf(prefs.getFloat("zoom", 1f).coerceIn(0.7f, 1.7f)) }
+    var zoom by remember { mutableFloatStateOf(prefs.getFloat("zoom", 1f).let { if (it.isFinite()) it.coerceIn(0.7f, 1.7f) else 1f }) }
     var zoomShown by remember { mutableStateOf(false) }
     var panel by rememberSaveable { mutableStateOf(false) }
     val written = remember { HashSet<String>() }
@@ -686,7 +686,7 @@ fun ChatScreen(
                     .fillMaxWidth()
                     .pinchZoom(
                         onZoom = { z ->
-                            zoom = (zoom * z).coerceIn(0.7f, 1.7f)
+                            if (z.isFinite() && z > 0f) zoom = (zoom * z).coerceIn(0.7f, 1.7f)
                             zoomShown = true
                         },
                         onEnd = { prefs.edit().putFloat("zoom", zoom).apply() },

@@ -208,8 +208,9 @@ enum class ChatTick { NONE, PENDING, SENT, READ }
 sealed interface ChatRow {
     val key: String
 
-    data class Day(val date: LocalDate) : ChatRow {
-        override val key: String get() = "day-$date"
+    /** [tag] отличает повтор того же дня (прежняя переписка и нынешняя), чтобы ключи строк не совпадали. */
+    data class Day(val date: LocalDate, val tag: String = "") : ChatRow {
+        override val key: String get() = "day-$date$tag"
     }
 
     data class Message(
@@ -535,16 +536,24 @@ object ChatLogic {
                 old == null -> message
                 old.deleted || message.deleted -> message.asDeleted().copy(at = old.at)
                 // Тот же номер, но другое сообщение: второй телефон начал переписку заново. Прежнее не теряем.
+                // Остаётся более новое: старая страница архива не должна вытеснять свежее сообщение из головы
+                // (иначе они менялись бы местами при каждой сверке и копились в «раньше»).
                 old.at != message.at -> {
-                    moved += old
-                    message
+                    if (message.at >= old.at) {
+                        moved += old
+                        message
+                    } else {
+                        moved += message
+                        old
+                    }
                 }
                 else -> message
             }
         }
+        if (moved.isEmpty()) return state.copy(theirs = bySeq.values.sortedBy { it.seq })
         return state.copy(
             theirs = bySeq.values.sortedBy { it.seq },
-            earlier = if (moved.isEmpty()) state.earlier else (state.earlier + moved).sortedBy { it.at },
+            earlier = (state.earlier + moved).distinctBy { Triple(it.from, it.seq, it.at) }.sortedBy { it.at },
         )
     }
 
@@ -638,21 +647,28 @@ object ChatLogic {
     fun rows(state: ChatState, me: Person, zone: ZoneId = ZoneId.systemDefault()): List<ChatRow> {
         data class Item(val message: ChatMessage, val mine: Boolean, val earlier: Boolean)
         // Удалённые сообщения исчезают совсем, как будто их и не было.
+        // Одно и то же сообщение дважды (в прежних версиях оно могло попасть в «раньше» не один раз) — показываем однажды.
         val items = buildList {
             state.earlier.forEach { if (!it.deleted) add(Item(it, it.from == me.id, true)) }
             state.mine.forEach { if (!it.deleted) add(Item(it, true, false)) }
             state.theirs.forEach { if (!it.deleted) add(Item(it, false, false)) }
-        }.sortedWith(compareBy<Item>({ !it.earlier }, { it.message.at }, { it.message.from }, { it.message.seq }))
+        }.distinctBy { Triple(it.earlier, it.message.key, it.message.at) }
+            .sortedWith(compareBy<Item>({ !it.earlier }, { it.message.at }, { it.message.from }, { it.message.seq }))
         val byKey = HashMap<String, ChatMessage>(state.mine.size + state.theirs.size)
         state.mine.forEach { if (!it.deleted) byKey[it.key] = it }
         state.theirs.forEach { if (!it.deleted) byKey[it.key] = it }
 
         val out = ArrayList<ChatRow>(items.size + 16)
+        // Ключи строк обязаны быть разными, иначе список падает при открытии переписки.
+        val usedDays = HashMap<String, Int>()
         var previousDay: LocalDate? = null
         items.forEachIndexed { index, item ->
             val day = Instant.ofEpochMilli(item.message.at).atZone(zone).toLocalDate()
             if (day != previousDay) {
-                out += ChatRow.Day(day)
+                val base = (if (item.earlier) "-old" else "")
+                val seen = usedDays.getOrDefault("$day$base", 0)
+                usedDays["$day$base"] = seen + 1
+                out += ChatRow.Day(day, base + (if (seen > 0) "-$seen" else ""))
                 previousDay = day
             }
             val before = items.getOrNull(index - 1)

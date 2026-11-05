@@ -24,11 +24,31 @@ object CrashLog {
                     appendLine("Каждыйдневник ${BuildConfig.VERSION_NAME}, Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), ${Build.MANUFACTURER} ${Build.MODEL}")
                     appendLine("Когда: ${LocalDateTime.now().withNano(0)}")
                     appendLine("Поток: ${thread.name}")
+                    append(short(error))
+                    appendLine()
+                    appendLine("--- полностью ---")
                     append(Log.getStackTraceString(error))
                 }
                 File(app.filesDir, FILE).writeText(text.take(30_000))
             }
             previous?.uncaughtException(thread, error)
+        }
+    }
+
+    /**
+     * Главное коротко, чтобы влезло в сообщение: сама ошибка, её причины и только строчки из кода приложения
+     * (плюс по три первых строки каждой ошибки). Полный текст идёт ниже.
+     */
+    private fun short(error: Throwable): String = buildString {
+        var current: Throwable? = error
+        var depth = 0
+        while (current != null && depth < 6) {
+            appendLine((if (depth == 0) "" else "Причина: ") + current.javaClass.name + ": " + current.message.orEmpty().take(400))
+            current.stackTrace.forEachIndexed { index, frame ->
+                if (index < 3 || frame.className.startsWith("io.github.cmix7777")) appendLine("  at $frame")
+            }
+            current = current.cause?.takeIf { it !== current }
+            depth++
         }
     }
 
