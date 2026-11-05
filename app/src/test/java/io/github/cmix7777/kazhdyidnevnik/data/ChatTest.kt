@@ -273,6 +273,36 @@ class ChatTest {
     }
 
     @Test
+    fun rowKeysStayUniqueWhenEarlierChatOverlapsDays() {
+        val day1 = ZonedDateTime.of(2026, 11, 1, 12, 0, 0, 0, zone).toInstant().toEpochMilli()
+        val day2 = day1 + 86_400_000
+        // «Раньше» заканчивается вторым днём, а нынешняя переписка начинается с первого — и то же сообщение там дважды.
+        val old = theirs(7, at = day2)
+        val state = ChatState(
+            earlier = listOf(theirs(5, at = day1), old, old),
+            mine = listOf(mine(1, at = day1 + 1000), mine(2, at = day2 + 1000)),
+            theirs = listOf(theirs(1, at = day2 + 2000)),
+        )
+        val rows = ChatLogic.rows(state, aizat, zone)
+        assertEquals(rows.size, rows.map { it.key }.toSet().size)
+        assertEquals(1, rows.count { it is ChatRow.Message && it.earlier && it.message.seq == 7L })
+    }
+
+    @Test
+    fun oldArchivePageDoesNotPushOutFreshMessage() {
+        val fresh = theirs(1, at = 999_999, text = "заново")
+        val stale = theirs(1, at = 1000, text = "давнее")
+        var state = ChatState(theirs = listOf(fresh))
+        // Голова и старая страница спорят о номере 1 при каждой сверке: свежее остаётся, давнее одно в «раньше».
+        repeat(3) {
+            state = ChatLogic.mergeTheirsPage(state, ChatPage(from = "nastya", index = 0, messages = listOf(stale)))
+            state = ChatLogic.mergeTheirs(state, ChatHead(from = "nastya", last = 1, messages = listOf(fresh)), it.toLong()).state
+        }
+        assertEquals("заново", state.theirs.single().text)
+        assertEquals(listOf("давнее"), state.earlier.map { it.text })
+    }
+
+    @Test
     fun previewFitsIntoAPushAndPhotosAreNamed() {
         val preview = ChatLogic.preview(ChatMessage("aizat", 3, 10, "щ".repeat(3000)))
         assertTrue(preview.text.toByteArray(Charsets.UTF_8).size <= 1503)

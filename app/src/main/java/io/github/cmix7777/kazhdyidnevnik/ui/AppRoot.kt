@@ -23,6 +23,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -58,6 +61,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -157,20 +161,32 @@ private fun CrashReportDialog() {
         onDismissRequest = close,
         title = { Text("Приложение вылетело") },
         text = {
-            Text(
-                "В прошлый раз Каждыйдневник закрылся с ошибкой. Скопируй отчёт и пришли его в чат с Claude: " +
-                    "по нему видно, где именно сломалось. Сам отчёт никуда не отправляется.",
-            )
+            androidx.compose.foundation.layout.Column {
+                Text(
+                    "В прошлый раз Каждыйдневник закрылся с ошибкой. Скопируй отчёт и пришли его в чат с Claude " +
+                        "(или просто скриншот этого окна): по нему видно, где именно сломалось. Сам отчёт никуда не отправляется.",
+                )
+                // Главное из отчёта видно сразу, чтобы хватило и скриншота.
+                Text(
+                    text = text.lineSequence().takeWhile { !it.startsWith("---") }.take(24).joinToString("\n"),
+                    fontSize = 11.sp,
+                    lineHeight = 13.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                    modifier = Modifier
+                        .padding(top = 10.dp)
+                        .heightIn(max = 260.dp)
+                        .verticalScroll(rememberScrollState()),
+                )
+            }
         },
         confirmButton = {
             androidx.compose.material3.TextButton(onClick = {
                 context.getSystemService(android.content.ClipboardManager::class.java)
                     ?.setPrimaryClip(android.content.ClipData.newPlainText("Отчёт о вылете", text))
-                android.widget.Toast.makeText(context, "Отчёт скопирован", android.widget.Toast.LENGTH_SHORT).show()
-                close()
-            }) { Text("Скопировать отчёт") }
+                android.widget.Toast.makeText(context, "Отчёт скопирован, окно закроет «Готово»", android.widget.Toast.LENGTH_SHORT).show()
+            }) { Text("Скопировать") }
         },
-        dismissButton = { androidx.compose.material3.TextButton(onClick = close) { Text("Закрыть") } },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = close) { Text("Готово") } },
     )
 }
 
