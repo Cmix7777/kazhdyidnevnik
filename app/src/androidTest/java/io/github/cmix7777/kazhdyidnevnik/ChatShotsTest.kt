@@ -23,6 +23,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.cmix7777.kazhdyidnevnik.data.ChatLogic
 import io.github.cmix7777.kazhdyidnevnik.data.ChatMessage
 import io.github.cmix7777.kazhdyidnevnik.data.ChatPhoto
+import io.github.cmix7777.kazhdyidnevnik.data.ChatFile
+import io.github.cmix7777.kazhdyidnevnik.data.ChatCircle
+import io.github.cmix7777.kazhdyidnevnik.data.ChatSticker
 import io.github.cmix7777.kazhdyidnevnik.data.ChatVoice
 import io.github.cmix7777.kazhdyidnevnik.data.ChatState
 import io.github.cmix7777.kazhdyidnevnik.data.Person
@@ -250,5 +253,58 @@ class ChatShotsTest {
         compose.onNodeWithTag("chat-send").performClick()
         compose.mainClock.advanceTimeBy(2600)
         save("chat_11_sunrise")
+    }
+
+    @Test
+    fun nightEffect() {
+        compose.setContent { Screen(Person.AIZAT, dark = true, state = sample(Person.AIZAT), initialText = "Спокойной ночи") }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("chat-send").performClick()
+        compose.mainClock.advanceTimeBy(1500)
+        save("chat_12_night")
+    }
+
+    @Test
+    fun fireEffect() {
+        compose.setContent { Screen(Person.NASTYA, dark = true, state = sample(Person.NASTYA), initialText = "Ура, сдала!") }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("chat-send").performClick()
+        compose.mainClock.advanceTimeBy(1200)
+        save("chat_13_fire")
+    }
+
+    /** Всё сразу и с обеих сторон: так переписка выглядит у того, кому всё это прислали. Не должна падать. */
+    @Test
+    fun everythingFromBothSides() {
+        val owner = Person.AIZAT
+        val me = owner.id
+        val other = owner.partner.id
+        val now = System.currentTimeMillis()
+        val mine = listOf(
+            ChatMessage(me, 1, now - 600_000, "Записка со смайликом \u2764\uFE0F и\nпереносом", hand = true),
+            ChatMessage(me, 2, now - 590_000, "", sticker = ChatSticker("s-mine")),
+            ChatMessage(me, 3, now - 580_000, "\uD83D\uDC4D"),
+        )
+        val theirs = listOf(
+            ChatMessage(other, 1, now - 500_000, "Её записка", hand = true),
+            ChatMessage(other, 2, now - 490_000, "", sticker = ChatSticker("s-her")),
+            ChatMessage(other, 3, now - 480_000, "", voice = ChatVoice("v-her", 8_000, 1, "")),
+            ChatMessage(other, 4, now - 470_000, "", circle = ChatCircle("c-her", 6_000, 2)),
+            ChatMessage(other, 5, now - 460_000, "", file = ChatFile("f-her", "отчёт по практике.pdf", 1_400_000, "application/pdf", 7)),
+            ChatMessage(other, 6, now - 450_000, "Секрет для тебя", secret = true),
+            ChatMessage(other, 7, now - 5_000, "Ура, получилось!", effect = "fire"),
+        )
+        val state = ChatState(
+            pair = "x", mine = mine, theirs = theirs, restored = true, uploaded = 3, theirRead = 3, readUpTo = 7,
+            myReactions = mapOf("$other:7" to "\u2764\uFE0F", "$other:2" to "\uD83D\uDD25"),
+            theirReactions = mapOf("$other:7" to "\u2764\uFE0F", "$me:3" to "\uD83D\uDE02"),
+        )
+        compose.setContent { Screen(owner, dark = true, state = state) }
+        compose.mainClock.advanceTimeBy(1200)
+        save("chat_14_everything")
+        compose.mainClock.advanceTimeBy(4000)
+        compose.waitForIdle()
     }
 }
