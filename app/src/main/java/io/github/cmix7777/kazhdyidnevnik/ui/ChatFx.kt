@@ -543,7 +543,10 @@ internal class WordFxState {
     /** Один кадр: новые эффекты появляются, у остальных идёт время, закончившиеся убираются. */
     internal fun advance(dt: Float, dp: Float) {
         if (width > 0f) spawn(width, height, dp)
-        for (effect in items) if (!effect.done && !effect.update(dt)) effect.done = true
+        for (effect in items) {
+            if (effect.done) continue
+            if (!runCatching { effect.update(dt) }.getOrDefault(false)) effect.done = true
+        }
         if (items.removeAll { it.done }) count = items.size + pending.size
     }
 }
@@ -573,7 +576,14 @@ internal fun WordFxLayer(state: WordFxState, modifier: Modifier = Modifier) {
             },
     ) {
         state.tick
-        for (effect in state.items) if (!effect.done) effect.draw(this)
+        for (effect in state.items) {
+            if (effect.done) continue
+            try {
+                effect.draw(this)
+            } catch (e: RuntimeException) {
+                effect.done = true
+            }
+        }
     }
 }
 

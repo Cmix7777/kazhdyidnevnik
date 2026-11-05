@@ -361,7 +361,7 @@ private fun GlyphThumb(glyph: HandGlyph, modifier: Modifier) {
 
 /** Буква или запасной знак в записке: где стоит и как чуть повёрнута (каждый раз немного иначе). */
 private class NoteItem(
-    val ch: Char,
+    val ch: String,
     val glyph: HandGlyph?,
     val x: Float,
     val line: Int,
@@ -397,10 +397,26 @@ internal fun HandNote(
     val layout = remember(text, font, seed, maxW) {
         val random = Random(seed)
         val gap = 0.2f * xh
-        fun advance(ch: Char): Float {
-            val g = HandFonts.glyph(font, ch)
-            if (g != null) return g.width * (if (ch.isUpperCase()) 1.3f else 1f) * xh + gap
-            return measurer.measure(AnnotatedString(ch.toString()), fallbackStyle).size.width + 0.06f * xh
+        fun glyphOf(token: String): HandGlyph? = if (token.length == 1) HandFonts.glyph(font, token[0]) else null
+        fun upper(token: String): Boolean = token.length == 1 && token[0].isUpperCase()
+        fun advance(token: String): Float {
+            val g = glyphOf(token)
+            if (g != null) return g.width * (if (upper(token)) 1.3f else 1f) * xh + gap
+            return measurer.measure(AnnotatedString(token), fallbackStyle).size.width + 0.06f * xh
+        }
+        // Текст делится на настоящие знаки (смайлик из нескольких кодов — один знак), а не на половинки символов.
+        fun tokens(word: String): List<String> {
+            val out = ArrayList<String>()
+            val it = android.icu.text.BreakIterator.getCharacterInstance()
+            it.setText(word)
+            var start = it.first()
+            var end = it.next()
+            while (end != android.icu.text.BreakIterator.DONE) {
+                out += word.substring(start, end)
+                start = end
+                end = it.next()
+            }
+            return out
         }
         val items = ArrayList<NoteItem>()
         var x = 0f
@@ -419,14 +435,15 @@ internal fun HandNote(
                 t += 110f
                 continue
             }
-            val width = word.sumOf { advance(it).toDouble() }.toFloat()
+            val parts = tokens(word)
+            val width = parts.sumOf { advance(it).toDouble() }.toFloat()
             if (x > 0f && x + width > maxW) {
                 line++
                 x = 0f
             }
-            for (ch in word) {
-                val g = HandFonts.glyph(font, ch)
-                val scale = (if (ch.isUpperCase() && g != null) 1.3f else 1f) * (0.94f + random.nextFloat() * 0.12f)
+            for (ch in parts) {
+                val g = glyphOf(ch)
+                val scale = (if (upper(ch) && g != null) 1.3f else 1f) * (0.94f + random.nextFloat() * 0.12f)
                 items += NoteItem(ch, g, x, line, scale, (random.nextFloat() - 0.5f) * 0.1f, (random.nextFloat() - 0.5f) * 0.1f * xh, random.nextFloat() * 6.28f, t)
                 x += advance(ch)
                 maxX = max(maxX, x)
@@ -492,7 +509,7 @@ internal fun HandNote(
                     if (g == null) {
                         translate(item.x + 1f, oy) {
                             rotate(item.rotation * 34f, pivot = Offset.Zero) {
-                                val measured = measurer.measure(AnnotatedString(item.ch.toString()), fallbackStyle)
+                                val measured = measurer.measure(AnnotatedString(item.ch), fallbackStyle)
                                 drawText(measured, topLeft = Offset(0f, -measured.firstBaseline))
                             }
                         }

@@ -140,6 +140,38 @@ fun AppRoot(
     } else {
         MainPager(vm, extras, diary, owner)
     }
+    CrashReportDialog()
+}
+
+/** Приложение в прошлый раз вылетело: предложить скопировать отчёт и прислать его. */
+@Composable
+private fun CrashReportDialog() {
+    val context = LocalContext.current
+    var report by remember { mutableStateOf(io.github.cmix7777.kazhdyidnevnik.service.CrashLog.read(context)) }
+    val text = report ?: return
+    val close = {
+        io.github.cmix7777.kazhdyidnevnik.service.CrashLog.clear(context)
+        report = null
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Приложение вылетело") },
+        text = {
+            Text(
+                "В прошлый раз Каждыйдневник закрылся с ошибкой. Скопируй отчёт и пришли его в чат с Claude: " +
+                    "по нему видно, где именно сломалось. Сам отчёт никуда не отправляется.",
+            )
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = {
+                context.getSystemService(android.content.ClipboardManager::class.java)
+                    ?.setPrimaryClip(android.content.ClipData.newPlainText("Отчёт о вылете", text))
+                android.widget.Toast.makeText(context, "Отчёт скопирован", android.widget.Toast.LENGTH_SHORT).show()
+                close()
+            }) { Text("Скопировать отчёт") }
+        },
+        dismissButton = { androidx.compose.material3.TextButton(onClick = close) { Text("Закрыть") } },
+    )
 }
 
 /** Две страницы: Айзат слева, Настя справа. Открывается страница владельца телефона. */
