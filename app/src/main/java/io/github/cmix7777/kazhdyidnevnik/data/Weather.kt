@@ -77,6 +77,19 @@ data class Forecast(
     }
 }
 
+/**
+ * Время прогноза. open-meteo отдаёт часы по Ижевску (Europe/Samara), а телефон может жить в другом поясе
+ * (например, по сети встал на московское время). Тогда «сейчас» телефона и часы прогноза расходились
+ * на час: снег, который идёт сейчас, отбрасывался как устаревший, и на этом телефоне его не было.
+ */
+object WeatherClock {
+    val ZONE: java.time.ZoneId = java.time.ZoneId.of("Europe/Samara")
+
+    /** Время телефона [now] в его поясе [phone] — то же мгновение по часам прогноза. */
+    fun toForecastTime(now: LocalDateTime, phone: java.time.ZoneId = java.time.ZoneId.systemDefault()): LocalDateTime =
+        if (phone.rules == ZONE.rules) now else now.atZone(phone).withZoneSameInstant(ZONE).toLocalDateTime()
+}
+
 /** Разбирает ответ open-meteo.com. */
 object WeatherParser {
 

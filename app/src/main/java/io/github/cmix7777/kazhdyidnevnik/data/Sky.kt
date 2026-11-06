@@ -89,7 +89,7 @@ data class SkyState(
     companion object {
         fun at(now: LocalDateTime, forecast: Forecast?): SkyState {
             val (rise, set) = Astronomy.sun(now.toLocalDate()) ?: (7.0 to 18.0)
-            val cover = forecast?.current?.cloudCover ?: forecast?.hourAt(now)?.cloudCover
+            val cover = forecast?.current?.cloudCover ?: forecast?.hourAt(WeatherClock.toForecastTime(now))?.cloudCover
             return SkyState(
                 hour = Astronomy.hours(now.toLocalTime()),
                 sunrise = rise,
@@ -112,7 +112,9 @@ data class GlassWeather(val mode: GlassMode, val strength: Float) {
         const val FROST_FROM = -8.0
 
         /** По погоде сейчас: дождь и морось, снег, мороз или ничего. Сила зависит от того, насколько сильные осадки. */
-        fun from(forecast: Forecast?, now: LocalDateTime): GlassWeather {
+        fun from(forecast: Forecast?, phoneNow: LocalDateTime, phoneZone: java.time.ZoneId = java.time.ZoneId.systemDefault()): GlassWeather {
+            // Сравниваем с прогнозом по его часам (Ижевск), а не по поясу телефона.
+            val now = WeatherClock.toForecastTime(phoneNow, phoneZone)
             // «Сейчас» из прогноза верно только, пока свежее: морось то начинается, то кончается,
             // поэтому берём ещё и прогноз на этот час, и если осадки есть хоть там, хоть там — они на стекле.
             val current = forecast?.current?.takeIf { kotlin.math.abs(java.time.Duration.between(it.time, now).toMinutes()) <= 30 }

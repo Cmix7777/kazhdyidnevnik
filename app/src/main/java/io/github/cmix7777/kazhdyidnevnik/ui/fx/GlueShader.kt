@@ -6,7 +6,7 @@ package io.github.cmix7777.kazhdyidnevnik.ui.fx
  * карточками вырастает перемычка, как между каплями. Формулы и числа те же, что в демо.
  * Все координаты в пикселях, начало в левом верхнем углу.
  */
-internal const val GLUE_AGSL = """
+internal const val GLUE_AGSL = SSTEP_AGSL + """
 uniform float uDpr;
 uniform float uTime;
 uniform float uK;
@@ -55,10 +55,10 @@ half4 main(float2 p) {
 
     float dOut = max(d, 0.0);
     float glowA = (0.40 * exp(-dOut / (30.0 * uDpr)) + bridge * 0.45 * exp(-dOut / (10.0 * uDpr))) * uGlow;
-    float cov = 1.0 - smoothstep(-0.9 * uDpr, 0.9 * uDpr, d);
+    float cov = 1.0 - sstep(-0.9 * uDpr, 0.9 * uDpr, d);
     float din = max(-d, 0.0);
     float3 fill = glass + edge * 0.20 * exp(-din / (16.0 * uDpr)) + edge * bridge * 0.55 * exp(-din / (34.0 * uDpr));
-    float rim = 1.0 - smoothstep(0.0, 1.4 * uDpr, abs(d));
+    float rim = 1.0 - sstep(0.0, 1.4 * uDpr, abs(d));
     float shimmer = 0.85 + 0.15 * sin(uTime * 1.3 + p.x * 0.010 / uDpr + p.y * 0.006 / uDpr);
 
     float3 col = mix(edge, fill, cov) + (edge * 0.9 * shimmer + float3(0.08)) * rim;

@@ -109,7 +109,7 @@ fun WeatherCard(
     }
 
     val current = forecast.current?.takeIf { it.time.toLocalDate() == date }
-    val nowHour = forecast.hourAt(now)
+    val nowHour = forecast.hourAt(io.github.cmix7777.kazhdyidnevnik.data.WeatherClock.toForecastTime(now))
     val temperature = current?.temperature ?: nowHour?.temperature ?: day.max
     val feels = current?.feelsLike ?: nowHour?.feelsLike
     val code = current?.code ?: nowHour?.code ?: day.code
@@ -166,7 +166,7 @@ fun WeatherCard(
         }
 
         // По часам.
-        val hours = forecast.hoursFrom(now, 12)
+        val hours = forecast.hoursFrom(io.github.cmix7777.kazhdyidnevnik.data.WeatherClock.toForecastTime(now), 12)
         if (hours.isNotEmpty()) {
             HourlyStrip(hours)
         }

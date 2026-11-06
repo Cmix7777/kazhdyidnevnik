@@ -1,5 +1,23 @@
 package io.github.cmix7777.kazhdyidnevnik.ui.fx
 
+/**
+ * smoothstep, который одинаково считается на всех телефонах. Встроенный smoothstep по стандарту
+ * не определён, если первый край больше второго, а в эффектах так написано часто («от радиуса до
+ * пятой части радиуса», «от 0,55 до 0»). Большинство видеокарт всё равно считают как надо, но на
+ * некоторых такой smoothstep даёт ноль: снежинки, капли, звёзды и узоры инея просто не рисуются.
+ * Поэтому все эффекты пользуются этой формулой: при любом порядке краёв результат один и тот же.
+ */
+internal const val SSTEP_AGSL = """
+float sstep(float a, float b, float x) {
+    float w = b - a;
+    if (abs(w) < 0.000001) {
+        return 0.0;
+    }
+    float t = clamp((x - a) / w, 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
+"""
+
 internal const val NOISE = """
 float h21(float2 p) {
     p = fract(p * float2(123.34, 456.21));
@@ -36,7 +54,7 @@ float fbm(float2 p) {
  * дождь (капли преломляют то, что под ними, стекло чуть запотевает), снег, мороз по краям с оттаиванием
  * под пальцем. Цвета на входе и выходе с учётом прозрачности: между карточками фон экрана прозрачный.
  */
-internal const val WEATHER_GLASS_AGSL = """
+internal const val WEATHER_GLASS_AGSL = SSTEP_AGSL + """
 uniform shader content;
 uniform float2 uSize;
 uniform float uDp;
@@ -68,12 +86,13 @@ float snowLayer(float2 q, float t, float sc, float sp, float sz, float density) 
     float2 g = q / sc;
     g.y -= t * sp;
     g.x += sin(g.y * 0.6 + t * 0.4) * 0.35;
-    float2 id = floor(g);
+    // Номер клетки не растёт со временем бесконечно: на больших числах хэш на части видеокарт теряет точность.
+    float2 id = mod(floor(g), 256.0);
     float2 f = fract(g) - 0.5;
     float n = h21(id);
     float2 c = (float2(h21(id + 1.7), h21(id + 5.3)) - 0.5) * 0.6;
     float r = sz * (0.6 + 0.6 * h21(id + 9.1));
-    return smoothstep(r, r * 0.2, length(f - c)) * step(1.0 - density, n);
+    return sstep(r, r * 0.2, length(f - c)) * step(1.0 - density, n);
 }
 
 half4 main(float2 p) {
@@ -91,9 +110,9 @@ half4 main(float2 p) {
         float n = h21(id);
         float2 c = (float2(h21(id + 3.1), h21(id + 7.7)) - 0.5) * 0.6;
         float life = fract(t * 0.07 + n);
-        float r = mix(0.09, 0.22, h21(id + 11.3)) * smoothstep(0.0, 0.06, life) * smoothstep(1.0, 0.7, life);
+        float r = mix(0.09, 0.22, h21(id + 11.3)) * sstep(0.0, 0.06, life) * sstep(1.0, 0.7, life);
         float2 d = f - c;
-        float m1 = smoothstep(r, r * 0.6, length(d)) * step(1.0 - 0.7 * uStrength, h21(id + 2.2));
+        float m1 = sstep(r, r * 0.6, length(d)) * step(1.0 - 0.7 * uStrength, h21(id + 2.2));
         // Стекающие капли с чистой дорожкой.
         float cw = 54.0;
         float ch = 200.0;
@@ -108,9 +127,9 @@ half4 main(float2 p) {
         float2 d2 = float2(f2.x - x0, (f2.y - y) * ch / cw);
         float r2 = 0.12 + 0.07 * n2;
         float2 ds = d2 * float2(1.0, d2.y < 0.0 ? 0.75 : 1.15);
-        float alive = smoothstep(0.0, 0.04, tt) * smoothstep(1.0, 0.92, tt) * step(1.0 - 0.65 * uStrength, n2);
-        float m2 = smoothstep(r2, r2 * 0.6, length(ds)) * alive;
-        float trail = smoothstep(0.09, 0.03, abs(d2.x)) * step(d2.y, -r2 * 0.8) * smoothstep(-y * ch / cw - 0.01, 0.0, d2.y) * alive;
+        float alive = sstep(0.0, 0.04, tt) * sstep(1.0, 0.92, tt) * step(1.0 - 0.65 * uStrength, n2);
+        float m2 = sstep(r2, r2 * 0.6, length(ds)) * alive;
+        float trail = sstep(0.09, 0.03, abs(d2.x)) * step(d2.y, -r2 * 0.8) * sstep(-y * ch / cw - 0.01, 0.0, d2.y) * alive;
         float clearM = clamp(max(m1, m2) + trail * 0.85, 0.0, 1.0);
         // Лёгкая дымка, чтобы текст оставался читаемым.
         float4 fogged = mix(float4(base), blur3(p, 2.0 * uDp, float4(base)) * 0.92 + float4(0.03, 0.035, 0.05, 0.05), 0.3 * uStrength);
@@ -121,9 +140,9 @@ half4 main(float2 p) {
             float2 lens = d * cs * m1 * -2.2 + d2 * cw * m2 * -2.0;
             float4 refr = float4(content.eval(p + lens * uDp)) * 1.05;
             glass = mix(glass, refr, dropM);
-            float hl = smoothstep(0.55, 0.0, length(d / max(r, 0.001) - float2(-0.35, -0.4))) * m1
-                     + smoothstep(0.55, 0.0, length(ds / r2 - float2(-0.35, -0.4))) * m2;
-            float rimD = m1 * smoothstep(r * 0.55, r * 0.95, length(d)) + m2 * smoothstep(r2 * 0.55, r2 * 0.95, length(ds));
+            float hl = sstep(0.55, 0.0, length(d / max(r, 0.001) - float2(-0.35, -0.4))) * m1
+                     + sstep(0.55, 0.0, length(ds / r2 - float2(-0.35, -0.4))) * m2;
+            float rimD = m1 * sstep(r * 0.55, r * 0.95, length(d)) + m2 * sstep(r2 * 0.55, r2 * 0.95, length(ds));
             glass = float4(glass.rgb * (1.0 - rimD * 0.3), glass.a);
             float hla = hl * 0.3;
             glass = float4(glass.rgb * (1.0 - hla) + float3(hla), glass.a + hla * (1.0 - glass.a));
@@ -142,22 +161,22 @@ half4 main(float2 p) {
     } else {
         float2 wh = uSize / uDp;
         float2 uv = q / wh;
-        float corner = smoothstep(0.33, 0.7, length((uv - 0.5) * float2(1.0, 0.75)));
-        float edge = smoothstep(0.08, 0.0, min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y)));
+        float corner = sstep(0.33, 0.7, length((uv - 0.5) * float2(1.0, 0.75)));
+        float edge = sstep(0.08, 0.0, min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y)));
         float zone = clamp(corner * 1.1 + edge * 0.6, 0.0, 1.0) * uAmt * uStrength;
         // Середина экрана чистая: узоры и размытие считаются только у краёв.
         if (zone > 0.001) {
             float melt = 0.0;
             for (int i = 0; i < 12; i++) {
                 float3 w = uWipe[i];
-                melt += w.z * smoothstep(36.0, 14.0, length(q - w.xy));
+                melt += w.z * sstep(36.0, 14.0, length(q - w.xy));
             }
             melt = clamp(melt, 0.0, 1.0);
             float warp = fbm2(q * 0.025);
             float fv = fbm(q * 0.06 + warp * 2.5);
-            float veins = smoothstep(0.82, 0.98, 1.0 - abs(fv * 2.0 - 1.0));
+            float veins = sstep(0.82, 0.98, 1.0 - abs(fv * 2.0 - 1.0));
             float amount = zone * (1.0 - melt);
-            amount *= smoothstep(0.25, 0.6, fbm2(q * 0.02 + 3.0) + amount * 0.4);
+            amount *= sstep(0.25, 0.6, fbm2(q * 0.02 + 3.0) + amount * 0.4);
             if (amount > 0.001) {
                 float a = amount * 0.7;
                 float4 frosted = blur5(p, 3.0 * uDp, float4(base)) * 0.75 + float4(0.11, 0.14, 0.19, 0.25);
@@ -179,7 +198,7 @@ half4 main(float2 p) {
  * Живое небо в фоне (AGSL): градиент по времени суток, круглые мерцающие звёзды, изредка падающая звезда,
  * солнце с ореолом, луна в настоящей фазе, облака по прогнозу, подсвеченные на закате.
  */
-internal const val SKY_AGSL = """
+internal const val SKY_AGSL = SSTEP_AGSL + """
 uniform float2 uSize;
 uniform float uDp;
 uniform float uTime;
@@ -200,7 +219,7 @@ float starLayer(float2 q, float cellSize, float chance, float seed, float t) {
     float size = mix(0.35, 1.25, pow(h21(id + seed + 3.3), 3.0));
     float dist = length((f - c) * cellSize);
     float twinkle = 0.65 + 0.35 * sin(t * (0.8 + 2.2 * h21(id + seed + 9.9)) + n * 60.0);
-    float core = smoothstep(size + 0.9, size - 0.3, dist);
+    float core = sstep(size + 0.9, size - 0.3, dist);
     float halo = exp(-dist / (size * 2.2)) * 0.25 * step(0.85, h21(id + seed + 5.5));
     return (core + halo) * twinkle * mix(0.55, 1.0, h21(id + seed + 4.4));
 }
@@ -211,13 +230,13 @@ half4 main(float2 p) {
     float v = q.y / wh.y;
     float h = uHour;
     float t = uTime;
-    float dayF = smoothstep(uRise - 0.5, uRise + 1.0, h) * (1.0 - smoothstep(uSet - 1.0, uSet + 0.5, h));
+    float dayF = sstep(uRise - 0.5, uRise + 1.0, h) * (1.0 - sstep(uSet - 1.0, uSet + 0.5, h));
     float dr = (h - uRise) / 0.8;
     float ds = (h - uSet) / 0.8;
     float tw = clamp(exp(-dr * dr) + exp(-ds * ds), 0.0, 1.0);
     float3 night = mix(float3(0.016, 0.02, 0.06), float3(0.045, 0.045, 0.12), v);
     float3 day = mix(float3(0.06, 0.12, 0.30), float3(0.17, 0.28, 0.56), v);
-    float3 dusk = mix(float3(0.11, 0.05, 0.22), mix(float3(0.58, 0.2, 0.42), float3(0.98, 0.48, 0.24), smoothstep(0.55, 1.0, v)), smoothstep(0.2, 1.0, v));
+    float3 dusk = mix(float3(0.11, 0.05, 0.22), mix(float3(0.58, 0.2, 0.42), float3(0.98, 0.48, 0.24), sstep(0.55, 1.0, v)), sstep(0.2, 1.0, v));
     float3 col = mix(night, day, dayF);
     col = mix(col, dusk, tw * 0.9);
     // Цвет палитры приложения сверху, чтобы фон оставался «своим».
@@ -239,7 +258,7 @@ half4 main(float2 p) {
         float2 pa = q - head;
         float along = dot(pa, -dir);
         float across = length(pa + dir * along);
-        float tail = smoothstep(70.0, 0.0, along) * step(0.0, along) * smoothstep(1.2, 0.0, across);
+        float tail = sstep(70.0, 0.0, along) * step(0.0, along) * sstep(1.2, 0.0, across);
         col += float3(0.95, 0.95, 1.0) * tail * sin(k * 3.14159) * starVis;
     }
 
@@ -249,7 +268,7 @@ half4 main(float2 p) {
         float2 sp = float2(mix(-0.05, 1.05, sunPos) * wh.x, wh.y * (1.02 - 0.8 * sin(3.14159 * clamp(sunPos, 0.0, 1.0))));
         float dist = length(q - sp);
         float3 sunC = mix(float3(1.0, 0.55, 0.25), float3(1.0, 0.92, 0.75), sin(3.14159 * clamp(sunPos, 0.0, 1.0)));
-        col += sunC * (smoothstep(15.0, 13.0, dist) * 0.9 + exp(-dist / 40.0) * 0.25 + exp(-dist / 140.0) * 0.25) * (1.0 - uCloud * 0.6);
+        col += sunC * (sstep(15.0, 13.0, dist) * 0.9 + exp(-dist / 40.0) * 0.25 + exp(-dist / 140.0) * 0.25) * (1.0 - uCloud * 0.6);
     }
 
     // Луна в настоящей фазе.
@@ -261,12 +280,12 @@ half4 main(float2 p) {
         float2 mp = float2(mix(-0.05, 1.05, mpos) * wh.x, wh.y * (0.9 - 0.7 * sin(3.14159 * clamp(mpos, 0.0, 1.0))));
         float2 d = q - mp;
         float r = 11.0;
-        float disc = smoothstep(r + 0.8, r - 0.8, length(d));
+        float disc = sstep(r + 0.8, r - 0.8, length(d));
         float lit = (1.0 - cos(6.2832 * uMoon)) * 0.5;
         float side = uMoon < 0.5 ? -1.0 : 1.0;
-        float shadow = smoothstep(r + 0.8, r - 0.8, length(d - float2(side * 2.0 * r * lit, 0.0)));
+        float shadow = sstep(r + 0.8, r - 0.8, length(d - float2(side * 2.0 * r * lit, 0.0)));
         // Почти новая луна не видна совсем, иначе от неё остаётся тонкий контур.
-        float vis = smoothstep(0.03, 0.12, lit);
+        float vis = sstep(0.03, 0.12, lit);
         col += float3(0.95, 0.93, 0.85) * disc * (1.0 - shadow) * 0.9 * (1.0 - uCloud * 0.7) * vis
              + float3(0.6, 0.65, 0.9) * exp(-length(d) / 34.0) * 0.18 * lit * (1.0 - uCloud * 0.7);
     }
@@ -274,15 +293,15 @@ half4 main(float2 p) {
     // Облака: плотность по прогнозу; на закате подсвечены снизу.
     if (uCloud > 0.03) {
         float cl = fbm(q * float2(0.005, 0.011) + float2(t * 0.004, 0.0));
-        float cm = smoothstep(0.62 - uCloud * 0.35, 0.85 - uCloud * 0.3, cl) * clamp(uCloud * 1.4, 0.0, 1.0) * (1.0 - v * 0.4);
+        float cm = sstep(0.62 - uCloud * 0.35, 0.85 - uCloud * 0.3, cl) * clamp(uCloud * 1.4, 0.0, 1.0) * (1.0 - v * 0.4);
         float3 cloudNight = float3(0.07, 0.075, 0.12);
         float3 cloudDay = float3(0.45, 0.5, 0.62);
-        float3 cloudDusk = mix(float3(0.42, 0.25, 0.38), float3(1.0, 0.6, 0.42), smoothstep(0.3, 1.0, v));
+        float3 cloudDusk = mix(float3(0.42, 0.25, 0.38), float3(1.0, 0.6, 0.42), sstep(0.3, 1.0, v));
         float3 cloudC = mix(mix(cloudNight, cloudDay, dayF), cloudDusk, tw * 0.85);
         col = mix(col, cloudC, cm * 0.75);
     }
     // Дымка у горизонта.
-    col += mix(float3(0.03, 0.03, 0.08), float3(0.25, 0.12, 0.06), tw) * smoothstep(0.7, 1.0, v) * 0.5;
+    col += mix(float3(0.03, 0.03, 0.08), float3(0.25, 0.12, 0.06), tw) * sstep(0.7, 1.0, v) * 0.5;
     // Лёгкий шум против полос на плавном градиенте (особенно заметных на OLED).
     col += (h21(p) - 0.5) / 255.0;
     return half4(half3(clamp(col, 0.0, 1.0)), 1.0);
