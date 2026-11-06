@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.PartnerShareTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-06T17:52:57.369Z" hostname="runnervm7aw5e" time="0.007">
+  <properties/>
+  <testcase name="codeSurvivesBeingInsideAMessage" classname="io.github.cmix7777.kazhdyidnevnik.data.PartnerShareTest" time="0.004"/>
+  <testcase name="sharedEventsReplaceHardCodedShiftsOnTheOtherPhone" classname="io.github.cmix7777.kazhdyidnevnik.data.PartnerShareTest" time="0.001"/>
+  <testcase name="themeModeFallsBackToDark" classname="io.github.cmix7777.kazhdyidnevnik.data.PartnerShareTest" time="0.001"/>
+  <testcase name="onlyRelevantEventsWithoutPrivateFields" classname="io.github.cmix7777.kazhdyidnevnik.data.PartnerShareTest" time="0.0"/>
+  <testcase name="garbageGivesNothing" classname="io.github.cmix7777.kazhdyidnevnik.data.PartnerShareTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

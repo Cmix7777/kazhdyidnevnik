@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.robust.GarbageInTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-06T17:53:43.891Z" hostname="runnervm7aw5e" time="0.579">
+  <properties/>
+  <testcase name="diaryAndBackupFilesNeverCrash" classname="io.github.cmix7777.kazhdyidnevnik.robust.GarbageInTest" time="0.079"/>
+  <testcase name="moneyAndReleaseTextsNeverCrash" classname="io.github.cmix7777.kazhdyidnevnik.robust.GarbageInTest" time="0.084"/>
+  <testcase name="chatStateFromDiskNeverCrashes" classname="io.github.cmix7777.kazhdyidnevnik.robust.GarbageInTest" time="0.144"/>
+  <testcase name="weatherAnswersWithHolesStillParse" classname="io.github.cmix7777.kazhdyidnevnik.robust.GarbageInTest" time="0.022"/>
+  <testcase name="schedulePagesNeverCrash" classname="io.github.cmix7777.kazhdyidnevnik.robust.GarbageInTest" time="0.12"/>
+  <testcase name="sharedEventsAndPairCodesFromMessengerNeverCrash" classname="io.github.cmix7777.kazhdyidnevnik.robust.GarbageInTest" time="0.081"/>
+  <testcase name="encryptedDataFromCloudNeverCrashes" classname="io.github.cmix7777.kazhdyidnevnik.robust.GarbageInTest" time="0.029"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
