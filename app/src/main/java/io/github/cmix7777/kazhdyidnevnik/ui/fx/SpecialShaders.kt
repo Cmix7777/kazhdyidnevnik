@@ -7,7 +7,7 @@ package io.github.cmix7777.kazhdyidnevnik.ui.fx
  * остаётся: частицы исчезают целиком, а свечение гаснет вместе с ними.
  */
 
-private const val COMMON = """
+private const val COMMON = SSTEP_AGSL + """
 uniform float2 uSize;
 uniform float uDp;
 uniform float uT;
@@ -112,7 +112,7 @@ half4 main(float2 p) {
     float r0 = 30.0;
     float2 pa = float2(mix(-r0, c.x - 6.0, ea), c.y - sin(ea * 3.14159) * 30.0);
     float2 pb = float2(mix(wh.x + r0, c.x + 6.0, ea), c.y + sin(ea * 3.14159) * 30.0);
-    float pulse = 1.0 + 0.1 * smoothstep(0.85, 1.2, uT) + 0.06 * sin(max(uT - 1.2, 0.0) * 5.0) * step(1.2, uT);
+    float pulse = 1.0 + 0.1 * sstep(0.85, 1.2, uT) + 0.06 * sin(max(uT - 1.2, 0.0) * 5.0) * step(1.2, uT);
     float dA = length(q - pa) - r0 * pulse;
     float dB = length(q - pb) - r0 * pulse;
     float d = smin(dA, dB, 40.0);
@@ -121,10 +121,10 @@ half4 main(float2 p) {
     float R = ew * length(wh) * 0.85;
     float ang = atan(q.y - c.y, q.x - c.x);
     float rr = length(q - c) + (fbm(float2(ang * 2.0, uT * 0.8)) - 0.5) * 36.0 * (1.0 - w);
-    float reveal = smoothstep(R + 4.0, R - 4.0, rr) * step(0.001, w);
-    float blobFade = 1.0 - smoothstep(0.0, 0.25, w);
-    float endFade = 1.0 - smoothstep(3.2, 3.5, uT);
-    float veil = (1.0 - reveal) * 0.97 * endFade * smoothstep(0.0, 0.25, uT);
+    float reveal = sstep(R + 4.0, R - 4.0, rr) * step(0.001, w);
+    float blobFade = 1.0 - sstep(0.0, 0.25, w);
+    float endFade = 1.0 - sstep(3.2, 3.5, uT);
+    float veil = (1.0 - reveal) * 0.97 * endFade * sstep(0.0, 0.25, uT);
     float4 outc = float4(float3(0.03, 0.02, 0.05) * veil, veil);
 
     float side = clamp(0.5 + (dB - dA) / 80.0, 0.0, 1.0);
@@ -137,12 +137,12 @@ half4 main(float2 p) {
     float2 g = q / 16.0;
     float2 id = floor(g);
     float2 spo = (float2(h21(id + 2.0), h21(id + 5.0)) - 0.5) * 0.8;
-    float spark = smoothstep(0.12, 0.0, length(fract(g) - 0.5 - spo)) * step(0.82, h21(id))
+    float spark = sstep(0.12, 0.0, length(fract(g) - 0.5 - spo)) * step(0.82, h21(id))
         * exp(-abs(rr - R + 20.0) / 30.0) * step(0.001, w) * (1.0 - w) * 1.5;
     light = (light + float3(spark)) * endFade;
     outc = over(glowLayer(light), outc);
 
-    float cov = (1.0 - smoothstep(-0.8, 0.8, d)) * blobFade * endFade;
+    float cov = (1.0 - sstep(-0.8, 0.8, d)) * blobFade * endFade;
     outc = over(float4((cc * 0.85 + float3(0.15)) * cov, cov), outc);
     return half4(outc);
 }
@@ -184,7 +184,7 @@ half4 main(float2 p) {
         float r = (7.0 + 10.0 * h2) * step(delay, uT);
         dB = smin(dB, length(q - pos) - r, 16.0);
     }
-    float m = smoothstep(1.05, 1.75, uT);
+    float m = sstep(1.05, 1.75, uT);
     float dS = 10000.0;
     if (uHeart > 0.5) {
         float2 hp = (q - c) / 84.0;
@@ -195,7 +195,7 @@ half4 main(float2 p) {
         if (uDig.x < -0.5) { gx = 0.0; }
         dS = min(sdDigit(q - c + float2(gx, 0.0), uDig.x, 17.0, 34.0, 9.0), sdDigit(q - c - float2(gx, 0.0), uDig.y, 17.0, 34.0, 9.0));
     }
-    float hold = smoothstep(1.75, 1.95, uT) * (1.0 - smoothstep(2.8, 2.9, uT));
+    float hold = sstep(1.75, 1.95, uT) * (1.0 - sstep(2.8, 2.9, uT));
     dS += sin(q.y * 0.12 + uT * 4.0) * 1.2 * hold;
     float b = clamp((uT - 2.85) / 0.7, 0.0, 1.0);
     float d = smin(dB + m * 30.0 + b * 80.0, dS + (1.0 - m) * 70.0 + b * 80.0, 20.0);
@@ -212,13 +212,13 @@ half4 main(float2 p) {
             }
         }
     }
-    float endFade = 1.0 - smoothstep(3.3, 3.6, uT);
-    float veil = (1.0 - smoothstep(2.9, 3.5, uT)) * smoothstep(0.0, 0.3, uT) * 0.95;
+    float endFade = 1.0 - sstep(3.3, 3.6, uT);
+    float veil = (1.0 - sstep(2.9, 3.5, uT)) * sstep(0.0, 0.3, uT) * 0.95;
     float4 outc = float4(float3(0.03, 0.02, 0.05) * veil, veil);
     float vy = clamp((q.y - c.y + 60.0) / 120.0, 0.0, 1.0);
     float3 cc = mix(uC, uC2, vy);
     outc = over(glowLayer(cc * exp(-max(d, 0.0) / 16.0) * 0.7 * endFade), outc);
-    float cov = (1.0 - smoothstep(-0.8, 0.8, d)) * endFade;
+    float cov = (1.0 - sstep(-0.8, 0.8, d)) * endFade;
     float3 fill = cc * 0.9 + float3(0.1) + float3(0.22) * exp(min(d, 0.0) / 5.0);
     outc = over(float4(min(fill, float3(1.0)) * cov, cov), outc);
     return half4(outc);
@@ -240,15 +240,15 @@ float snowL(float2 q, float t, float sc, float sp, float sz) {
     float n = h21(id);
     float2 c = (float2(h21(id + 1.7), h21(id + 5.3)) - 0.5) * 0.6;
     float r = sz * (0.6 + 0.6 * h21(id + 9.1));
-    return smoothstep(r, r * 0.2, length(f - c)) * step(0.45, n);
+    return sstep(r, r * 0.2, length(f - c)) * step(0.45, n);
 }
 
 half4 main(float2 p) {
     float2 q = p / uDp;
     float2 wh = uSize / uDp;
     float2 c = float2(wh.x * 0.5, wh.y * 0.44);
-    float endFade = 1.0 - smoothstep(4.0, 4.3, uT);
-    float veil = (1.0 - smoothstep(3.7, 4.3, uT)) * smoothstep(0.0, 0.3, uT) * 0.95;
+    float endFade = 1.0 - sstep(4.0, 4.3, uT);
+    float veil = (1.0 - sstep(3.7, 4.3, uT)) * sstep(0.0, 0.3, uT) * 0.95;
     float4 outc = float4(float3(0.02, 0.03, 0.06) * veil, veil);
 
     float snow = snowL(q, uT, 30.0, 0.8, 0.08) * 0.6 + snowL(q + 7.0, uT, 18.0, 0.5, 0.07) * 0.4;
@@ -264,15 +264,15 @@ half4 main(float2 p) {
         float ang = h1 * 6.2832 + uT * (2.0 + 2.0 * h2);
         float R = mix(260.0 + 160.0 * h2, 20.0 + 80.0 * h1, esw);
         float2 pos = c + float2(cos(ang), sin(ang) * 0.55) * R;
-        flakes += smoothstep(3.2, 0.8, length(q - pos));
+        flakes += sstep(3.2, 0.8, length(q - pos));
     }
     }
-    float white = snow * veil * 0.7 + clamp(flakes, 0.0, 1.0) * (1.0 - smoothstep(1.3, 1.9, uT)) * step(0.001, uT);
+    float white = snow * veil * 0.7 + clamp(flakes, 0.0, 1.0) * (1.0 - sstep(1.3, 1.9, uT)) * step(0.001, uT);
 
     float sp = 50.0;
     float dd0 = min(min(sdDigit(q - c + float2(sp * 1.5, 0.0), uYear.x, 15.0, 28.0, 7.0), sdDigit(q - c + float2(sp * 0.5, 0.0), uYear.y, 15.0, 28.0, 7.0)),
                     min(sdDigit(q - c - float2(sp * 0.5, 0.0), uYear.z, 15.0, 28.0, 7.0), sdDigit(q - c - float2(sp * 1.5, 0.0), uYear.w, 15.0, 28.0, 7.0)));
-    float grow = smoothstep(1.2, 2.0, uT);
+    float grow = sstep(1.2, 2.0, uT);
     float crumble = clamp((uT - 2.9) / 0.9, 0.0, 1.0);
     float3 light = float3(white);
     float cov = 0.0;
@@ -284,7 +284,7 @@ half4 main(float2 p) {
         light += tint * exp(-max(dd, 0.0) / 14.0) * 0.5 * grow * (1.0 - crumble);
         if (dd < 1.0) {
             float visible = step(fbm(q * 0.09), grow * 1.2) * step(crumble * 1.15, fbm(q * 0.06 + float2(0.0, -crumble * 1.5)) + 0.1);
-            cov = (1.0 - smoothstep(-0.8, 0.8, dd)) * visible;
+            cov = (1.0 - sstep(-0.8, 0.8, dd)) * visible;
             float2 cell = floor(q * 0.5);
             float sparkle = pow(h21(cell), 50.0) * (0.5 + 0.5 * sin(uT * 5.0 + h21(cell + 1.0) * 30.0));
             snowC = mix(float3(0.85, 0.92, 1.0), float3(1.0), fbm(q * 0.3)) + float3(sparkle * 1.5);
@@ -304,7 +304,7 @@ half4 main(float2 p) {
         float2 pos = st + float2((h21(float2(fi, 2.0)) - 0.5) * 40.0 * ft, 520.0 * ft * ft);
         float r = (2.0 + 3.0 * h21(float2(fi, 4.0))) * (1.0 - min(ft, 1.0) * 0.5);
         if (ft > 0.0) {
-            chunks = max(chunks, smoothstep(r, r - 1.2, length(q - pos)));
+            chunks = max(chunks, sstep(r, r - 1.2, length(q - pos)));
         }
     }
     }

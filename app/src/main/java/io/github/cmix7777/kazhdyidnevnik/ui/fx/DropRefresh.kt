@@ -43,7 +43,7 @@ import kotlin.math.min
  * становится кольцом с бегущим разрывом, а когда всё обновилось, разрыв закрывается и внутри рисуется галочка.
  * Координаты в dp внутри маленького холста индикатора, цвета на выходе с учётом прозрачности.
  */
-internal const val DROP_AGSL = """
+internal const val DROP_AGSL = SSTEP_AGSL + """
 uniform float2 uSize;
 uniform float uDp;
 uniform float uTime;
@@ -87,7 +87,7 @@ half4 main(float2 p) {
     float dD = rlen - uDrop.z;
     float ang = atan(rel.y, rel.x);
     float gf = fract(ang / 6.2832 + uTime * 1.1);
-    float gap = smoothstep(0.0, 0.06, gf) * (1.0 - smoothstep(0.16, 0.26, gf)) * (1.0 - uCheck);
+    float gap = sstep(0.0, 0.06, gf) * (1.0 - sstep(0.16, 0.26, gf)) * (1.0 - uCheck);
     float ringD = abs(rlen - uDrop.z) - 2.2 + gap * 8.0;
     dD = mix(dD, ringD, uRing);
     if (uDrop.z < 0.05) {
@@ -103,10 +103,10 @@ half4 main(float2 p) {
     float d = smin(smin(dS, dT, max(uK * 0.6, 0.01)), dD, max(uK, 0.01));
     float vy = clamp((q.y - uSrc.y) / max(uDrop.y + uDrop.z - uSrc.y, 24.0), 0.0, 1.0);
     float3 edge = mix(uA1, uA2, vy);
-    float cov = 1.0 - smoothstep(-0.8, 0.8, d);
+    float cov = 1.0 - sstep(-0.8, 0.8, d);
     float glow = exp(-max(d, 0.0) / 10.0) * 0.45 * (1.0 - cov);
     float3 fill = edge * 0.85 + float3(0.08);
-    float spec = smoothstep(0.5, 0.0, length(rel / max(uDrop.z, 1.0) - float2(-0.35, -0.45))) * (1.0 - uRing);
+    float spec = sstep(0.5, 0.0, length(rel / max(uDrop.z, 1.0) - float2(-0.35, -0.45))) * (1.0 - uRing);
     fill = min(fill + float3(spec * 0.45), float3(1.0));
     float3 col = fill * cov + edge * glow;
     float a = clamp(cov + glow, 0.0, 1.0);
@@ -123,7 +123,7 @@ half4 main(float2 p) {
         if (drawn > l1) {
             d2 = sdSeg(rel, c1, c1 + (c2 - c1) * clamp((drawn - l1) / l2, 0.001, 1.0));
         }
-        float ck = 1.0 - smoothstep(1.0, 2.2, min(d1, d2));
+        float ck = 1.0 - sstep(1.0, 2.2, min(d1, d2));
         col = mix(col, float3(1.0), ck);
         a = max(a, ck);
         float cg = exp(-min(d1, d2) / 5.0) * 0.35 * (1.0 - ck) * (1.0 - a);

@@ -30,7 +30,7 @@ import kotlin.math.floor
  * 0 — снаружи. Так содержимое двух страниц никогда не просвечивает друг через друга.
  * Свечение рисует только верхняя страница ([uGlow] = 1).
  */
-internal const val INK_AGSL = """
+internal const val INK_AGSL = SSTEP_AGSL + """
 uniform shader content;
 uniform float2 uSize;
 uniform float uDp;
@@ -65,7 +65,7 @@ half4 main(float2 p) {
     float ang = atan(d.y, d.x + 0.0001);
     float warp = (sin(ang * 4.0 + t * 1.3) * 0.55 + sin(ang * 7.0 - t * 1.7 + 1.3) * 0.3 + sin(ang * 11.0 + t * 2.3 + 0.7) * 0.15) * 44.0;
     float e = raw + warp * bump * min(1.0, R / 220.0);
-    float m = smoothstep(5.0, -5.0, e);
+    float m = sstep(5.0, -5.0, e);
     float mask = mix(1.0 - m, m, uInside);
     float2 dir = d / max(dist, 0.001);
     float near = exp(-abs(e) / 22.0) * bump;

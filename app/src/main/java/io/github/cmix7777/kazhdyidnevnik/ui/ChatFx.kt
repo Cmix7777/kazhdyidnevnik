@@ -52,6 +52,7 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.SSTEP_AGSL
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberEffectTime
 import kotlin.math.PI
 import kotlin.math.cos
@@ -70,7 +71,7 @@ import kotlin.random.Random
 
 // ---------- дымок на фоне ----------
 
-private const val SMOKE_AGSL = """
+private const val SMOKE_AGSL = SSTEP_AGSL + """
 uniform float2 uSize;
 uniform float uTime;
 uniform float3 uA;
@@ -100,9 +101,9 @@ half4 main(float2 fc) {
     float2 q = float2(fbm(uv * 1.6 + float2(0.0, t)), fbm(uv * 1.6 + float2(5.2, -t * 0.8)));
     float2 r = float2(fbm(uv * 1.4 + 2.2 * q + float2(1.7, 9.2) + t * 0.6), fbm(uv * 1.4 + 2.2 * q + float2(8.3, 2.8) - t * 0.5));
     float f = fbm(uv * 1.2 + 2.6 * r);
-    float side = smoothstep(0.1, 0.9, fc.x / uSize.x + (r.x - 0.5) * 0.6);
+    float side = sstep(0.1, 0.9, fc.x / uSize.x + (r.x - 0.5) * 0.6);
     float3 smoke = mix(uB, uA, side);
-    float dens = smoothstep(0.35, 0.95, f) * (0.55 + 0.45 * smoothstep(1.0, 0.0, fc.y / uSize.y));
+    float dens = sstep(0.35, 0.95, f) * (0.55 + 0.45 * sstep(1.0, 0.0, fc.y / uSize.y));
     float3 col = uBg + smoke * dens * 0.5;
     return half4(half3(col), 1.0);
 }
