@@ -63,6 +63,12 @@ android {
         compose = true
         buildConfig = true
     }
+
+    // Поддельное облако и прочие помощники нужны и обычным тестам, и тестам на эмуляторе.
+    sourceSets {
+        getByName("test").java.srcDir("src/testShared/java")
+        getByName("androidTest").java.srcDir("src/testShared/java")
+    }
 }
 
 kotlin {

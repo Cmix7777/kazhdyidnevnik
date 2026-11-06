@@ -399,11 +399,38 @@ object ChatSync {
      * Переписка правда перед глазами: экран открыт, телефон не погас и не заблокирован.
      * Только тогда пришедшее считается прочитанным.
      */
-    private fun seen(app: Context): Boolean {
-        if (!visible) return false
+    private fun seen(app: Context): Boolean = visible && screenSeen(app)
+
+    /** Экран включён и не заблокирован. Тесты на эмуляторе подменяют: там экран может быть под замком. */
+    @androidx.annotation.VisibleForTesting
+    internal var screenSeen: (Context) -> Boolean = { app ->
         val awake = runCatching { app.getSystemService(android.os.PowerManager::class.java)?.isInteractive }.getOrNull() ?: true
         val locked = runCatching { app.getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked }.getOrNull() ?: false
-        return awake && !locked
+        awake && !locked
+    }
+
+    /** Для тестов: забыть переписку на этом телефоне, как после переустановки (настройки не трогаются). */
+    @androidx.annotation.VisibleForTesting
+    internal fun resetForTest(context: Context) {
+        val app = context.applicationContext
+        synchronized(lock) {
+            loop?.cancel()
+            loop = null
+            chatWatchers.set(0)
+            mainWatchers.set(0)
+            visible = false
+            target = null
+            mutableState.value = ChatState()
+            mutableStatus.value = Status()
+            theirTyping = -1L
+            theirTypingChanged = 0L
+            lastTypingSent = 0L
+            lastActivity = 0L
+            tagFor = null
+            fileFailures.clear()
+            File(app.filesDir, FILE).delete()
+            File(app.filesDir, "$FILE.tmp").delete()
+        }
     }
 
     /** Отметить всё полученное прочитанным (экран переписки открыт и на виду). */
@@ -445,7 +472,7 @@ object ChatSync {
 
     // ---- обмен с облаком ----
 
-    private fun cloud(settings: AppSettings) = ChatCloud(JsoupTransport, settings.cloudTokens)
+    private fun cloud(settings: AppSettings) = ChatCloud(CloudNet.transport, settings.cloudTokens)
 
     /** Забрать новое от второго человека и отправить своё, если что-то не ушло. true — облако ответило. */
     suspend fun pull(context: Context): Boolean {

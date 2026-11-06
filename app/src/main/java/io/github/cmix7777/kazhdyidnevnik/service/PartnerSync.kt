@@ -205,7 +205,7 @@ object PartnerSync {
     }
 
     private fun exchange(app: Context, settings: AppSettings, owner: Person, code: String) {
-        val cloud = CloudShares(JsoupTransport, settings.cloudTokens)
+        val cloud = CloudShares(CloudNet.transport, settings.cloudTokens)
         val now = System.currentTimeMillis()
 
         val diary = DiaryRepository.current(app.filesDir)

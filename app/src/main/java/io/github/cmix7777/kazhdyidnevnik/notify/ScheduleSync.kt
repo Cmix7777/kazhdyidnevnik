@@ -29,7 +29,15 @@ object ScheduleSync {
 
     private val mutex = Mutex()
 
-    fun repository(context: Context, person: Person): ScheduleSource = when (person) {
+    /** Подмена сайтов расписания в тестах на эмуляторе (быстрый, медленный, ломающийся источник). */
+    @Volatile
+    var sourceOverride: ((Context, Person) -> ScheduleSource)? = null
+
+    /** Сколько ждать обновления недели, прежде чем остановить каплю и показать ошибку. */
+    @Volatile
+    var refreshLimitMs: Long = 60_000L
+
+    fun repository(context: Context, person: Person): ScheduleSource = sourceOverride?.invoke(context, person) ?: when (person) {
         Person.AIZAT -> ScheduleRepository(File(context.filesDir, "schedule"))
         Person.NASTYA -> CollegeRepository(File(context.filesDir, "schedule-nastya"))
     }

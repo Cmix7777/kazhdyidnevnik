@@ -510,17 +510,24 @@ object ChatLogic {
     /**
      * Второй телефон начал нумерацию заново (переустановка, сброс): его голова кончается раньше, чем то, что уже есть.
      * Сообщения с большими номерами — из прежней нумерации, они уходят в «раньше». Отметки «прочитано»
-     * опускаются до его последнего номера: иначе каждое новое сообщение сразу считалось бы прочитанным,
-     * у него стояло бы «прочитано», а здесь не было бы ни уведомления, ни счётчика.
+     * пересчитываются по времени: прочитано то, что написано не позже последнего прочитанного раньше.
+     * Иначе каждое новое сообщение сразу считалось бы прочитанным: у него стояло бы «прочитано»,
+     * а здесь не было бы ни уведомления, ни счётчика.
      */
     private fun afterRestart(state: ChatState, head: ChatHead): ChatState? {
         if (head.last >= lastSeq(state.theirs)) return null
         val stale = state.theirs.filter { it.seq > head.last }
+        // Новые сообщения из головы, написанные не позже [limit], — уже виденные.
+        fun upTo(mark: Long): Long {
+            val limit = state.theirs.filter { it.seq <= mark }.maxOfOrNull { it.at } ?: return 0
+            val seen = head.messages.filter { it.at <= limit }.maxOfOrNull { it.seq }
+            return seen ?: if (head.messages.isEmpty()) head.last else (head.first - 1).coerceAtLeast(0)
+        }
         return state.copy(
             theirs = state.theirs.filter { it.seq <= head.last },
             earlier = (state.earlier + stale.filter { !it.deleted }).distinctBy { Triple(it.from, it.seq, it.at) }.sortedBy { it.at },
-            readUpTo = minOf(state.readUpTo, head.last),
-            notifiedUpTo = minOf(state.notifiedUpTo, head.last),
+            readUpTo = minOf(state.readUpTo, upTo(state.readUpTo)),
+            notifiedUpTo = minOf(state.notifiedUpTo, upTo(state.notifiedUpTo)),
             // Опущенную отметку надо отправить заново, даже если она меньше уже отправленной.
             readSent = -1,
         )

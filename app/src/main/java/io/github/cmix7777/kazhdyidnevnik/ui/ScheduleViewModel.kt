@@ -119,7 +119,7 @@ class ScheduleViewModel(app: Application) : AndroidViewModel(app) {
                 // Скачивание и разбор могут застрять в коде, который нельзя прервать. Ждём их со стороны:
                 // через минуту капля всё равно останавливается, а не крутится вечно.
                 val work = viewModelScope.async { ScheduleSync.syncWeek(getApplication<Application>(), person, offset) }
-                val result = withTimeoutOrNull(REFRESH_LIMIT_MS) { work.await() }
+                val result = withTimeoutOrNull(ScheduleSync.refreshLimitMs) { work.await() }
                 if (result == null) {
                     work.cancel()
                     state.error = describe(person, java.util.concurrent.TimeoutException())
@@ -226,6 +226,5 @@ class ScheduleViewModel(app: Application) : AndroidViewModel(app) {
 
     private companion object {
         const val STALE_AFTER_MS = 30 * 60 * 1000L
-        const val REFRESH_LIMIT_MS = 60_000L
     }
 }
