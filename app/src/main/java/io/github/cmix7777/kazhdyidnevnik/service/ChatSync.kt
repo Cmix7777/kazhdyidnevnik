@@ -81,6 +81,10 @@ object ChatSync {
         private set
 
     @Volatile private var target: File? = null
+
+    /** Как часто, пока приложение открыто, забирать дела и капли второго человека. */
+    @Volatile
+    internal var partnerPollMs: Long = 60_000L
     @Volatile private var lastActivity = 0L
     @Volatile private var lastTypingSent = 0L
     @Volatile private var theirTyping = -1L
@@ -219,8 +223,16 @@ object ChatSync {
             if (loop?.isActive == true) return
             loop = scope.launch {
                 var failures = 0
+                var partnerPolled = 0L
                 while (chatWatchers.get() > 0 || mainWatchers.get() > 0) {
                     val ok = if (AppSettings(app).pairCode != null) pull(app) else true
+                    // Пока приложение открыто, дела и капли второго человека тоже подтягиваются сами,
+                    // а не только при следующем открытии.
+                    val polledAgo = System.currentTimeMillis() - partnerPolled
+                    if (mainWatchers.get() > 0 && polledAgo >= partnerPollMs && AppSettings(app).pairCode != null) {
+                        partnerPolled = System.currentTimeMillis()
+                        runCatching { PartnerSync.sync(app, force = true) }
+                    }
                     failures = if (ok) 0 else failures + 1
                     val now = System.currentTimeMillis()
                     val pause = when {
@@ -688,6 +700,20 @@ object ChatSync {
         update { it.copy(readSent = maxOf(it.readSent, upTo)) }
     }
 
+    /** Капля привета ушла в облако: толкнуть телефон второго человека, чтобы он забрал её сразу. */
+    fun pushDrop(context: Context) {
+        val app = context.applicationContext
+        scope.launch {
+            ensureLoaded(app)
+            val settings = AppSettings(app)
+            val owner = settings.owner ?: return@launch
+            val current = state.value
+            val token = current.theirPush ?: return@launch
+            val hook = settings.pushHook ?: current.theirHook ?: return@launch
+            runCatching { ChatPush.send(hook, token, mapOf("k" to "d", "f" to owner.id)) }
+        }
+    }
+
     /** Мгновенный пуш второму телефону о новом сообщении (если пересылка настроена). */
     private fun pushPartner(settings: AppSettings, code: String, owner: Person, message: ChatMessage) {
         val current = state.value
@@ -766,7 +792,13 @@ object ChatSync {
         val settings = AppSettings(app)
         val owner = settings.owner ?: return
         val code = settings.pairCode ?: return
-        if (data["k"] != "m" || data["f"] != owner.partner.id) return
+        if (data["f"] != owner.partner.id) return
+        if (data["k"] == "d") {
+            // Капля привета уже в облаке: забираем её сразу, и если приложение открыто, она тут же упадёт.
+            runBlocking { withTimeoutOrNull(8_000) { PartnerSync.sync(app, force = true) } }
+            return
+        }
+        if (data["k"] != "m") return
         val preview = data["p"]?.let { ChatPreviewSeal.open(code, owner.partner, it) }
         if (preview != null && !visible) {
             val current = state.value

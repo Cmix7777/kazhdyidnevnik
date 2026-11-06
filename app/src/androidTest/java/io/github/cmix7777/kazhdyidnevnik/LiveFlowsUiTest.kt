@@ -164,13 +164,52 @@ class LiveFlowsUiTest {
         }
     }
 
+    /** Айзат бросил каплю: она лежит в облаке. Возвращает время капли. */
+    private fun aizatThrowsDrop(): Long {
+        val now = System.currentTimeMillis()
+        val dropAt = now - 30_000
+        val shared = SharedEvents(Person.AIZAT, now, emptyList(), emptyList(), listOf(dropAt))
+        CloudShares(store, MemoryTokens()).publish(code, Person.AIZAT, PartnerShare.encode(shared), now)
+        return dropAt
+    }
+
+    /** Капля упала и запись показана до конца: приложение отметило её просмотренной. */
+    private fun waitShown(dropAt: Long, timeoutMs: Long) =
+        waitUntil("капля Айзата показана Насте", timeoutMs) { AppSettings(context).dropsSeenUntil == dropAt }
+
     @Test
     fun dropFromAizatIsShownWhenNastyaOpensTheApp() {
-        val now = System.currentTimeMillis()
-        val shared = SharedEvents(Person.AIZAT, now, emptyList(), emptyList(), listOf(now - 60_000))
-        CloudShares(store, MemoryTokens()).publish(code, Person.AIZAT, PartnerShare.encode(shared), now)
+        val dropAt = aizatThrowsDrop()
         launchAs(Person.NASTYA)
-        waitFor(hasText("Айзат думал о тебе", substring = true), 30_000)
+        waitShown(dropAt, 30_000)
+    }
+
+    @Test
+    fun dropArrivesWhileNastyaHasTheAppOpen() {
+        ChatSync.partnerPollMs = 2_000L
+        try {
+            launchAs(Person.NASTYA)
+            Thread.sleep(2_000)
+            val dropAt = aizatThrowsDrop()
+            // Без пуша: приложение само подтягивает капли, пока открыто (здесь — при каждом круге опроса).
+            waitShown(dropAt, 50_000)
+        } finally {
+            ChatSync.partnerPollMs = 60_000L
+        }
+    }
+
+    @Test
+    fun pushAboutDropBringsItAtOnce() {
+        ChatSync.partnerPollMs = 10 * 60_000L
+        try {
+            launchAs(Person.NASTYA)
+            Thread.sleep(2_000)
+            val dropAt = aizatThrowsDrop()
+            ChatSync.onPush(context, mapOf("k" to "d", "f" to Person.AIZAT.id))
+            waitShown(dropAt, 15_000)
+        } finally {
+            ChatSync.partnerPollMs = 60_000L
+        }
     }
 
     @Test
