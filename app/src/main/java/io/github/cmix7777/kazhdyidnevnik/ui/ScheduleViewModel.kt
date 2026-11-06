@@ -22,9 +22,12 @@ import io.github.cmix7777.kazhdyidnevnik.notify.Notifier
 import io.github.cmix7777.kazhdyidnevnik.notify.ReminderScheduler
 import io.github.cmix7777.kazhdyidnevnik.notify.ScheduleCheckWorker
 import io.github.cmix7777.kazhdyidnevnik.notify.ScheduleSync
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jsoup.HttpStatusException
 import java.io.IOException
 import java.time.LocalDate
@@ -113,12 +116,24 @@ class ScheduleViewModel(app: Application) : AndroidViewModel(app) {
         state.loading += start
         viewModelScope.launch {
             try {
-                val result = ScheduleSync.syncWeek(getApplication<Application>(), person, offset)
+                // Скачивание и разбор могут застрять в коде, который нельзя прервать. Ждём их со стороны:
+                // через минуту капля всё равно останавливается, а не крутится вечно.
+                val work = viewModelScope.async { ScheduleSync.syncWeek(getApplication<Application>(), person, offset) }
+                val result = withTimeoutOrNull(ScheduleSync.refreshLimitMs) { work.await() }
+                if (result == null) {
+                    work.cancel()
+                    state.error = describe(person, java.util.concurrent.TimeoutException())
+                    return@launch
+                }
                 state.weeks[result.week.weekStart] = result.week
                 state.error = null
                 rescheduleReminders()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 state.error = describe(person, e)
+            } catch (e: OutOfMemoryError) {
+                state.error = describe(person, SheetFormatException("таблица слишком большая"))
             } finally {
                 state.loading -= start
             }
@@ -201,6 +216,7 @@ class ScheduleViewModel(app: Application) : AndroidViewModel(app) {
     private fun describe(person: Person, e: Exception): String {
         val site = if (person == Person.AIZAT) "Сайт расписания" else "Сайт колледжа"
         return when (e) {
+            is java.util.concurrent.TimeoutException -> "$site не ответил за минуту. Показано сохранённое расписание."
             is HttpStatusException -> "$site ответил ошибкой ${e.statusCode}. Показано сохранённое расписание."
             is IOException -> "Нет связи с сайтом расписания. Показано сохранённое расписание."
             is SheetFormatException -> "Не получилось прочитать таблицу колледжа: ${e.message}. Показано сохранённое расписание."

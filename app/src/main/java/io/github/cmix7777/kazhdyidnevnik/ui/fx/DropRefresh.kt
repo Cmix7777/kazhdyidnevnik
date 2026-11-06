@@ -173,6 +173,14 @@ fun rememberDropRefresh(refreshing: Boolean, failed: Boolean): DropRefreshState 
     val state = remember { DropRefreshState() }
     val failedNow by rememberUpdatedState(failed)
     val loading = refreshing && state.byUser
+    // Потянули, а загрузка так и не началась (неделя уже обновлялась или всё взялось из памяти):
+    // отметку «жестом» снимаем, иначе следующее тихое обновление вдруг повиснет каплей.
+    LaunchedEffect(state.byUser) {
+        if (state.byUser && !state.wasRefreshing) {
+            delay(PULL_WAIT_MS)
+            if (!state.wasRefreshing && !state.done) state.byUser = false
+        }
+    }
     LaunchedEffect(loading) {
         if (loading) {
             state.wasRefreshing = true
@@ -204,6 +212,7 @@ fun rememberDropRefresh(refreshing: Boolean, failed: Boolean): DropRefreshState 
 }
 
 private const val DONE_HOLD_MS = 950L
+private const val PULL_WAIT_MS = 2_000L
 private const val LABEL_MS = 3_000L
 
 /** Насколько сдвинута страница (в долях порога) — столько же места получает капля. */

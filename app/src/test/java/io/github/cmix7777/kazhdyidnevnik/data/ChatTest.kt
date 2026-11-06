@@ -199,15 +199,32 @@ class ChatTest {
         assertTrue(merge.restarted)
         assertEquals(listOf("новое 1", "новое 2"), merge.state.theirs.map { it.text })
         assertEquals(5, merge.state.earlier.size)
-        assertEquals(2L, merge.state.readUpTo)
-        assertEquals(2L, merge.state.notifiedUpTo)
+        // Оба новых сообщения написаны после всего прочитанного: они непрочитанные, о них будет уведомление.
+        assertEquals(0L, merge.state.readUpTo)
+        assertEquals(0L, merge.state.notifiedUpTo)
         assertEquals(-1L, merge.state.readSent)
-        // Следующее его сообщение — непрочитанное, о нём будет уведомление, и у него не будет «прочитано».
+        assertEquals(2, ChatLogic.unread(merge.state))
+        assertEquals(listOf(1L, 2L), ChatLogic.toNotify(merge.state).map { it.seq })
+        // Следующее его сообщение тоже непрочитанное, и у него не будет «прочитано».
         val next = ChatLogic.mergeTheirs(merge.state, head.copy(last = 3, messages = head.messages + theirs(3, at = 901_000)), 8)
         assertFalse(next.restarted)
-        assertEquals(1, ChatLogic.unread(next.state))
-        assertEquals(listOf(3L), ChatLogic.toNotify(next.state).map { it.seq })
+        assertEquals(3, ChatLogic.unread(next.state))
         assertEquals(ChatTick.SENT, ChatLogic.tick(ChatState(mine = listOf(mine(3)), uploaded = 3, theirRead = 2), mine(3), true))
+    }
+
+    @Test
+    fun restartNoticedLateKeepsWhatWasAlreadyRead() {
+        // Сброс случился давно: новые 1-2 уже заменили старые и прочитаны, а старые 3-5 так и висят.
+        val fresh = listOf(theirs(1, at = 900_000, text = "новое 1"), theirs(2, at = 900_500, text = "новое 2"))
+        val state = ChatState(theirs = fresh + (3..5).map { theirs(it) }, readUpTo = 5, notifiedUpTo = 5)
+        val merge = ChatLogic.mergeTheirs(state, ChatHead(from = "nastya", last = 2, messages = fresh), 9)
+        assertTrue(merge.restarted)
+        assertEquals(2L, merge.state.readUpTo)
+        assertEquals(0, ChatLogic.unread(merge.state))
+        assertEquals(3, merge.state.earlier.size)
+        // А сообщение после этого уже честно непрочитанное.
+        val next = ChatLogic.mergeTheirs(merge.state, ChatHead(from = "nastya", last = 3, messages = fresh + theirs(3, at = 950_000)), 10)
+        assertEquals(1, ChatLogic.unread(next.state))
     }
 
     @Test

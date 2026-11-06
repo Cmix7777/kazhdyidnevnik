@@ -31,3 +31,9 @@ object JsoupTransport : HttpTransport {
         return HttpReply(response.statusCode(), response.body())
     }
 }
+
+/** Через что приложение ходит в облако. Тесты на эмуляторе подставляют сюда поддельную базу. */
+object CloudNet {
+    @Volatile
+    var transport: HttpTransport = JsoupTransport
+}

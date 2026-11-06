@@ -3,8 +3,8 @@ package io.github.cmix7777.kazhdyidnevnik.data
 import io.github.cmix7777.kazhdyidnevnik.data.sheet.SheetReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jsoup.Jsoup
 import java.io.File
 import java.io.IOException
@@ -46,10 +46,12 @@ class CollegeRepository(private val dir: File) : ScheduleSource {
 
     /** Таблица семестра. Если её только что скачали (например, для соседней недели), берём ту же. */
     private suspend fun timetable(timeoutMs: Int): CollegeTimetable = withContext(Dispatchers.IO) {
-        lock.withLock {
+        // Таблицу уже качает кто-то ещё (фоновая проверка): ждём его, но не бесконечно.
+        withTimeoutOrNull(timeoutMs * 3L) { lock.lock() } ?: throw IOException("таблица колледжа ещё скачивается")
+        try {
             val cached = memory
             if (cached != null && System.currentTimeMillis() - cached.second < REUSE_MS) {
-                return@withLock cached.first
+                return@withContext cached.first
             }
             val url = fileUrl(timeoutMs)
             val bytes = Jsoup.connect(url)
@@ -65,6 +67,8 @@ class CollegeRepository(private val dir: File) : ScheduleSource {
             File(dir, SOURCE_URL).writeText(url)
             memory = table to System.currentTimeMillis()
             table
+        } finally {
+            lock.unlock()
         }
     }
 

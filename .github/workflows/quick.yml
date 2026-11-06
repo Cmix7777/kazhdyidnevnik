@@ -1,0 +1,80 @@
+name: Быстрая проверка
+
+# Сборка и обычные тесты без эмулятора: несколько минут вместо пятнадцати. Для черновой ветки quick.
+on:
+  push:
+    branches: [quick]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: quick-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Сборка и обычные тесты
+        id: build
+        run: |
+          set -o pipefail
+          gradle --no-daemon --continue testDebugUnitTest compileDebugAndroidTestKotlin assembleRelease 2>&1 | tee build.log
+
+      - name: Отчёт
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ job.status }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/report" && cd "$RUNNER_TEMP/report"
+          {
+            echo "run=${GITHUB_RUN_NUMBER}"
+            echo "sha=${GITHUB_SHA}"
+            echo "result=${RESULT}"
+            echo "time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "apk=$(stat -c %s "$GITHUB_WORKSPACE/app/build/outputs/apk/release/app-release.apk" 2>/dev/null)"
+            echo "--- errors ---"
+            grep -E "^e: |error:|FAILED|BUILD|tests completed" "$GITHUB_WORKSPACE/build.log" 2>/dev/null | head -n 60 || true
+            echo "--- what went wrong ---"
+            grep -A 25 "What went wrong" "$GITHUB_WORKSPACE/build.log" 2>/dev/null | head -n 80 || true
+            cat "$GITHUB_WORKSPACE"/app/build/outputs/mapping/release/missing_rules.txt 2>/dev/null | head -n 40 || true
+            echo "--- failures ---"
+            python3 - "$GITHUB_WORKSPACE/app/build/test-results/testDebugUnitTest" <<'PY' || true
+          import glob, sys, xml.etree.ElementTree as ET
+          total = failed = 0
+          for path in sorted(glob.glob(sys.argv[1] + "/*.xml")):
+              root = ET.parse(path).getroot()
+              for case in root.iter("testcase"):
+                  total += 1
+                  for bad in list(case.findall("failure")) + list(case.findall("error")):
+                      failed += 1
+                      text = (bad.text or "").strip().splitlines()
+                      frames = [l.strip() for l in text if "cmix7777" in l][:4]
+                      print(f"{case.get('classname').split('.')[-1]}.{case.get('name')}: {(bad.get('message') or '')[:600]}")
+                      for f in frames: print("    " + f)
+          print(f"tests={total} failed={failed}")
+          PY
+            echo "--- live ---"
+            grep -h "LIVE:" "$GITHUB_WORKSPACE"/app/build/test-results/testDebugUnitTest/*.xml 2>/dev/null | head -n 80 || true
+          } > status.txt
+          cp -r "$GITHUB_WORKSPACE/app/build/live" . 2>/dev/null || true
+          git init -q
+          git checkout -q -b ci-quick
+          git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "Быстрая проверка ${GITHUB_RUN_NUMBER}: ${RESULT}"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" ci-quick

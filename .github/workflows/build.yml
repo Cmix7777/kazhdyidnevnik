@@ -60,6 +60,30 @@ jobs:
             --title "Версия 1.0.${VERSION_CODE}" \
             --notes "${CLEAN:-Новая версия}"
 
+      - name: Копия для jsDelivr
+        # Запасной адрес обновления: у некоторых операторов GitHub отдаёт файл по капле. Метка apk-v1.0.N
+        # указывает на коммит, в котором лежит только APK; приложение качает его с cdn.jsdelivr.net.
+        if: success() && env.SIGNING_KEYSTORE != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          TAG="apk-v1.0.${VERSION_CODE}"
+          mkdir -p "$RUNNER_TEMP/mirror" && cd "$RUNNER_TEMP/mirror"
+          git init -q
+          cp "$GITHUB_WORKSPACE/kazhdyidnevnik.apk" .
+          git add kazhdyidnevnik.apk
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "APK 1.0.${VERSION_CODE}"
+          git tag "$TAG"
+          git push -q "$REMOTE" "$TAG" || echo "mirror push failed" >> "$GITHUB_WORKSPACE/build.log"
+          # Старые копии не нужны: оставляем три последние.
+          git ls-remote --tags "$REMOTE" 'apk-v*' | awk '{print $2}' | sed 's#refs/tags/##' | grep -v '\^{}' | sort -V | head -n -3 \
+            | while read -r old; do git push -q "$REMOTE" ":refs/tags/$old" || true; done || true
+          # Разогреть jsDelivr, чтобы первый телефон не ждал, и записать, что он ответил.
+          sleep 20
+          curl -sL -o /dev/null -w "jsdelivr: %{http_code} %{size_download}\n" \
+            "https://cdn.jsdelivr.net/gh/${GITHUB_REPOSITORY}@${TAG}/kazhdyidnevnik.apk" >> "$GITHUB_WORKSPACE/build.log" || true
+
       - name: Отчёт о сборке
         if: always()
         env:
@@ -77,6 +101,8 @@ jobs:
             grep -E "^e: |error:|FAILED|BUILD|tests completed" "$GITHUB_WORKSPACE/build.log" 2>/dev/null | head -n 60 || true
             echo "--- what went wrong ---"
             grep -A 25 "What went wrong" "$GITHUB_WORKSPACE/build.log" 2>/dev/null | head -n 120 || true
+            echo "apk=$(stat -c %s "$GITHUB_WORKSPACE/app/build/outputs/apk/release/app-release.apk" 2>/dev/null)"
+            grep -E "^jsdelivr:|mirror push failed" "$GITHUB_WORKSPACE/build.log" 2>/dev/null || true
             echo "--- tail ---"
             tail -n 60 "$GITHUB_WORKSPACE/build.log" 2>/dev/null || true
           } > status.txt

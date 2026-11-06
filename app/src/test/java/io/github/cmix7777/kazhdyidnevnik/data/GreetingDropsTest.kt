@@ -49,6 +49,16 @@ class GreetingDropsTest {
     }
 
     @Test
+    fun dropFromPhoneWithFastClockIsStillShown() {
+        // Часы того, кто бросил каплю, спешат на 20 минут: капля всё равно показывается, а не пропадает молча.
+        val now = at(20, 0)
+        val ahead = at(20, 20)
+        assertEquals(listOf(ahead), GreetingDrops.unseen(listOf(ahead), 0L, now))
+        // Совсем странное время (на сутки вперёд) не показывается.
+        assertTrue(GreetingDrops.unseen(listOf(at(20, 0, today.plusDays(1))), 0L, now).isEmpty())
+    }
+
+    @Test
     fun dropsTravelInShareCode() {
         val shared = SharedEvents(Person.AIZAT, at(20, 0), emptyList(), drops = listOf(at(9, 10), at(14, 20)))
         val back = PartnerShare.decode(PartnerShare.encode(shared))!!

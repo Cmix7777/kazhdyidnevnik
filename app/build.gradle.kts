@@ -43,10 +43,14 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            if (hasSigning) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            // Без лишнего кода APK в несколько раз меньше: обновление быстрее доходит даже по медленной связи
+            // и помещается на запасной адрес (jsDelivr берёт файлы до 20 МБ). Имена классов не меняются
+            // (см. proguard-rules.pro), чтобы отчёты о вылете оставались читаемыми.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Без ключа (проверка ветки) подписываем отладочным: такую сборку можно поставить на эмулятор.
+            signingConfig = if (hasSigning) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
 
@@ -58,6 +62,12 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    // Поддельное облако и прочие помощники нужны и обычным тестам, и тестам на эмуляторе.
+    sourceSets {
+        getByName("test").java.srcDir("src/testShared/java")
+        getByName("androidTest").java.srcDir("src/testShared/java")
     }
 }
 

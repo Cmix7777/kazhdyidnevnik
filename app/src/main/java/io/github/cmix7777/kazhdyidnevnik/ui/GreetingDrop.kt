@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import io.github.cmix7777.kazhdyidnevnik.data.GreetingDrops
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
+import io.github.cmix7777.kazhdyidnevnik.service.ChatSync
 import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.EffectsSettings
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.Haptics
@@ -251,7 +252,8 @@ object DropOutbox {
             delay(GreetingDrops.UNDO_MS)
             val settings = AppSettings(app)
             settings.sentDrops = GreetingDrops.withSent(settings.sentDrops, at)
-            PartnerSync.syncNow(app, force = true)
+            // Сначала капля ложится в облако, потом телефон второго получает толчок и забирает её сразу.
+            if (PartnerSync.sync(app, force = true)) ChatSync.pushDrop(app)
         }
     }
 

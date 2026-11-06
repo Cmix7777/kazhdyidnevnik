@@ -34,6 +34,19 @@ class ReleaseTest {
     }
 
     @Test
+    fun checksumAndMirrorAddress() {
+        val sha = "ab".repeat(32)
+        val json = """{"tag_name":"v1.0.40","body":"x","assets":[{"name":"kazhdyidnevnik.apk","size":7000000,""" +
+            """"digest":"sha256:$sha","browser_download_url":"https://github.com/Cmix7777/kazhdyidnevnik/releases/download/v1.0.40/kazhdyidnevnik.apk"}]}"""
+        val release = requireNotNull(ReleaseParser.fromApi(json))
+        assertEquals(sha, release.sha256)
+        assertEquals("https://cdn.jsdelivr.net/gh/Cmix7777/kazhdyidnevnik@apk-v1.0.40/kazhdyidnevnik.apk", release.mirrorUrl)
+        // Непонятная сумма не считается суммой: файл тогда проверяется только по размеру.
+        assertNull(ReleaseParser.fromApi(json.replace("sha256:$sha", "md5:123"))!!.sha256)
+        assertNull(ReleaseParser.fromApi(json.replace(sha, "abc"))!!.sha256)
+    }
+
+    @Test
     fun rejectsStrangeAnswers() {
         assertNull(ReleaseParser.fromApi("""{"message":"API rate limit exceeded"}"""))
         assertNull(ReleaseParser.fromApi("не json"))
