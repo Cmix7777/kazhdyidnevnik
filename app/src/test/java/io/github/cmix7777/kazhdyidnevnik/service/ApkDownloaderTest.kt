@@ -1,7 +1,5 @@
 package io.github.cmix7777.kazhdyidnevnik.service
 
-import com.sun.net.httpserver.HttpExchange
-import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -11,10 +9,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import java.io.File
-import java.net.InetSocketAddress
+import java.io.IOException
+import java.io.OutputStream
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.Socket
 import java.nio.file.Files
 import java.util.Collections
 import java.util.Random
+import kotlin.concurrent.thread
 
 /**
  * Скачивание обновления на настоящем маленьком сервере: замирающем, медленном, обрывающемся,
@@ -25,56 +28,86 @@ class ApkDownloaderTest {
     private val apk = ByteArray(300_000).also { Random(11).nextBytes(it) }
     private val dir: File = Files.createTempDirectory("apk").toFile()
     private val target = File(dir, "app.apk")
-    private val servers = mutableListOf<HttpServer>()
+    private val sockets = mutableListOf<ServerSocket>()
     private val ranges = Collections.synchronizedList(mutableListOf<String>())
 
     @After
     fun stop() {
-        servers.forEach { it.stop(0) }
+        sockets.forEach { runCatching { it.close() } }
         dir.deleteRecursively()
     }
 
-    /** Сервер, который на каждый запрос зовёт [handler] с номером запроса и началом из Range. */
-    private fun server(handler: (exchange: HttpExchange, request: Int, from: Long) -> Unit): String {
-        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+    /**
+     * Крошечный HTTP-сервер на сокетах (в тестах Android нет готового). На каждый запрос зовёт [handler]
+     * с номером запроса, началом из Range и потоком ответа; после ответа соединение закрывается.
+     */
+    private fun server(handler: (out: OutputStream, request: Int, from: Long) -> Unit): String {
+        val socket = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+        sockets += socket
         var count = 0
-        server.createContext("/app.apk") { exchange ->
-            val range = exchange.requestHeaders.getFirst("Range")
-            ranges += range ?: "-"
-            val from = range?.removePrefix("bytes=")?.substringBefore('-')?.toLongOrNull() ?: 0L
-            try {
-                handler(exchange, count++, from)
-            } catch (e: Exception) {
-                // Клиент закрыл соединение — для теста это нормально.
-            } finally {
-                runCatching { exchange.close() }
+        thread(isDaemon = true) {
+            while (!socket.isClosed) {
+                val client: Socket = try {
+                    socket.accept()
+                } catch (e: IOException) {
+                    break
+                }
+                val number = synchronized(this) { count++ }
+                thread(isDaemon = true) {
+                    client.use {
+                        val input = it.getInputStream().bufferedReader(Charsets.ISO_8859_1)
+                        var range: String? = null
+                        while (true) {
+                            val line = input.readLine() ?: return@use
+                            if (line.isEmpty()) break
+                            if (line.startsWith("Range:", ignoreCase = true)) range = line.substringAfter(':').trim()
+                        }
+                        ranges += range ?: "-"
+                        val from = range?.removePrefix("bytes=")?.substringBefore('-')?.toLongOrNull() ?: 0L
+                        try {
+                            handler(it.getOutputStream(), number, from)
+                        } catch (e: IOException) {
+                            // Клиент закрыл соединение — для теста это нормально.
+                        }
+                    }
+                }
             }
         }
-        server.executor = java.util.concurrent.Executors.newCachedThreadPool { task -> Thread(task).apply { isDaemon = true } }
-        server.start()
-        servers += server
-        return "http://127.0.0.1:${server.address.port}/app.apk"
+        return "http://127.0.0.1:${socket.localPort}/app.apk"
     }
 
+    private fun head(out: OutputStream, status: String, vararg headers: String) {
+        val text = buildString {
+            append("HTTP/1.1 ").append(status).append("\r\n")
+            headers.forEach { append(it).append("\r\n") }
+            append("Connection: close\r\n\r\n")
+        }
+        out.write(text.toByteArray(Charsets.ISO_8859_1))
+        out.flush()
+    }
+
+    private fun error(out: OutputStream, status: String) = head(out, status, "Content-Length: 0")
+
     /** Отдать файл с [from] (206, если просили Range и сервер его понимает), по [chunk] байт с паузой [pauseMs]. */
-    private fun send(exchange: HttpExchange, from: Long, honourRange: Boolean = true, upTo: Int = apk.size, chunk: Int = 16_384, pauseMs: Long = 0) {
+    private fun send(out: OutputStream, from: Long, honourRange: Boolean = true, upTo: Int = apk.size, chunk: Int = 16_384, pauseMs: Long = 0) {
         val start = if (honourRange) from.toInt() else 0
         val partial = honourRange && from > 0
         val length = apk.size - start
-        if (partial) exchange.responseHeaders.add("Content-Range", "bytes $start-${apk.size - 1}/${apk.size}")
-        exchange.sendResponseHeaders(if (partial) 206 else 200, length.toLong())
-        val body = exchange.responseBody
+        if (partial) {
+            head(out, "206 Partial Content", "Content-Length: $length", "Content-Range: bytes $start-${apk.size - 1}/${apk.size}")
+        } else {
+            head(out, "200 OK", "Content-Length: $length")
+        }
         var pos = start
         while (pos < upTo) {
             val n = minOf(chunk, upTo - pos)
-            body.write(apk, pos, n)
-            body.flush()
+            out.write(apk, pos, n)
+            out.flush()
             pos += n
             if (pauseMs > 0) Thread.sleep(pauseMs)
         }
-        // Замирание: байты больше не идут, но соединение не закрывается.
+        // Замирание: байты больше не идут, но соединение ещё открыто.
         if (upTo < apk.size) Thread.sleep(5_000)
-        body.close()
     }
 
     private fun downloader() = ApkDownloader(
@@ -91,7 +124,7 @@ class ApkDownloaderTest {
 
     @Test(timeout = 20_000)
     fun plainDownloadReportsProgressToTheEnd() {
-        val url = server { exchange, _, from -> send(exchange, from) }
+        val url = server { out, _, from -> send(out, from) }
         val progress = mutableListOf<DownloadProgress>()
         download(url, sha = sha(apk), progress = progress)
         assertArrayEquals(apk, target.readBytes())
@@ -102,8 +135,8 @@ class ApkDownloaderTest {
 
     @Test(timeout = 20_000)
     fun frozenConnectionIsResumedFromTheSamePlace() {
-        val url = server { exchange, request, from ->
-            if (request == 0) send(exchange, from, upTo = 120_000) else send(exchange, from)
+        val url = server { out, request, from ->
+            if (request == 0) send(out, from, upTo = 120_000) else send(out, from)
         }
         download(url)
         assertArrayEquals(apk, target.readBytes())
@@ -113,16 +146,16 @@ class ApkDownloaderTest {
 
     @Test(timeout = 20_000)
     fun brokenServerFallsBackToMirror() {
-        val github = server { exchange, _, _ -> exchange.sendResponseHeaders(502, -1) }
-        val mirror = server { exchange, _, from -> send(exchange, from) }
+        val github = server { out, _, _ -> error(out, "502 Bad Gateway") }
+        val mirror = server { out, _, from -> send(out, from) }
         download(github, mirror)
         assertArrayEquals(apk, target.readBytes())
     }
 
     @Test(timeout = 30_000)
     fun trickleSwitchesToMirrorAndKeepsWhatWasDownloaded() {
-        val github = server { exchange, _, from -> send(exchange, from, chunk = 2_000, pauseMs = 100) }
-        val mirror = server { exchange, _, from -> send(exchange, from) }
+        val github = server { out, _, from -> send(out, from, chunk = 2_000, pauseMs = 100) }
+        val mirror = server { out, _, from -> send(out, from) }
         val progress = mutableListOf<DownloadProgress>()
         download(github, mirror, progress = progress)
         assertArrayEquals(apk, target.readBytes())
@@ -134,8 +167,8 @@ class ApkDownloaderTest {
 
     @Test(timeout = 20_000)
     fun serverWithoutRangeStartsOverAndStillGivesTheRightFile() {
-        val url = server { exchange, request, from ->
-            if (request == 0) send(exchange, from, honourRange = false, upTo = 100_000) else send(exchange, from, honourRange = false)
+        val url = server { out, request, from ->
+            if (request == 0) send(out, from, honourRange = false, upTo = 100_000) else send(out, from, honourRange = false)
         }
         download(url)
         assertArrayEquals(apk, target.readBytes())
@@ -143,14 +176,14 @@ class ApkDownloaderTest {
 
     @Test(timeout = 20_000)
     fun connectionCutShortIsResumed() {
-        val url = server { exchange, request, from ->
+        val url = server { out, request, from ->
             if (request == 0) {
-                exchange.sendResponseHeaders(200, apk.size.toLong())
-                exchange.responseBody.write(apk, 0, 50_000)
-                exchange.responseBody.flush()
+                head(out, "200 OK", "Content-Length: ${apk.size}")
+                out.write(apk, 0, 50_000)
+                out.flush()
                 // Обрыв: соединение закрывается раньше обещанной длины.
             } else {
-                send(exchange, from)
+                send(out, from)
             }
         }
         download(url)
@@ -159,7 +192,7 @@ class ApkDownloaderTest {
 
     @Test(timeout = 20_000)
     fun wrongChecksumIsAnErrorAndLeavesNoFile() {
-        val url = server { exchange, _, from -> send(exchange, from) }
+        val url = server { out, _, from -> send(out, from) }
         try {
             download(url, sha = "0".repeat(64))
             fail("испорченный файл не должен считаться скачанным")
@@ -171,7 +204,7 @@ class ApkDownloaderTest {
 
     @Test(timeout = 20_000)
     fun everythingDownGivesReadableErrorInsteadOfEndlessBar() {
-        val github = server { exchange, _, _ -> exchange.sendResponseHeaders(404, -1) }
+        val github = server { out, _, _ -> error(out, "404 Not Found") }
         val dead = "http://127.0.0.1:1/app.apk"
         try {
             download(github, dead)
@@ -185,9 +218,11 @@ class ApkDownloaderTest {
 
     @Test(timeout = 20_000)
     fun unknownSizeStillCompletes() {
-        val url = server { exchange, _, _ ->
-            exchange.sendResponseHeaders(200, 0)
-            exchange.responseBody.use { it.write(apk) }
+        val url = server { out, _, _ ->
+            // Без длины: файл кончается, когда закрывается соединение.
+            head(out, "200 OK")
+            out.write(apk)
+            out.flush()
         }
         val progress = mutableListOf<DownloadProgress>()
         download(url, size = 0, progress = progress)
