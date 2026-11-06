@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="ru">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Расписание МВЕК</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&amp;display=swap" rel="stylesheet">
+  <link href="//fonts.googleapis.com/css?family=PT+Sans:400,700&amp;subset=latin,cyrillic-ext" rel="stylesheet" type="text/css">
+  <link rel="stylesheet" href="../css/crud.css">
+  <!-- слайдер мобильной версии на главной странице !-->
+  <link rel="stylesheet" href="../css/style-slider.css">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/jquery-ui.css">
+  <link rel="stylesheet" href="../css/new.css?3">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=UA-119620340-3"></script>
+  <script src="../js/analytic.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.3/jquery-ui.min.js"></script>
+  <script src="../js/mousewheel.js"></script>
+  <script src="../js/slimscroll.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.11.3/jquery-ui.min.js"></script>
+ </head>
+ <body>
+  <header class="app-header">
+   <img class="logo-placeholder" src="../img/new/logo.png" alt="МВЕК">
+   <h1 class="header-title">Расписание занятий МВЕК</h1>
+  </header>
+  <style>
+    .schedule-block .crudTable tr td {
+        border: 1px solid #aaa;
+        padding: 5px 10px;
+    }
+    .schedule-block .crudTable tr.border td {
+        padding: 0;
+    }
+
+    .schedule-nav {
+        font-size: 1.5em;
+        color: #2c496c;
+        text-align: center;
+    }
+</style>
+  <!-- Step 5: Schedule Display Area (Added button container here) -->
+  <div id="scheduleHeaderContainer" style="position: relative; text-align: center;">
+   <!-- Schedule title will be inserted here by JS -->
+   <a href="/">
+    <button id="backToSelectionButton" class="back-button" title="Показать список">←</button>
+   </a><!-- Renamed ID -->
+  </div>
+  <h1>Расписание для группы ДИС-234/21Б</h1>
+  <div class="schedule-nav">
+   <a href="/schedule/table?group=ДИС-234/21Б&amp;skip=0" style="margin-right: 20px">&lt;</a>09 — 15 ноября <a href="/schedule/table?group=ДИС-234/21Б&amp;skip=2" style="margin-left: 20px;">&gt;</a>
+  </div>
+  <style>
+        .pr-announce {
+            border: 1px dotted #ccc;
+            padding: 15px 40px;
+            margin: 20px 0 20px 0;
+            font-size: 1.1em;
+            font-weight: bold;
+
+        }
+        .pr-announce span {
+            /*font-size: 1.4em;*/
+        }
+        .pr-announce p {
+            margin: 0;
+        }
+    </style>
+  <div class="schedule-desctop">
+   <div class="module-block schedule-block">
+    <div class="crudTable">
+     <table style="margin-top:20px" class="crud">
+      <tbody>
+       <tr>
+        <th></th>
+        <th></th>
+        <th>Время</th>
+        <th>Предмет</th>
+        <th>Тема</th>
+        <th>Преподаватель</th>
+        <th>АУД</th>
+       </tr>
+      </tbody>
+     </table>
+    </div>
+   </div>
+  </div>
+  <div class="schedule_mob">
+   <div id="schedule_mob">
+    <div class="dates">
+     <div class="date_and_wday">
+      <div class="day_of_the_week">Пн</div>
+      <input type="radio" name="date" id="date09.11" onclick="showLessonsInAWeek('09.11')" checked><label for="date09.11" class="single_date">09.11</label> <span class="checkmark"></span>
+     </div>
+     <div class="date_and_wday">
+      <div class="day_of_the_week">Вт</div>
+      <input type="radio" name="date" id="date10.11" onclick="showLessonsInAWeek('10.11')"><label for="date10.11" class="single_date">10.11</label> <span class="checkmark"></span>
+     </div>
+     <div class="date_and_wday">
+      <div class="day_of_the_week">Ср</div>
+      <input type="radio" name="date" id="date11.11" onclick="showLessonsInAWeek('11.11')"><label for="date11.11" class="single_date">11.11</label> <span class="checkmark"></span>
+     </div>
+     <div class="date_and_wday">
+      <div class="day_of_the_week">Чт</div>
+      <input type="radio" name="date" id="date12.11" onclick="showLessonsInAWeek('12.11')"><label for="date12.11" class="single_date">12.11</label> <span class="checkmark"></span>
+     </div>
+     <div class="date_and_wday">
+      <div class="day_of_the_week">Пт</div>
+      <input type="radio" name="date" id="date13.11" onclick="showLessonsInAWeek('13.11')"><label for="date13.11" class="single_date">13.11</label> <span class="checkmark"></span>
+     </div>
+     <div class="date_and_wday">
+      <div class="day_of_the_week">Сб</div>
+      <input type="radio" name="date" id="date14.11" onclick="showLessonsInAWeek('14.11')"><label for="date14.11" class="single_date">14.11</label> <span class="checkmark"></span>
+     </div>
+     <div class="date_and_wday">
+      <div class="day_of_the_week">Вс</div>
+      <input type="radio" name="date" id="date15.11" onclick="showLessonsInAWeek('15.11')"><label for="date15.11" class="single_date">15.11</label> <span class="checkmark"></span>
+     </div>
+    </div>
+    <div class="lessons_wrap" id="09.11" style="display: flex;">
+     <div class="lesson_block">
+      <b class="lesson_title">Нет занятий</b>
+      <br>
+      <br>
+     </div>
+    </div>
+    <div class="lessons_wrap" id="10.11">
+     <div class="lesson_block">
+      <b class="lesson_title">Нет занятий</b>
+      <br>
+      <br>
+     </div>
+    </div>
+    <div class="lessons_wrap" id="11.11">
+     <div class="lesson_block">
+      <b class="lesson_title">Нет занятий</b>
+      <br>
+      <br>
+     </div>
+    </div>
+    <div class="lessons_wrap" id="12.11">
+     <div class="lesson_block">
+      <b class="lesson_title">Нет занятий</b>
+      <br>
+      <br>
+     </div>
+    </div>
+    <div class="lessons_wrap" id="13.11">
+     <div class="lesson_block">
+      <b class="lesson_title">Нет занятий</b>
+      <br>
+      <br>
+     </div>
+    </div>
+    <div class="lessons_wrap" id="14.11">
+     <div class="lesson_block">
+      <b class="lesson_title">Нет занятий</b>
+      <br>
+      <br>
+     </div>
+    </div>
+    <div class="lessons_wrap" id="15.11">
+     <div class="lesson_block">
+      <b class="lesson_title">Нет занятий</b>
+      <br>
+      <br>
+     </div>
+    </div>
+   </div>
+   <script type="text/javascript">
+        function showLessonsInAWeek(id){
+            hideAll();
+            var lessons_wrap = document.getElementById(id);
+            lessons_wrap.classList.add('b-show');
+            lessons_wrap.style.display = "flex";
+
+        }
+
+        function hideAll() {
+            var lessons_wrap = document.getElementsByClassName('lessons_wrap');
+            for (var i = 0; i < lessons_wrap.length; ++i) {
+                lessons_wrap[i].style.display = 'none';
+            }
+        }
+    </script>
+  </div>
+ </body>
+</html>
