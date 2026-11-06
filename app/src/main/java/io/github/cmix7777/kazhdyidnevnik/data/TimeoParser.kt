@@ -41,6 +41,9 @@ object TimeoParser {
             if (cells.size < offset + 6) continue
 
             val time = timeRegex.find(cells[offset + 1].text()) ?: continue
+            // «24:00» или опечатка вроде «8:70» не роняют всю неделю: такая строка просто пропускается.
+            val start = clock(time.groupValues[1], time.groupValues[2]) ?: continue
+            val end = clock(time.groupValues[3], time.groupValues[4]) ?: continue
             val subject = cells[offset + 2].text().trim()
             if (subject.isEmpty()) continue
 
@@ -52,8 +55,8 @@ object TimeoParser {
             result += Lesson(
                 date = date,
                 number = cells[offset].text().trim().toIntOrNull(),
-                start = LocalTime.of(time.groupValues[1].toInt(), time.groupValues[2].toInt()),
-                end = LocalTime.of(time.groupValues[3].toInt(), time.groupValues[4].toInt()),
+                start = start,
+                end = end,
                 subject = subject,
                 topic = cells[offset + 3].text().trim(),
                 teacher = cells[offset + 4].text().trim(),
@@ -62,6 +65,12 @@ object TimeoParser {
             )
         }
         return result.sortedWith(compareBy({ it.date }, { it.start }))
+    }
+
+    private fun clock(hours: String, minutes: String): LocalTime? {
+        val h = hours.toIntOrNull() ?: return null
+        val m = minutes.toIntOrNull() ?: return null
+        return if (h in 0..23 && m in 0..59) LocalTime.of(h, m) else null
     }
 
     /**
