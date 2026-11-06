@@ -80,6 +80,16 @@ class LiveSourcesTest {
         }
         log("timeo: ${ms(started)} мс, пар на неделе ${week.lessons.size}")
         week.lessons.take(12).forEach { log("  ${it.date} ${it.start}-${it.end} ${it.subject} | ${it.room} | ${it.teacher}") }
+        // Сама страница — чтобы можно было посмотреть глазами, если пар вдруг ноль.
+        for (skip in 0..1) {
+            val repository = ScheduleRepository(dir)
+            runCatching {
+                val html = Jsoup.connect(repository.url(skip)).userAgent(AGENT).timeout(40_000).get().outerHtml()
+                saveCopy("timeo-$skip.html", html.toByteArray())
+                val parsed = runBlocking { repository.download(skip, LocalDate.now(), 40_000) }
+                log("timeo неделя +$skip: ${html.length} знаков, пар ${parsed.lessons.size}")
+            }.onFailure { log("timeo неделя +$skip: $it") }
+        }
     }
 
     private fun saveCopy(name: String, bytes: ByteArray) {

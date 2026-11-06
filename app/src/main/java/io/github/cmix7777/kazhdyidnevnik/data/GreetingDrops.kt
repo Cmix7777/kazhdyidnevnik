@@ -25,9 +25,16 @@ object GreetingDrops {
     /** Добавить отправленную каплю и убрать старые. */
     fun withSent(drops: List<Long>, at: Long): List<Long> = recent(drops + at, at)
 
+    /**
+     * Насколько капля может быть «из будущего». Время капли ставят часы того, кто её бросил; если они
+     * спешат относительно этого телефона, капля всё равно должна показаться, а не тихо отметиться
+     * просмотренной (так и было при расхождении часов больше чем на пять минут).
+     */
+    const val AHEAD_MS = 6L * 60 * 60 * 1000
+
     /** Что показать сейчас: непросмотренные капли за последние сутки, по времени. */
     fun unseen(drops: List<Long>, seenUntil: Long, now: Long): List<Long> =
-        drops.filter { it > seenUntil && now - it < SHOW_MS && it <= now + 5 * 60 * 1000 }.sorted()
+        drops.filter { it > seenUntil && now - it < SHOW_MS && it <= now + AHEAD_MS }.sorted()
 
     /** До какого времени считать всё просмотренным (самая поздняя капля, если она новее прежней отметки). */
     fun seenMark(drops: List<Long>, seenUntil: Long): Long = maxOf(seenUntil, drops.maxOrNull() ?: 0L)
