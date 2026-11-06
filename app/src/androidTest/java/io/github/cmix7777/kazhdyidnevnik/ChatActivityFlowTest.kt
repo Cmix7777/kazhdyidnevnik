@@ -111,13 +111,16 @@ class ChatActivityFlowTest {
         }
     }
 
+    /**
+     * Ждать условия, давая приложению жить: часы Compose в тестах идут, только пока тест ждёт через них,
+     * поэтому простой Thread.sleep останавливал бы анимации (капля так и висела бы, не долетев).
+     */
     private fun waitUntil(what: String, timeoutMs: Long = 20_000, condition: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            if (runCatching(condition).getOrDefault(false)) return
-            Thread.sleep(200)
+        try {
+            compose.waitUntil(timeoutMs) { runCatching(condition).getOrDefault(false) }
+        } catch (e: ComposeTimeoutException) {
+            throw AssertionError("Не дождался: $what. Сейчас на экране: ${screenTexts()}", e)
         }
-        throw AssertionError("Не дождался: $what. Сейчас на экране: ${screenTexts()}")
     }
 
     @Test
