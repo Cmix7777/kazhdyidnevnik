@@ -69,14 +69,14 @@ class SkyTest {
     @Test
     fun glassFollowsWeather() {
         val now = LocalDateTime.of(2026, 10, 12, 12, 0)
-        assertEquals(GlassMode.RAIN, GlassWeather.from(weather(61, 5.0), now).mode)
-        assertEquals(1f, GlassWeather.from(weather(65, 5.0), now).strength, 0.001f)
-        assertTrue(GlassWeather.from(weather(53, 5.0), now).strength < GlassWeather.from(weather(63, 5.0), now).strength)
-        assertEquals(GlassMode.SNOW, GlassWeather.from(weather(73, -3.0), now).mode)
-        assertEquals(GlassMode.FROST, GlassWeather.from(weather(0, -15.0), now).mode)
-        assertEquals(GlassMode.NONE, GlassWeather.from(weather(3, -5.0), now).mode)
-        assertEquals(GlassMode.NONE, GlassWeather.from(weather(0, 18.0), now).mode)
-        assertEquals(GlassWeather.NONE, GlassWeather.from(null, now))
+        assertEquals(GlassMode.RAIN, GlassWeather.from(weather(61, 5.0), now, WeatherClock.ZONE).mode)
+        assertEquals(1f, GlassWeather.from(weather(65, 5.0), now, WeatherClock.ZONE).strength, 0.001f)
+        assertTrue(GlassWeather.from(weather(53, 5.0), now, WeatherClock.ZONE).strength < GlassWeather.from(weather(63, 5.0), now, WeatherClock.ZONE).strength)
+        assertEquals(GlassMode.SNOW, GlassWeather.from(weather(73, -3.0), now, WeatherClock.ZONE).mode)
+        assertEquals(GlassMode.FROST, GlassWeather.from(weather(0, -15.0), now, WeatherClock.ZONE).mode)
+        assertEquals(GlassMode.NONE, GlassWeather.from(weather(3, -5.0), now, WeatherClock.ZONE).mode)
+        assertEquals(GlassMode.NONE, GlassWeather.from(weather(0, 18.0), now, WeatherClock.ZONE).mode)
+        assertEquals(GlassWeather.NONE, GlassWeather.from(null, now, WeatherClock.ZONE))
     }
 
     @Test
@@ -91,6 +91,26 @@ class SkyTest {
     }
 
     @Test
+    fun snowNowIsSeenByPhoneInAnotherTimeZone() {
+        // Прогноз по Ижевску: снег идёт сейчас, в 10:05. А телефон по сети стоит на московском времени — у него 9:05.
+        val izhevsk = LocalDateTime.of(2026, 11, 6, 10, 5)
+        val forecast = Forecast(
+            current = CurrentWeather(time = izhevsk.withMinute(0), temperature = -2.0, feelsLike = -6.0, code = 73, wind = 3.0, gusts = 6.0, isDay = true),
+            hours = listOf(
+                HourWeather(time = izhevsk.minusHours(1).withMinute(0), temperature = -1.0, feelsLike = -4.0, precipitationChance = 10, precipitation = 0.0, code = 3, wind = 3.0, gusts = 5.0, isDay = true),
+                HourWeather(time = izhevsk.withMinute(0), temperature = -2.0, feelsLike = -6.0, precipitationChance = 90, precipitation = 1.2, code = 73, wind = 3.0, gusts = 6.0, isDay = true),
+            ),
+            days = emptyList(),
+        )
+        val moscowPhone = java.time.ZoneId.of("Europe/Moscow")
+        assertEquals(GlassMode.SNOW, GlassWeather.from(forecast, izhevsk.minusHours(1), moscowPhone).mode)
+        // И телефон по ижевскому времени видит то же самое.
+        assertEquals(GlassMode.SNOW, GlassWeather.from(forecast, izhevsk, WeatherClock.ZONE).mode)
+        // Телефон в UTC (как сервер проверки) — тоже.
+        assertEquals(GlassMode.SNOW, GlassWeather.from(forecast, izhevsk.minusHours(4), java.time.ZoneOffset.UTC).mode)
+    }
+
+    @Test
     fun drizzleShowsByHourWhenNowIsOld() {
         val now = LocalDateTime.of(2026, 11, 4, 14, 10)
         // Снимок «сейчас» двухчасовой давности без осадков, а на этот час по прогнозу морось — на стекле морось.
@@ -99,9 +119,9 @@ class SkyTest {
             hours = listOf(HourWeather(time = now.withMinute(0), temperature = 4.0, feelsLike = 2.0, precipitationChance = 70, precipitation = 0.2, code = 53, wind = 1.0, gusts = 2.0, isDay = true)),
             days = emptyList(),
         )
-        assertEquals(GlassMode.RAIN, GlassWeather.from(forecast, now).mode)
+        assertEquals(GlassMode.RAIN, GlassWeather.from(forecast, now, WeatherClock.ZONE).mode)
         // Свежий снимок с моросью тоже даёт морось, даже если по часам её нет.
         val fresh = forecast.copy(current = forecast.current!!.copy(time = now, code = 51), hours = emptyList())
-        assertEquals(GlassMode.RAIN, GlassWeather.from(fresh, now).mode)
+        assertEquals(GlassMode.RAIN, GlassWeather.from(fresh, now, WeatherClock.ZONE).mode)
     }
 }
