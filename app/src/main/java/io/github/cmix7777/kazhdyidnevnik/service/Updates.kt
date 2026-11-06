@@ -15,8 +15,6 @@ import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import java.io.File
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 /** Обновление приложения из раздела Releases на GitHub. */
 object Updates {
@@ -73,54 +71,23 @@ object Updates {
         }
     }
 
-    /** Скачать APK. [onProgress] получает долю от 0 до 1 (или -1, если размер неизвестен). */
-    suspend fun download(context: Context, release: Release, onProgress: (Float) -> Unit): File =
-        withContext(Dispatchers.IO) {
-            val dir = File(context.cacheDir, "updates")
-            dir.mkdirs()
-            dir.listFiles()?.forEach { it.delete() }
-            val file = File(dir, "kazhdyidnevnik-${release.versionName}.apk")
-
-            val connection = URL(release.apkUrl).openConnection() as HttpURLConnection
-            connection.connectTimeout = 20_000
-            connection.readTimeout = 60_000
-            connection.setRequestProperty("User-Agent", USER_AGENT)
-            try {
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw IOException("GitHub ответил ${connection.responseCode}")
-                }
-                val total = connection.contentLengthLong.takeIf { it > 0 } ?: release.sizeBytes
-                connection.inputStream.use { input ->
-                    file.outputStream().use { output ->
-                        val buffer = ByteArray(64 * 1024)
-                        var copied = 0L
-                        var lastReported = -1
-                        while (true) {
-                            val read = input.read(buffer)
-                            if (read < 0) break
-                            output.write(buffer, 0, read)
-                            copied += read
-                            if (total > 0) {
-                                val percent = (copied * 100 / total).toInt()
-                                if (percent != lastReported) {
-                                    lastReported = percent
-                                    onProgress(copied.toFloat() / total)
-                                }
-                            } else {
-                                onProgress(-1f)
-                            }
-                        }
-                        if (total > 0 && copied != total) throw IOException("Файл скачался не полностью")
-                    }
-                }
-            } catch (e: Exception) {
-                file.delete()
-                throw e
-            } finally {
-                connection.disconnect()
-            }
-            file
-        }
+    /**
+     * Скачать APK: сначала с GitHub, при замирании или медленной скорости — с копии на jsDelivr,
+     * продолжая с уже скачанного. Не виснет: в худшем случае через пару минут — понятная ошибка.
+     */
+    suspend fun download(
+        context: Context,
+        release: Release,
+        downloader: ApkDownloader = ApkDownloader(),
+        onProgress: (DownloadProgress) -> Unit,
+    ): File {
+        val dir = File(context.cacheDir, "updates")
+        dir.mkdirs()
+        dir.listFiles()?.forEach { it.delete() }
+        val file = File(dir, "kazhdyidnevnik-${release.versionName}.apk")
+        val sources = listOf(release.apkUrl, release.mirrorUrl).distinct()
+        return downloader.download(sources, file, release.sizeBytes, release.sha256, onProgress)
+    }
 
     /** Разрешено ли этому приложению ставить обновления (настройка «Установка неизвестных приложений»). */
     fun canInstall(context: Context): Boolean = context.packageManager.canRequestPackageInstalls()

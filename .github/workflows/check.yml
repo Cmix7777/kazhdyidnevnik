@@ -34,7 +34,7 @@ jobs:
         id: build
         run: |
           set -o pipefail
-          gradle --no-daemon --continue testDebugUnitTest assembleDebug assembleDebugAndroidTest 2>&1 | tee build.log
+          gradle --no-daemon --continue testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease 2>&1 | tee build.log
 
       - name: Ускорение эмулятора (KVM)
         if: steps.build.outcome == 'success'
@@ -62,6 +62,7 @@ jobs:
             adb logcat -d -v time > logcat.txt 2>&1 || true
             adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.TogetherWeekShotsTest,io.github.cmix7777.kazhdyidnevnik.SpecialDayShotsTest,io.github.cmix7777.kazhdyidnevnik.WeatherShotsTest,io.github.cmix7777.kazhdyidnevnik.LiveUiShotsTest,io.github.cmix7777.kazhdyidnevnik.GreetingRealAppTest,io.github.cmix7777.kazhdyidnevnik.ChatShotsTest,io.github.cmix7777.kazhdyidnevnik.ChatCloudLiveTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > instrument.log 2>&1 || true
             adb pull /sdcard/Android/data/io.github.cmix7777.kazhdyidnevnik/files/shots shots || true
+            sh .github/release-smoke.sh > release.log 2>&1 || true
 
       - name: Отчёт проверки
         if: always()
@@ -85,6 +86,8 @@ jobs:
             tail -n 80 "$GITHUB_WORKSPACE/instrument.log" 2>/dev/null || true
             echo "--- screens ---"
             grep -v "^\s*at " "$GITHUB_WORKSPACE/screens.log" 2>/dev/null | tail -n 40 || true
+            echo "--- release ---"
+            cat "$GITHUB_WORKSPACE/release.log" 2>/dev/null | tail -n 40 || true
             echo "--- live ---"
             grep -h "LIVE:" "$GITHUB_WORKSPACE"/app/build/test-results/testDebugUnitTest/*.xml 2>/dev/null | head -n 80 || true
             echo "--- logcat ---"

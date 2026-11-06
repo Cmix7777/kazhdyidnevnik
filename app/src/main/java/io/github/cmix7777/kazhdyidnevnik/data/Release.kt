@@ -14,7 +14,12 @@ data class Release(
     val notes: String,
     val apkUrl: String,
     val sizeBytes: Long = 0,
-)
+    /** Сумма SHA-256 файла из ответа GitHub (если GitHub её сообщил). */
+    val sha256: String? = null,
+) {
+    /** Запасной адрес того же файла: копия на jsDelivr, её выкладывает сборка вместе с версией. */
+    val mirrorUrl: String get() = ReleaseParser.mirrorUrl(versionName)
+}
 
 object ReleaseParser {
 
@@ -26,6 +31,9 @@ object ReleaseParser {
     fun versionCode(tag: String): Int? = tagRegex.find(tag)?.groupValues?.get(3)?.toIntOrNull()
 
     fun apkUrl(tag: String): String = "https://github.com/$REPO/releases/download/$tag/$APK_NAME"
+
+    /** Копия APK на jsDelivr: метка apk-v1.0.N указывает на коммит, где лежит только этот файл. */
+    fun mirrorUrl(versionName: String): String = "https://cdn.jsdelivr.net/gh/$REPO@apk-v$versionName/$APK_NAME"
 
     /** Ответ api.github.com/repos/…/releases/latest. */
     fun fromApi(json: String): Release? {
@@ -41,6 +49,10 @@ object ReleaseParser {
             notes = root["body"]?.jsonPrimitive?.contentOrNull.orEmpty().trim(),
             apkUrl = asset?.get("browser_download_url")?.jsonPrimitive?.contentOrNull ?: apkUrl(tag),
             sizeBytes = asset?.get("size")?.jsonPrimitive?.longOrNull ?: 0L,
+            sha256 = asset?.get("digest")?.jsonPrimitive?.contentOrNull
+                ?.takeIf { it.startsWith("sha256:") }
+                ?.removePrefix("sha256:")
+                ?.takeIf { it.length == 64 },
         )
     }
 

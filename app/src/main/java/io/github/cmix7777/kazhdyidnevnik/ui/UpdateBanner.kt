@@ -67,11 +67,18 @@ fun UpdateBanner(extras: ExtrasViewModel, modifier: Modifier = Modifier) {
                         trackColor = white.copy(alpha = 0.25f),
                     )
                     Text(
-                        "Скачиваю… ${(state.progress * 100).toInt()}%",
+                        "Скачиваю… ${(state.progress * 100).toInt()}%" + megabytes(state.done, state.total),
                         style = MaterialTheme.typography.bodyMedium,
                         color = soft,
                     )
                 }
+                // Что происходит, если всё идёт не гладко: человек видит, что приложение не зависло.
+                val note = when {
+                    state.mirror -> "Качаю с запасного адреса: GitHub отдавал слишком медленно."
+                    state.slow -> "GitHub отдаёт очень медленно, сейчас попробую запасной адрес."
+                    else -> null
+                }
+                if (note != null) Text(note, style = MaterialTheme.typography.bodySmall, color = soft)
             }
             is UpdateState.NeedsPermission -> {
                 Text(
@@ -108,4 +115,11 @@ fun UpdateBanner(extras: ExtrasViewModel, modifier: Modifier = Modifier) {
             else -> Unit
         }
     }
+}
+
+/** « · 3,2 из 7,1 МБ» или пусто, если размер неизвестен. */
+internal fun megabytes(done: Long, total: Long): String {
+    if (total <= 0) return ""
+    fun mb(bytes: Long) = String.format(java.util.Locale.forLanguageTag("ru"), "%.1f", bytes / 1_000_000.0)
+    return " · ${mb(done)} из ${mb(total)} МБ"
 }

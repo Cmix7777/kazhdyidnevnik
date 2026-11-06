@@ -28,7 +28,15 @@ sealed interface UpdateState {
     data object Checking : UpdateState
     data object UpToDate : UpdateState
     data class Available(val release: Release) : UpdateState
-    data class Downloading(val release: Release, val progress: Float) : UpdateState
+    /** [done]/[total] — байты (total 0 — неизвестно); [mirror] — качается с запасного адреса; [slow] — очень медленно. */
+    data class Downloading(
+        val release: Release,
+        val progress: Float,
+        val done: Long = 0,
+        val total: Long = 0,
+        val mirror: Boolean = false,
+        val slow: Boolean = false,
+    ) : UpdateState
     data class NeedsPermission(val release: Release, val file: File) : UpdateState
     data class Ready(val release: Release, val file: File) : UpdateState
     data class Failed(val message: String, val release: Release?) : UpdateState
@@ -116,8 +124,8 @@ class ExtrasViewModel(private val app: Application) : AndroidViewModel(app) {
         update = UpdateState.Downloading(release, 0f)
         viewModelScope.launch {
             try {
-                val file = Updates.download(app, release) { progress ->
-                    update = UpdateState.Downloading(release, progress)
+                val file = Updates.download(app, release) { p ->
+                    update = UpdateState.Downloading(release, p.fraction, p.done, p.total, p.mirror, p.slow)
                 }
                 install(release, file)
             } catch (e: Exception) {
@@ -210,6 +218,7 @@ class ExtrasViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     private fun describe(e: Exception): String = when (e) {
+        is io.github.cmix7777.kazhdyidnevnik.service.DownloadException -> e.message ?: "нет связи с GitHub"
         is HttpStatusException -> "GitHub ответил ошибкой ${e.statusCode}"
         is IOException -> "нет связи с GitHub"
         else -> e.javaClass.simpleName
