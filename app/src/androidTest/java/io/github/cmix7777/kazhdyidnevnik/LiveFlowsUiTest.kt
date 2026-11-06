@@ -20,6 +20,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import io.github.cmix7777.kazhdyidnevnik.data.CloudShares
+import io.github.cmix7777.kazhdyidnevnik.data.PartnerEventsRepository
 import io.github.cmix7777.kazhdyidnevnik.data.PartnerShare
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.ScheduleSource
@@ -39,6 +40,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -209,7 +211,9 @@ class LiveFlowsUiTest {
             Thread.sleep(2_000)
             val dropAt = aizatThrowsDrop()
             ChatSync.onPush(context, mapOf("k" to "d", "f" to Person.AIZAT.id))
-            waitShown(dropAt, 15_000)
+            // Пуш уже принёс каплю в телефон (без опроса); дальше только анимация, а она на эмуляторе медленная.
+            assertEquals(listOf(dropAt), PartnerEventsRepository.current(context.filesDir)?.drops)
+            waitShown(dropAt, 50_000)
         } finally {
             ChatSync.partnerPollMs = 60_000L
         }
