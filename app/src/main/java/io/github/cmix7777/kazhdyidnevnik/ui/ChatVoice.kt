@@ -179,13 +179,44 @@ class VoiceRecorder(private val context: Context) {
     }
 }
 
-/** Одно голосовое играет за раз. */
+/**
+ * Одно голосовое играет за раз. Скорость (1x, 1,5x, 2x) запоминается; недослушанное голосовое
+ * продолжается с того места, где остановился (пока приложение открыто).
+ */
 internal object VoicePlayer {
     data class Playing(val id: String, val position: Long, val duration: Long, val paused: Boolean)
 
     private val mutable = MutableStateFlow<Playing?>(null)
     val state: StateFlow<Playing?> = mutable.asStateFlow()
+    private val mutableSpeed = MutableStateFlow(1f)
+    val speed: StateFlow<Float> = mutableSpeed.asStateFlow()
+    private var speedLoaded = false
+    private val positions = HashMap<String, Long>()
     private var player: MediaPlayer? = null
+
+    private fun prefs(context: Context) = context.applicationContext.getSharedPreferences("voice", Context.MODE_PRIVATE)
+
+    fun loadSpeed(context: Context) {
+        if (speedLoaded) return
+        speedLoaded = true
+        mutableSpeed.value = prefs(context).getFloat("speed", 1f).takeIf { it in SPEEDS } ?: 1f
+    }
+
+    /** Следующая скорость по кругу: 1x → 1,5x → 2x → 1x. */
+    fun nextSpeed(context: Context) {
+        loadSpeed(context)
+        val next = SPEEDS[(SPEEDS.indexOf(mutableSpeed.value) + 1) % SPEEDS.size]
+        mutableSpeed.value = next
+        prefs(context).edit().putFloat("speed", next).apply()
+        player?.let { p -> if (runCatching { p.isPlaying }.getOrDefault(false)) applySpeed(p) }
+    }
+
+    /** Скорость меняют только у играющего плеера: у стоящего это на части телефонов запускает звук. */
+    private fun applySpeed(p: MediaPlayer) {
+        runCatching { p.playbackParams = p.playbackParams.setSpeed(mutableSpeed.value) }
+    }
+
+    private val SPEEDS = listOf(1f, 1.5f, 2f)
     private val handler = Handler(Looper.getMainLooper())
     private val ticker = object : Runnable {
         override fun run() {
@@ -205,11 +236,13 @@ internal object VoicePlayer {
                 mutable.value = current.copy(paused = true)
             } else {
                 p0.start()
+                applySpeed(p0)
                 mutable.value = current.copy(paused = false)
                 handler.post(ticker)
             }
             return
         }
+        loadSpeed(context)
         stop()
         val file = ChatFiles.file(context, id)
         if (!file.exists()) return
@@ -224,14 +257,26 @@ internal object VoicePlayer {
             p.release()
             return
         }
-        p.setOnCompletionListener { stop() }
+        p.setOnCompletionListener {
+            // Дослушал до конца — в следующий раз сначала.
+            positions.remove(id)
+            stop(remember = false)
+        }
         player = p
+        val resume = positions[id]?.takeIf { it in 1 until (p.duration - 700L).coerceAtLeast(1L) } ?: 0L
+        if (resume > 0) runCatching { p.seekTo(resume.toInt()) }
         p.start()
-        mutable.value = Playing(id, 0L, p.duration.toLong(), false)
+        applySpeed(p)
+        mutable.value = Playing(id, resume, p.duration.toLong(), false)
         handler.post(ticker)
     }
 
-    fun stop() {
+    fun stop(remember: Boolean = true) {
+        if (remember) {
+            val s = mutable.value
+            val p = player
+            if (s != null && p != null) positions[s.id] = runCatching { p.currentPosition.toLong() }.getOrDefault(s.position)
+        }
         handler.removeCallbacks(ticker)
         player?.let {
             runCatching { it.stop() }
@@ -298,13 +343,36 @@ internal fun VoiceBubble(voice: ChatVoice, mine: Boolean, accent: Color, onReady
                     )
                 }
             }
-            Text(
-                text = if (gone) "стёрто из облака, верни из архива" else formatDuration(if (mineNow != null) mineNow.position else voice.durationMs),
-                style = MaterialTheme.typography.labelSmall,
-                color = fg.copy(alpha = 0.75f),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = if (gone) "стёрто из облака, верни из архива" else formatDuration(if (mineNow != null) mineNow.position else voice.durationMs),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = fg.copy(alpha = 0.75f),
+                )
+                // Скорость видна, пока голосовое играет (или стоит на паузе): нажал — быстрее.
+                if (mineNow != null) {
+                    val speed by VoicePlayer.speed.collectAsState()
+                    Text(
+                        text = speedLabel(speed),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fg,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(fg.copy(alpha = 0.18f))
+                            .clickable { VoicePlayer.nextSpeed(context) }
+                            .padding(horizontal = 7.dp, vertical = 1.dp)
+                            .testTag("voice-speed"),
+                    )
+                }
+            }
         }
     }
+}
+
+internal fun speedLabel(speed: Float): String = when (speed) {
+    1.5f -> "1,5x"
+    2f -> "2x"
+    else -> "1x"
 }
 
 // ---------- кружочки ----------

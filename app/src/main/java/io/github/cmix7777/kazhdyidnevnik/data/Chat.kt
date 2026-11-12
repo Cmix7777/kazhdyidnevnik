@@ -34,6 +34,8 @@ data class ChatMessage(
     @SerialName("k") val sticker: ChatSticker? = null,
     /** Любой файл: документ, архив, таблица. */
     @SerialName("fl") val file: ChatFile? = null,
+    /** Когда текст исправили (null — не исправляли). */
+    @SerialName("ed") val edited: Long? = null,
 ) {
     val key: String get() = "$from:$seq"
 
@@ -199,6 +201,17 @@ data class ChatState(
     val theirFont: String? = null,
     /** Сообщения, эффект которых уже сыграл: при следующем открытии он не повторяется. */
     val played: List<String> = emptyList(),
+    /** Сообщения «в будущее»: лежат на этом телефоне и уходят в назначенное время. */
+    val scheduled: List<ScheduledMessage> = emptyList(),
+)
+
+/** Сообщение, которое уйдёт само в [at] (миллисекунды). До этого его видно только отправителю. */
+@Serializable
+data class ScheduledMessage(
+    @SerialName("i") val id: String,
+    @SerialName("t") val text: String,
+    @SerialName("at") val at: Long,
+    @SerialName("r") val replyTo: String? = null,
 )
 
 /** Как отмечено своё сообщение: ещё в телефоне, ушло, прочитано. */
@@ -400,6 +413,48 @@ object ChatLogic {
             wipeFiles = state.wipeFiles + toWipe,
             myReactions = state.myReactions - target.key,
         )
+    }
+
+    /**
+     * Можно ли исправить своё сообщение: текст или подпись к фото, не удалённое и ещё в голове переписки
+     * (её второй телефон перечитывает при каждом изменении; старые архивные страницы он не перечитывает).
+     */
+    fun canEdit(state: ChatState, message: ChatMessage): Boolean =
+        !message.deleted && message.seq >= state.headStart && state.mine.any { it.seq == message.seq && it.at == message.at } &&
+            message.voice == null && message.circle == null && message.sticker == null && message.file == null &&
+            (message.text.isNotEmpty() || message.photo != null)
+
+    /** Исправить текст своего сообщения. Пустой текст у фото — фото без подписи; пустое сообщение не бывает. */
+    fun editMine(state: ChatState, seq: Long, text: String, now: Long): ChatState {
+        val target = state.mine.firstOrNull { it.seq == seq } ?: return state
+        if (!canEdit(state, target)) return state
+        val clean = text.trim().take(MAX_TEXT)
+        if (clean == target.text || (clean.isEmpty() && target.photo == null)) return state
+        return state.copy(
+            mine = state.mine.map { if (it.seq == seq) it.copy(text = clean, edited = now) else it },
+            revision = state.revision + 1,
+        )
+    }
+
+    /** Отложить сообщение до [at]: до этого времени оно лежит на телефоне и видно только отправителю. */
+    fun schedule(state: ChatState, id: String, text: String, at: Long, replyTo: String? = null): ChatState {
+        val clean = text.trim().take(MAX_TEXT)
+        if (clean.isEmpty() || state.scheduled.any { it.id == id }) return state
+        return state.copy(scheduled = (state.scheduled + ScheduledMessage(id, clean, at, replyTo)).sortedBy { it.at })
+    }
+
+    fun unschedule(state: ChatState, id: String): ChatState = state.copy(scheduled = state.scheduled.filter { it.id != id })
+
+    /** Отложенные сообщения, время которых пришло, уходят как обычные (с нынешним временем, по порядку). */
+    fun releaseDue(state: ChatState, me: Person, now: Long): ChatState {
+        val due = state.scheduled.filter { it.at <= now }
+        if (due.isEmpty()) return state
+        var next = state.copy(scheduled = state.scheduled - due.toSet())
+        due.forEachIndexed { index, item ->
+            val replyTo = item.replyTo?.takeIf { key -> (next.mine + next.theirs).any { it.key == key && !it.deleted } }
+            next = append(next, me, item.text, now + index, replyTo)
+        }
+        return next
     }
 
     /** Есть ли что отправить в облако (сообщения, удаления, токен пушей). */

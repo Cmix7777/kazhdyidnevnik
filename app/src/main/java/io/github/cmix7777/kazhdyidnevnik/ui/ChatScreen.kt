@@ -353,6 +353,8 @@ fun ChatRoot(onBack: () -> Unit) {
     }
     var viewing by remember { mutableStateOf<ChatPhoto?>(null) }
     var archive by remember { mutableStateOf(false) }
+    var media by remember { mutableStateOf(false) }
+    var sharedList by remember { mutableStateOf(false) }
     var fontEditor by remember { mutableStateOf(false) }
     val rootScope = rememberCoroutineScope()
     var saving by remember { mutableStateOf<ChatFile?>(null) }
@@ -453,8 +455,13 @@ fun ChatRoot(onBack: () -> Unit) {
                     when (item) {
                         "hand" -> fontEditor = true
                         "archive" -> archive = true
+                        "media" -> media = true
+                        "list" -> sharedList = true
                     }
                 },
+                onEdit = { message, text -> ChatSync.edit(context, message, text) },
+                onSchedule = { text, at, reply -> ChatSync.schedule(context, text, at, reply) },
+                onCancelScheduled = { id -> ChatSync.cancelScheduled(context, id) },
             )
         }
         viewing?.let { photo -> PhotoViewer(photo, onClose = { viewing = null }) }
@@ -473,6 +480,18 @@ fun ChatRoot(onBack: () -> Unit) {
             )
         }
         if (archive) ArchiveDialog(onClose = { archive = false })
+        if (media) {
+            MediaGalleryDialog(
+                state = state,
+                owner = owner,
+                photoContent = { photo, modifier -> ChatPhotoView(photo, modifier) },
+                onOpenPhoto = { viewing = it },
+                onOpenFile = { file -> openChatFile(context, file) },
+                onEnsureFiles = { message, mine -> ChatSync.ensureFiles(context, message, mine) },
+                onClose = { media = false },
+            )
+        }
+        if (sharedList) SharedListDialog(owner = owner, onClose = { sharedList = false })
         if (fontEditor) {
             HandFontDialog(
                 font = myFont,
@@ -542,6 +561,9 @@ fun ChatScreen(
     onOpenFile: (ChatMessage) -> Unit = {},
     onSaveFile: (ChatMessage) -> Unit = {},
     onMenu: (String) -> Unit = {},
+    onEdit: (ChatMessage, String) -> Unit = { _, _ -> },
+    onSchedule: (text: String, at: Long, replyTo: String?) -> Unit = { _, _, _ -> },
+    onCancelScheduled: (String) -> Unit = {},
 ) {
     val partner = owner.partner
     val dark = LocalDark.current
@@ -560,6 +582,11 @@ fun ChatScreen(
     var text by rememberSaveable { mutableStateOf(initialText) }
     var replyKey by rememberSaveable { mutableStateOf<String?>(null) }
     val replyTo = remember(replyKey, state) { ChatLogic.find(state, replyKey) }
+    // Исправление своего сообщения: его текст в поле ввода, «Отправить» сохраняет правку.
+    var editKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val editing = remember(editKey, state) { state.mine.firstOrNull { it.key == editKey && !it.deleted } }
+    var laterOpen by remember { mutableStateOf(false) }
+    var scheduledOpen by remember { mutableStateOf(false) }
     val maxBubble = (LocalConfiguration.current.screenWidthDp * 0.78f).dp
     val hasPending = state.mine.lastOrNull()?.let { it.seq > state.uploaded } == true
     val fx = remember { WordFxState() }
@@ -625,6 +652,12 @@ fun ChatScreen(
 
     fun sendNow(effect: String?, secret: Boolean) {
         val message = text.trim()
+        editing?.let { target ->
+            onEdit(target, message)
+            editKey = null
+            text = ""
+            return
+        }
         if (message.isEmpty()) return
         val chosen = effect ?: if (!secret) ChatLogic.detectEffect(message) else null
         onSendRich(message, replyKey, chosen, secret)
@@ -769,6 +802,12 @@ fun ChatScreen(
                                                 onSaveSticker = { onSaveSticker(message) },
                                                 onOpenFile = { onOpenFile(message) },
                                                 onSaveFile = { onSaveFile(message) },
+                                                canEdit = row.mine && !row.earlier && ChatLogic.canEdit(state, message),
+                                                onEdit = {
+                                                    editKey = message.key
+                                                    replyKey = null
+                                                    text = message.text
+                                                },
                                             )
                                         }
                                     }
@@ -815,7 +854,22 @@ fun ChatScreen(
                         .padding(horizontal = 20.dp, vertical = 4.dp),
                 )
             }
-            replyTo?.let { target ->
+            if (state.scheduled.isNotEmpty()) {
+                ScheduledStrip(count = state.scheduled.size, next = state.scheduled.first().at, zone = zone, onClick = { scheduledOpen = true })
+            }
+            editing?.let { target ->
+                ReplyBar(
+                    message = target,
+                    author = "Исправить сообщение",
+                    colors = colors,
+                    mine = true,
+                    onCancel = {
+                        editKey = null
+                        text = ""
+                    },
+                )
+            }
+            replyTo?.takeIf { editing == null }?.let { target ->
                 ReplyBar(
                     message = target,
                     author = if (target.from == owner.id) "Ты" else partner.shortName,
@@ -843,6 +897,7 @@ fun ChatScreen(
                 onSpecial = { option ->
                     when (option) {
                         "secret" -> sendNow(null, true)
+                        "later" -> if (text.isNotBlank() && editing == null) laterOpen = true
                         "hand" -> {
                             val message = text.trim()
                             if (message.isNotEmpty()) {
@@ -905,6 +960,26 @@ fun ChatScreen(
                     replyKey = null
                 }
             })
+        }
+        if (laterOpen) {
+            SendLaterDialog(
+                zone = zone,
+                onPick = { at ->
+                    laterOpen = false
+                    onSchedule(text.trim(), at, replyKey)
+                    text = ""
+                    replyKey = null
+                },
+                onDismiss = { laterOpen = false },
+            )
+        }
+        if (scheduledOpen) {
+            ScheduledDialog(
+                items = state.scheduled,
+                zone = zone,
+                onCancelItem = onCancelScheduled,
+                onDismiss = { scheduledOpen = false },
+            )
         }
     }
 }
@@ -988,6 +1063,22 @@ private fun ChatTopBar(
                     onClick = {
                         menu = false
                         onMenu("hand")
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Фото, кружочки и файлы") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_photo), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    onClick = {
+                        menu = false
+                        onMenu("media")
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Общий список") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_check), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    onClick = {
+                        menu = false
+                        onMenu("list")
                     },
                 )
                 DropdownMenuItem(
@@ -1076,6 +1167,8 @@ private fun MessageBubble(
     onSaveSticker: () -> Unit,
     onOpenFile: () -> Unit,
     onSaveFile: () -> Unit,
+    canEdit: Boolean = false,
+    onEdit: () -> Unit = {},
 ) {
     val message = row.message
     val context = LocalContext.current
@@ -1369,6 +1462,16 @@ private fun MessageBubble(
                         },
                     )
                 }
+                if (canEdit) {
+                    DropdownMenuItem(
+                        text = { Text("Изменить") },
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        onClick = {
+                            menu = false
+                            onEdit()
+                        },
+                    )
+                }
                 if (row.mine) {
                     DropdownMenuItem(
                         text = { Text("Удалить у обоих") },
@@ -1464,6 +1567,9 @@ private fun Meta(message: ChatMessage, tick: ChatTick, failed: Boolean, color: C
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         if (reactions.isNotEmpty()) {
             Text(text = reactions.joinToString(""), fontSize = 13.sp, modifier = Modifier.padding(end = 2.dp))
+        }
+        if (message.edited != null) {
+            Text(text = "изменено", style = MaterialTheme.typography.labelSmall, color = color)
         }
         Text(
             text = formatTime(Instant.ofEpochMilli(message.at).atZone(zone).toLocalTime()),
@@ -1917,6 +2023,7 @@ private val EFFECT_OPTIONS = listOf(
     EffectOption(WordFxNames.FIRE, "Салют", "для праздников", Color(0xFFF5B86B), Color(0xFFF472B6)),
     EffectOption("secret", "Невидимые чернила", "прочитает, проведя пальцем", Color(0xFFB08CF0), Color(0xFF4FA3E8)),
     EffectOption("hand", "Запиской", "своим почерком", Color(0xFFF4EFE3), Color(0xFF26358C)),
+    EffectOption("later", "Отправить позже", "уйдёт само в выбранное время", Color(0xFF7DD3FC), Color(0xFF6366F1)),
 )
 
 /** «Печатает…»: пузырь второго человека, в нём перетекают капли (или три точки, если анимации выключены). */
