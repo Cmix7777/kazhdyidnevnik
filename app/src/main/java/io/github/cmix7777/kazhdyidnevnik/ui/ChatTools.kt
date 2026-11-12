@@ -311,12 +311,6 @@ internal fun MediaGalleryDialog(
     }
 }
 
-private fun fileSize(bytes: Long): String = when {
-    bytes < 1_000 -> "$bytes Б"
-    bytes < 1_000_000 -> "${bytes / 1000} КБ"
-    else -> "%.1f МБ".format(bytes / 1_000_000f)
-}
-
 // ---------- общий список ----------
 
 /** Общий список: дела или покупки, видно обоим. Ненавязчиво живёт в меню переписки. */
