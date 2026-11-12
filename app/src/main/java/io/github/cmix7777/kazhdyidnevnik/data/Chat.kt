@@ -420,7 +420,7 @@ object ChatLogic {
      * (её второй телефон перечитывает при каждом изменении; старые архивные страницы он не перечитывает).
      */
     fun canEdit(state: ChatState, message: ChatMessage): Boolean =
-        !message.deleted && message.seq >= state.headStart && state.mine.any { it.seq == message.seq && it.at == message.at } &&
+        !message.deleted && message.seq >= state.headStart && state.mine.any { it.key == message.key && it.at == message.at } &&
             message.voice == null && message.circle == null && message.sticker == null && message.file == null &&
             (message.text.isNotEmpty() || message.photo != null)
 
