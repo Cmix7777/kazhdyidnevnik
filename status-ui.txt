@@ -1,0 +1,146 @@
+run=24
+sha=6082a5dcb53c53df0e409c2ed0b00d6431defe2b
+result=failure
+time=2026-11-12T15:07:18Z
+--- tests ---
+PASS AppScreensTest.firstLaunchAsksWhoseThePhoneIs
+PASS AppScreensTest.cancelledEditorLeavesNothingBehind
+PASS AppScreensTest.phoneLinkedBeforeEncryptionAsksToLinkAgain
+PASS AppScreensTest.pastingNothingUsefulIsExplained
+PASS AppScreensTest.pastingAnOldStyleCodeIsExplained
+PASS AppScreensTest.bottomTabsOpenTheirScreens
+PASS AppScreensTest.swipingToThePartnerShowsTheirPage
+PASS AppScreensTest.choosingAPhoneOpensTheDiary
+PASS AppScreensTest.settingsOffersTheLinkWithThePartner
+PASS AppScreensTest.addedEventShowsUpInTodayList
+PASS AppScreensTest.themeSwitchChangesAndRemembersTheTheme
+PASS ChatActivityFlowTest.longHistoryWithArchiveOpensAndScrollsToTheStart
+PASS ChatActivityFlowTest.readWriteAndGetAnAnswer
+PASS ChatActivityFlowTest.chatAfterPartnerStartedOverOpensWithoutCrash
+PASS ChatCloudLiveTest.twoPhonesTalkThroughTheRealCloud
+PASS ChatShotsTest.offlineMessageIsMarked
+PASS ChatShotsTest.aizatLightWithText
+PASS ChatShotsTest.nastyaDarkTyping
+PASS ChatShotsTest.everythingFromBothSides
+PASS ChatShotsTest.typingAndReplyingSendsTheRightThing
+PASS ChatShotsTest.aizatDark
+PASS ChatShotsTest.fireEffect
+PASS ChatShotsTest.heartsEffect
+PASS ChatShotsTest.nastyaLight
+PASS ChatShotsTest.empty
+PASS ChatShotsTest.richMessages
+PASS ChatShotsTest.sunriseEffect
+PASS ChatShotsTest.notPaired
+PASS ChatShotsTest.nightEffect
+PASS CloudFlowTest.greetingDropTravelsBothWays
+PASS CloudFlowTest.myMessageGetsReadMarkOnlyAfterPartnerReadsIt
+PASS CloudFlowTest.sharedListIsTheSameOnBothPhones
+PASS CloudFlowTest.deletedMessageDisappearsOnTheOtherPhone
+PASS CloudFlowTest.editedMessageChangesOnTheOtherPhone
+PASS CloudFlowTest.partnerMessagesArriveAndAreReadOnlyWhenChatIsOpen
+PASS CloudFlowTest.reinstallContinuesNumberingInsteadOfStartingOver
+PASS CloudFlowTest.partnerStartingOverDoesNotMakeNewMessagesLookRead
+PASS CloudFlowTest.scheduledMessageGoesWhenItsTimeComes
+FAIL GlassEffectsVisibleTest.heavySnowIsVisible: java.lang.AssertionError: SNOW 1.0: изменилось только 0.00% экрана at org.junit.Assert.fail(Assert.java:89) at org.junit.Assert.assertTrue(Assert.java:42) at io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest.check(GlassEffectsVisibleTest.kt:90) at io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest.heavySnowIsVisible(GlassEffectsVisibleTest.kt:97)
+FAIL GlassEffectsVisibleTest.frostIsVisible: java.lang.AssertionError: FROST 0.8: изменилось только 0.00% экрана at org.junit.Assert.fail(Assert.java:89) at org.junit.Assert.assertTrue(Assert.java:42) at io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest.check(GlassEffectsVisibleTest.kt:90) at io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest.frostIsVisible(GlassEffectsVisibleTest.kt:106)
+FAIL GlassEffectsVisibleTest.rainIsVisible: java.lang.AssertionError: RAIN 0.75: изменилось только 0.00% экрана at org.junit.Assert.fail(Assert.java:89) at org.junit.Assert.assertTrue(Assert.java:42) at io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest.check(GlassEffectsVisibleTest.kt:90) at io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest.rainIsVisible(GlassEffectsVisibleTest.kt:100)
+FAIL GlassEffectsVisibleTest.drizzleIsVisible: java.lang.AssertionError: RAIN 0.35: изменилось только 0.00% экрана at org.junit.Assert.fail(Assert.java:89) at org.junit.Assert.assertTrue(Assert.java:42) at io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest.check(GlassEffectsVisibleTest.kt:90) at io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest.drizzleIsVisible(GlassEffectsVisibleTest.kt:103)
+FAIL GlassEffectsVisibleTest.snowIsVisible: java.lang.AssertionError: SNOW 0.5: изменилось только 0.00% экрана at org.junit.Assert.fail(Assert.java:89) at org.junit.Assert.assertTrue(Assert.java:42) at io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest.check(GlassEffectsVisibleTest.kt:90) at io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest.snowIsVisible(GlassEffectsVisibleTest.kt:94)
+PASS GreetingRealAppTest.withoutLinkHoldingExplainsWhatToDo
+PASS GreetingRealAppTest.holdingThePartnerNameGrowsAndThrowsADrop
+PASS LiveFlowsUiTest.dropArrivesWhileNastyaHasTheAppOpen
+PASS LiveFlowsUiTest.dropFromAizatIsShownWhenNastyaOpensTheApp
+PASS LiveFlowsUiTest.stuckScheduleSiteStopsTheDropAndSaysSo
+FAIL LiveFlowsUiTest.nastyaThrowsADropAndItReachesAizat: java.lang.AssertionError: Не дождался: капля Насти в облаке. Сейчас на экране: Сегодня у Айзата | Четверг 12 ноября | свободный день | практика: день 11 из 14 | +1° | Пасмурно | ощущается −3° | ветер 3 м/с, порывы 8 | Днём 0°…+2°, небольшой снег, осадки 58% | гололёд | сейчас | 20:00 | 21:00 | 0° | 22:00 | 30% | 23:00 | 58% | 0:00 | 85% | 1:00 | 98% | 2:00 | 3:00 | 4:00 | 100% | 5:00 | 95% | 6:00 | обновлено 12.11 15:04 · open-meteo.com | Расписание | Сегодня ни пар, ни работы. Свободный день. | Дела Айзата приходят сами. Изменены 12.11 15:04, проверено 1… | Обновить сейчас | Вставить дела | Завтра  пятница | Сегодня | смена | Вышла версия 1.0.31 | Правка сообщений, сообщения в будущее и общ
+PASS LiveFlowsUiTest.pushAboutDropBringsItAtOnce
+PASS LiveFlowsUiTest.pullToRefreshEndsWithCheckMark
+PASS LiveUiShotsTest.greetingArrivalSingle
+PASS LiveUiShotsTest.greetingSend
+PASS LiveUiShotsTest.inkSwipe
+PASS LiveUiShotsTest.greetingArrival
+PASS LiveUiShotsTest.dropRefresh
+PASS LiveUiShotsTest.dayStrip
+FAIL PairingFlowUiTest.nastyaPastesAizatsCodeAndHisPlansArrive: java.lang.AssertionError: Нужное не появилось. Сейчас на экране: Сегодня у Айзата | Четверг 12 ноября | свободный день | практика: день 11 из 14 | +1° | Пасмурно | ощущается −3° | ветер 3 м/с, порывы 8 | Днём 0°…+2°, небольшой снег, осадки 58% | гололёд | сейчас | 20:00 | 21:00 | 0° | 22:00 | 30% | 23:00 | 58% | 0:00 | 85% | 1:00 | 98% | 2:00 | 3:00 | 4:00 | 100% | 5:00 | 95% | 6:00 | обновлено 12.11 15:05 · open-meteo.com | Расписание | Сегодня ни пар, ни работы. Свободный день. | Дела Айзата от 12.11 15:05. Это снимок: чтобы обновить, пуст… | Вставить дела | Завтра  пятница | Сегодня | 3 пары, смена | Вышла версия 1.0.31 | Правка сообщений, сообщения в будущее и общий список  Своё с… | Обн
+PASS ScheduleSyncFlowTest.firstLoadIsSavedQuietlyAndChangeIsNotified
+PASS ScheduleSyncFlowTest.emptyWeekFromTheSiteIsBelievedOnlyTheSecondTime
+PASS SpecialDayShotsTest.birthdayWithAge
+PASS SpecialDayShotsTest.anniversary
+PASS SpecialDayShotsTest.birthdayWithHeart
+PASS SpecialDayShotsTest.newYear
+PASS TogetherWeekShotsTest.gluingWeeksFrames
+PASS WeatherShotsTest.skyDawn
+PASS WeatherShotsTest.skyNightCrescentCloudy
+PASS WeatherShotsTest.skySunset
+PASS WeatherShotsTest.skyDay
+PASS WeatherShotsTest.skyEvening
+PASS WeatherShotsTest.frostWiped
+PASS WeatherShotsTest.rain
+PASS WeatherShotsTest.snow
+PASS WeatherShotsTest.frost
+PASS WeatherShotsTest.heavyRain
+PASS WeatherShotsTest.skyNightFullMoon
+total=76 failed=7
+--- what went wrong ---
+* What went wrong:
+Execution failed for task ':app:connectedDebugAndroidTest'.
+> There were failing tests. See the report at: file:///home/runner/work/kazhdyidnevnik/kazhdyidnevnik/app/build/reports/androidTests/connected/debug/index.html
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 8m 33s
+67 actionable tasks: 67 executed
+--- errors ---
+io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest > heavySnowIsVisible[emulator-5554 - 14] [31mFAILED [0m
+io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest > frostIsVisible[emulator-5554 - 14] [31mFAILED [0m
+io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest > rainIsVisible[emulator-5554 - 14] [31mFAILED [0m
+io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest > drizzleIsVisible[emulator-5554 - 14] [31mFAILED [0m
+io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest > snowIsVisible[emulator-5554 - 14] [31mFAILED [0m
+io.github.cmix7777.kazhdyidnevnik.LiveFlowsUiTest > nastyaThrowsADropAndItReachesAizat[emulator-5554 - 14] [31mFAILED [0m
+io.github.cmix7777.kazhdyidnevnik.PairingFlowUiTest > nastyaPastesAizatsCodeAndHisPlansArrive[emulator-5554 - 14] [31mFAILED [0m
+> Task :app:connectedDebugAndroidTest FAILED
+BUILD FAILED in 8m 33s
+--- tail ---
+emulator-5554 - 14 Tests 50/76 completed. (0 skipped) (6 failed)
+emulator-5554 - 14 Tests 53/76 completed. (0 skipped) (6 failed)
+emulator-5554 - 14 Tests 55/76 completed. (0 skipped) (6 failed)
+emulator-5554 - 14 Tests 57/76 completed. (0 skipped) (6 failed)
+
+> Task :app:connectedDebugAndroidTest
+
+io.github.cmix7777.kazhdyidnevnik.PairingFlowUiTest > nastyaPastesAizatsCodeAndHisPlansArrive[emulator-5554 - 14] [31mFAILED [0m
+	java.lang.AssertionError: Нужное не появилось. Сейчас на экране: Сегодня у Айзата | Четверг
+	12 ноября | свободный день | практика: день 11 из 14 | +1° | Пасмурно | ощущается −3° | ветер 3 м/с, порывы 8 | Днём 0°…+2°, небольшой снег, осадки 58% | гололёд | сейчас | 20:00 | 21:00 | 0° | 22:00 | 30% | 23:00 | 58% | 0:00 | 85% | 1:00 | 98% | 2:00 | 3:00 | 4:00 | 100% | 5:00 | 95% | 6:00 | обновлено 12.11 15:05 · open-meteo.com | Расписание | Сегодня ни пар, ни работы. Свободный день. | Дела Айзата от 12.11 15:05. Это снимок: чтобы обновить, пуст… | Вставить дела | Завтра  пятница | Сегодня | 3 пары, смена | Вышла версия 1.0.31 | Правка сообщений, сообщения в будущее и общий список
+
+emulator-5554 - 14 Tests 60/76 completed. (0 skipped) (7 failed)
+emulator-5554 - 14 Tests 64/76 completed. (0 skipped) (7 failed)
+emulator-5554 - 14 Tests 65/76 completed. (0 skipped) (7 failed)
+emulator-5554 - 14 Tests 68/76 completed. (0 skipped) (7 failed)
+emulator-5554 - 14 Tests 72/76 completed. (0 skipped) (7 failed)
+emulator-5554 - 14 Tests 76/76 completed. (0 skipped) (7 failed)
+
+> Task :app:connectedDebugAndroidTest
+Tests on emulator-5554 - 14 failed: There was 7 failure(s).
+
+Finished 76 tests on emulator-5554 - 14
+
+> Task :app:connectedDebugAndroidTest FAILED
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__reactivecircus_android-emulator-runner-1794495531555.json
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:connectedDebugAndroidTest'.
+> There were failing tests. See the report at: file:///home/runner/work/kazhdyidnevnik/kazhdyidnevnik/app/build/reports/androidTests/connected/debug/index.html
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 8m 33s
+67 actionable tasks: 67 executed
