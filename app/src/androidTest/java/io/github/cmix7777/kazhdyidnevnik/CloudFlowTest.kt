@@ -13,6 +13,8 @@ import io.github.cmix7777.kazhdyidnevnik.data.PartnerEventsRepository
 import io.github.cmix7777.kazhdyidnevnik.data.PartnerShare
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.SharedEvents
+import io.github.cmix7777.kazhdyidnevnik.data.SharedList
+import io.github.cmix7777.kazhdyidnevnik.data.SharedListStore
 import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
 import io.github.cmix7777.kazhdyidnevnik.service.ChatSync
 import io.github.cmix7777.kazhdyidnevnik.service.CloudNet
@@ -179,6 +181,54 @@ class CloudFlowTest {
         eventually("сообщение ушло") { aizatHead()?.last == 1L }
         ChatSync.delete(context, ChatSync.state.value.mine.single())
         eventually("удаление дошло") { aizatHead()?.messages?.single()?.deleted == true }
+    }
+
+    @Test
+    fun editedMessageChangesOnTheOtherPhone() {
+        partnerSends("привет")
+        pull()
+        ChatSync.send(context, "првиет, Настя")
+        eventually("сообщение ушло") { aizatHead()?.last == 1L }
+        ChatSync.edit(context, ChatSync.state.value.mine.single(), "привет, Настя")
+        eventually("правка дошла") { aizatHead()?.messages?.single()?.text == "привет, Настя" }
+        assertTrue(aizatHead()!!.messages.single().edited != null)
+    }
+
+    @Test
+    fun scheduledMessageGoesWhenItsTimeComes() {
+        partnerSends("привет")
+        pull()
+        ChatSync.schedule(context, "с добрым утром", System.currentTimeMillis() + 60 * 60_000L)
+        eventually("сообщение отложено") { ChatSync.state.value.scheduled.size == 1 }
+        runBlocking { ChatSync.releaseDue(context) }
+        // Время ещё не пришло: в облаке ничего.
+        assertTrue(aizatHead()?.messages.orEmpty().none { it.text == "с добрым утром" })
+        // Время пришло (как будто телефон проснулся по будильнику).
+        ChatSync.cancelScheduled(context, ChatSync.state.value.scheduled.single().id)
+        eventually("отменено") { ChatSync.state.value.scheduled.isEmpty() }
+        ChatSync.schedule(context, "с добрым утром", System.currentTimeMillis() - 1_000L)
+        eventually("сообщение отложено") { ChatSync.state.value.scheduled.size == 1 }
+        runBlocking { ChatSync.releaseDue(context) }
+        eventually("сообщение ушло") { aizatHead()?.messages?.any { it.text == "с добрым утром" } == true }
+        assertTrue(ChatSync.state.value.scheduled.isEmpty())
+    }
+
+    @Test
+    fun sharedListIsTheSameOnBothPhones() {
+        SharedListStore.update(context.filesDir) { emptyList() }
+        SharedListStore.update(context.filesDir) { SharedList.add(it, "milk", "молоко", Person.AIZAT, System.currentTimeMillis()) }
+        assertTrue(runBlocking { PartnerSync.sync(context) })
+        val theirCopy = PartnerShare.decode(nastyaShares.fetch(code, Person.AIZAT)!!.payload)!!.list
+        assertEquals(listOf("молоко"), theirCopy.map { it.text })
+        // Настя отметила «купила» и добавила своё.
+        val now = System.currentTimeMillis() + 1_000
+        val hers = SharedList.add(SharedList.toggle(theirCopy, "milk", now), "bread", "хлеб", Person.NASTYA, now)
+        nastyaShares.publish(code, Person.NASTYA, PartnerShare.encode(SharedEvents(Person.NASTYA, now, emptyList(), list = hers)), now)
+        assertTrue(runBlocking { PartnerSync.sync(context) })
+        val mine = SharedListStore.current(context.filesDir)
+        assertTrue(mine.first { it.id == "milk" }.done)
+        assertEquals(listOf("молоко", "хлеб"), mine.map { it.text })
+        SharedListStore.update(context.filesDir) { emptyList() }
     }
 
     @Test

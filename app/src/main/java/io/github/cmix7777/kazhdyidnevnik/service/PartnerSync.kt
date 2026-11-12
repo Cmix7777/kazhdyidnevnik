@@ -10,6 +10,8 @@ import io.github.cmix7777.kazhdyidnevnik.data.PartnerEventsRepository
 import io.github.cmix7777.kazhdyidnevnik.data.PartnerShare
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.SharedEvents
+import io.github.cmix7777.kazhdyidnevnik.data.SharedList
+import io.github.cmix7777.kazhdyidnevnik.data.SharedListStore
 import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
 import io.github.cmix7777.kazhdyidnevnik.notify.PartnerHeard
 import io.github.cmix7777.kazhdyidnevnik.notify.ReminderScheduler
@@ -212,9 +214,10 @@ object PartnerSync {
         val mine = PartnerShare.relevant(diary.events, LocalDate.now())
         val dates = PartnerShare.relevantDates(diary.deadlines)
         val drops = GreetingDrops.recent(settings.sentDrops, now)
-        val fingerprint = PairCode.fingerprint(PartnerShare.encode(SharedEvents(owner, 0L, mine, dates, drops)))
+        val list = SharedListStore.update(app.filesDir) { SharedList.prune(it, now) }
+        val fingerprint = PairCode.fingerprint(PartnerShare.encode(SharedEvents(owner, 0L, mine, dates, drops, list)))
         if (fingerprint != settings.publishedFingerprint || now - settings.publishedMillis > REPUBLISH_MS) {
-            cloud.publish(code, owner, PartnerShare.encode(SharedEvents(owner, now, mine, dates, drops)), now)
+            cloud.publish(code, owner, PartnerShare.encode(SharedEvents(owner, now, mine, dates, drops, list)), now)
             settings.publishedFingerprint = fingerprint
             settings.publishedMillis = now
         }
@@ -233,6 +236,8 @@ object PartnerSync {
         }
         settings.partnerHeardState = PartnerHeard.OK
         settings.partnerHeardMillis = maxOf(remote.updatedAt, shared.at)
+        // Общий список: соединяем копию второго телефона со своей (по каждому пункту — позднее изменение).
+        if (shared.list.isNotEmpty()) SharedListStore.update(app.filesDir) { SharedList.merge(it, shared.list) }
         val current = PartnerEventsRepository.current(app.filesDir)
         if (current == null || current.from != shared.from || shared.at > current.at) {
             PartnerEventsRepository.save(app.filesDir, shared)

@@ -141,9 +141,15 @@ class PairingFlowUiTest {
         compose.onNodeWithContentDescription("Настройки").performClick()
         waitFor(hasText("Чей это телефон"))
 
-        putOnClipboard(PairCode.message(Person.AIZAT, code))
-        scrollToItem("Вставить код")
-        compose.onNodeWithText("Вставить код").performClick()
+        // Буфер обмена на эмуляторе иногда отдаёт пустоту: кладём и вставляем до трёх раз.
+        repeat(3) {
+            if (AppSettings(context).pairCode == code) return@repeat
+            putOnClipboard(PairCode.message(Person.AIZAT, code))
+            compose.waitForIdle()
+            scrollToItem("Вставить код")
+            compose.onNodeWithText("Вставить код").performClick()
+            runCatching { compose.waitUntil(5_000) { AppSettings(context).pairCode == code } }
+        }
         compose.waitUntil(20_000) { AppSettings(context).pairCode == code }
         // Связь появилась, и обмен с облаком прошёл: дела Айзата у Насти.
         scrollToItem("Телефоны связаны", substring = true)

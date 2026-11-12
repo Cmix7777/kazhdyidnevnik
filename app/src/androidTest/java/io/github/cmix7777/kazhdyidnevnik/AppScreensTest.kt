@@ -287,9 +287,21 @@ class AppScreensTest {
     fun pastingAnOldStyleCodeIsExplained() {
         launchAs(Person.AIZAT)
         openSettings()
-        putOnClipboard("Код связи Каждогодневника (Настя): kdp-abcde-fghjk-mnpqr-stuvw")
-        scrollToItem("Вставить код")
-        compose.onNodeWithText("Вставить код").performClick()
+        // Буфер обмена на эмуляторе иногда отдаёт пустоту (окно на миг без фокуса): кладём и вставляем ещё раз.
+        var pasted = false
+        repeat(3) {
+            if (pasted) return@repeat
+            putOnClipboard("Код связи Каждогодневника (Настя): kdp-abcde-fghjk-mnpqr-stuvw")
+            compose.waitForIdle()
+            scrollToItem("Вставить код")
+            compose.onNodeWithText("Вставить код").performClick()
+            pasted = try {
+                compose.waitUntil(5_000) { compose.onAllNodes(hasText("Это код старого вида", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+                true
+            } catch (e: ComposeTimeoutException) {
+                false
+            }
+        }
         try {
             waitForText("Это код старого вида", substring = true)
         } catch (e: AssertionError) {

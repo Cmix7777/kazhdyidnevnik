@@ -73,3 +73,32 @@ class ChatSendWorker(context: Context, params: WorkerParameters) : CoroutineWork
         }
     }
 }
+
+/**
+ * Сообщение «в будущее»: будит телефон к назначенному времени (без сети не ждёт — сообщение встанет
+ * в очередь как обычное и уйдёт, когда сеть появится). Android может разбудить с опозданием на несколько минут.
+ */
+class ScheduledMessageWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+
+    override suspend fun doWork(): Result {
+        runCatching { ChatSync.releaseDue(applicationContext) }
+        runCatching { ChatSync.flush() }
+        return Result.success()
+    }
+
+    companion object {
+        private fun name(id: String) = "chat-later-$id"
+
+        fun enqueue(context: Context, id: String, at: Long) {
+            val delay = (at - System.currentTimeMillis()).coerceAtLeast(0L)
+            val request = OneTimeWorkRequestBuilder<ScheduledMessageWorker>()
+                .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(name(id), ExistingWorkPolicy.REPLACE, request)
+        }
+
+        fun cancel(context: Context, id: String) {
+            WorkManager.getInstance(context).cancelUniqueWork(name(id))
+        }
+    }
+}

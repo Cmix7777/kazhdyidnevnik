@@ -18,6 +18,7 @@ import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
 import io.github.cmix7777.kazhdyidnevnik.notify.ChatNotifier
 import io.github.cmix7777.kazhdyidnevnik.notify.ChatSendWorker
+import io.github.cmix7777.kazhdyidnevnik.notify.ScheduledMessageWorker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -397,6 +398,47 @@ object ChatSync {
         }
     }
 
+    /** Исправить своё сообщение: у второго текст поменяется при следующей сверке, рядом будет «изменено». */
+    fun edit(context: Context, message: ChatMessage, text: String) {
+        val app = context.applicationContext
+        scope.launch(writer) {
+            ensureLoaded(app)
+            update { ChatLogic.editMine(it, message.seq, text, System.currentTimeMillis()) }
+            lastActivity = System.currentTimeMillis()
+            uploadNow(app)
+        }
+    }
+
+    /** Сообщение «в будущее»: лежит на телефоне и уходит само в [at]. */
+    fun schedule(context: Context, text: String, at: Long, replyTo: String? = null) {
+        val app = context.applicationContext
+        if (text.isBlank()) return
+        val id = ChatFiles.newId()
+        scope.launch(writer) {
+            ensureLoaded(app)
+            update { ChatLogic.schedule(it, id, text, at, replyTo) }
+            ScheduledMessageWorker.enqueue(app, id, at)
+        }
+    }
+
+    fun cancelScheduled(context: Context, id: String) {
+        val app = context.applicationContext
+        ScheduledMessageWorker.cancel(app, id)
+        scope.launch(writer) { update { ChatLogic.unschedule(it, id) } }
+    }
+
+    /** Пришло время отложенных сообщений: они становятся обычными и уходят. */
+    suspend fun releaseDue(context: Context) {
+        val app = context.applicationContext
+        ensureLoaded(app)
+        val owner = AppSettings(app).owner ?: return
+        val before = state.value.scheduled.size
+        withContext(writer) { update { ChatLogic.releaseDue(it, owner, System.currentTimeMillis()) } }
+        if (state.value.scheduled.size == before) return
+        lastActivity = System.currentTimeMillis()
+        if (!upload(app)) ChatSendWorker.enqueue(app)
+    }
+
     /** Повторить отправку того, что не ушло. */
     fun retry(context: Context) {
         val app = context.applicationContext
@@ -497,6 +539,10 @@ object ChatSync {
             guarded {
                 val cloud = cloud(settings)
                 restoreIfNeeded(cloud, code, owner)
+                // Отложенное, чьё время пришло, пока приложение было открыто, уходит вместе с этой сверкой.
+                if (state.value.scheduled.any { it.at <= System.currentTimeMillis() }) {
+                    update { ChatLogic.releaseDue(it, owner, System.currentTimeMillis()) }
+                }
                 pullLocked(app, settings, cloud, code, owner)
                 if (ChatLogic.hasPending(state.value, settings.pushToken, settings.pushHook)) {
                     uploadLocked(app, settings, cloud, code, owner)
