@@ -69,7 +69,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -305,12 +309,18 @@ internal fun VoiceBubble(voice: ChatVoice, mine: Boolean, accent: Color, onReady
 
 // ---------- кружочки ----------
 
-/** Идущая запись кружочка: кнопка отпущена — [stop], увёл влево — [cancel]. */
+/**
+ * Идущая запись кружочка: кнопка отпущена — [stopRequested], увёл влево — [cancelled].
+ * Увёл вверх — [locked]: запись идёт без рук, пока не нажмёшь «Отправить» или «Отмена».
+ * [front] — какая камера снимает; переключать можно прямо во время записи.
+ */
 @Stable
 internal class CircleSession {
     var stopRequested by mutableStateOf(false)
     var cancelled by mutableStateOf(false)
     var startedAt by mutableLongStateOf(0L)
+    var locked by mutableStateOf(false)
+    var front by mutableStateOf(true)
 }
 
 private suspend fun cameraProvider(context: Context): ProcessCameraProvider = suspendCancellableCoroutine { cont ->
@@ -319,10 +329,12 @@ private suspend fun cameraProvider(context: Context): ProcessCameraProvider = su
 }
 
 /**
- * Запись кружочка: фронтальная камера в круге, по краю бежит время (до 30 секунд).
- * Отпустил кнопку — кружочек уходит, увёл палец влево — запись отменяется.
+ * Запись кружочка: камера в круге, по краю бежит время (до 30 секунд).
+ * Отпустил кнопку — кружочек уходит, увёл палец влево — запись отменяется, вверх — пишется без рук.
+ * Камеру можно перевернуть во время записи: запись при этом не прерывается.
  */
 @SuppressLint("MissingPermission")
+@androidx.annotation.OptIn(markerClass = [androidx.camera.video.ExperimentalPersistentRecording::class])
 @Composable
 internal fun CircleRecorderOverlay(session: CircleSession, accent: Color, onResult: (ByteArray?, Long) -> Unit) {
     val context = LocalContext.current
@@ -338,6 +350,11 @@ internal fun CircleRecorderOverlay(session: CircleSession, accent: Color, onResu
     val file = remember { File(context.cacheDir, "circle-${System.currentTimeMillis()}.mp4") }
     var finished by remember { mutableStateOf(false) }
     var elapsed by remember { mutableFloatStateOf(0f) }
+    // Камера, превью и запись — чтобы перевернуть камеру, не останавливая запись.
+    val useCases = remember { arrayOfNulls<androidx.camera.core.UseCase>(2) }
+    var bound by remember { mutableStateOf(false) }
+    var boundFront by remember { mutableStateOf(true) }
+    var canFlip by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val provider = runCatching { cameraProvider(context) }.getOrNull()
@@ -353,9 +370,16 @@ internal fun CircleRecorderOverlay(session: CircleSession, accent: Color, onResu
             .setTargetVideoEncodingBitRate(600_000)
             .build()
         val capture = VideoCapture.withOutput(recorder)
+        useCases[0] = preview
+        useCases[1] = capture
+        canFlip = runCatching {
+            provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) && provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+        }.getOrDefault(false)
         try {
             provider.unbindAll()
-            provider.bindToLifecycle(owner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, capture)
+            provider.bindToLifecycle(owner, if (session.front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
+            boundFront = session.front
+            bound = true
         } catch (e: Exception) {
             onResult(null, 0L)
             return@LaunchedEffect
@@ -366,8 +390,10 @@ internal fun CircleRecorderOverlay(session: CircleSession, accent: Color, onResu
             return@LaunchedEffect
         }
         val options = FileOutputOptions.Builder(file).setDurationLimitMillis(CIRCLE_MAX_MS).build()
+        // «Постоянная» запись переживает смену камеры: при перевороте она не обрывается.
         holder[0] = capture.output.prepareRecording(context, options)
             .withAudioEnabled()
+            .asPersistentRecording()
             .start(ContextCompat.getMainExecutor(context)) { event ->
                 if (event is VideoRecordEvent.Start) session.startedAt = SystemClock.elapsedRealtime()
                 if (event is VideoRecordEvent.Finalize && !finished) {
@@ -383,6 +409,28 @@ internal fun CircleRecorderOverlay(session: CircleSession, accent: Color, onResu
     }
     LaunchedEffect(session.stopRequested, session.cancelled) {
         if (session.stopRequested || session.cancelled) holder[0]?.stop()
+    }
+    // Перевернуть камеру: те же превью и запись привязываются к другой камере.
+    LaunchedEffect(session.front, bound) {
+        if (!bound || finished || session.front == boundFront) return@LaunchedEffect
+        val provider = providerHolder[0] ?: return@LaunchedEffect
+        val preview = useCases[0] ?: return@LaunchedEffect
+        val capture = useCases[1] ?: return@LaunchedEffect
+        val selector = if (session.front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
+        val switched = runCatching {
+            provider.unbindAll()
+            provider.bindToLifecycle(owner, selector, preview, capture)
+        }.isSuccess
+        if (switched) {
+            boundFront = session.front
+        } else {
+            // Другая камера не открылась — возвращаемся к прежней, запись продолжается.
+            runCatching {
+                provider.unbindAll()
+                provider.bindToLifecycle(owner, if (boundFront) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
+            }
+            session.front = boundFront
+        }
     }
     LaunchedEffect(Unit) {
         while (!finished) {
@@ -400,7 +448,9 @@ internal fun CircleRecorderOverlay(session: CircleSession, accent: Color, onResu
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f)),
+            .background(Color.Black.copy(alpha = 0.72f))
+            // Пока идёт запись, нажатия не проходят к переписке под затемнением.
+            .pointerInput(Unit) { awaitEachGesture { awaitFirstDown().consume() } },
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -422,11 +472,40 @@ internal fun CircleRecorderOverlay(session: CircleSession, accent: Color, onResu
                 color = Color.White,
             )
             Text(
-                text = "Отпусти — отправить, влево — отмена",
+                text = if (session.locked) "Запись идёт без рук" else "Отпусти — отправить, влево — отмена, вверх — без рук",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.7f),
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(22.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (session.locked) {
+                    CircleControl(R.drawable.ic_delete, "Отменить кружочек", Color.White.copy(alpha = 0.16f)) { session.cancelled = true }
+                }
+                if (canFlip) {
+                    CircleControl(R.drawable.ic_flip_camera, "Перевернуть камеру", Color.White.copy(alpha = 0.16f), testTag = "circle-flip") {
+                        session.front = !session.front
+                    }
+                }
+                if (session.locked) {
+                    CircleControl(R.drawable.ic_send, "Отправить кружочек", accent, testTag = "circle-send") { session.stopRequested = true }
+                }
+            }
         }
+    }
+}
+
+/** Круглая кнопка под кружочком: отмена, переворот камеры, отправка. */
+@Composable
+private fun CircleControl(icon: Int, description: String, background: Color, testTag: String = "", onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .clip(CircleShape)
+            .background(background)
+            .clickable(onClick = onClick)
+            .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(painterResource(icon), contentDescription = description, tint = Color.White, modifier = Modifier.size(26.dp))
     }
 }
 
