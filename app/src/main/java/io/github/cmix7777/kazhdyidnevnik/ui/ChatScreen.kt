@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -580,6 +581,8 @@ fun ChatScreen(
     var voiceTime by remember { mutableLongStateOf(0L) }
     var circle by remember { mutableStateOf<CircleSession?>(null) }
     var slide by remember { mutableFloatStateOf(0f) }
+    // Голосовое закреплено (увёл палец вверх): пишется без рук до кнопки «Отправить».
+    var voiceLocked by remember { mutableStateOf(false) }
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
     // Пришло новое сообщение, а человек и так внизу переписки: показываем его.
@@ -612,6 +615,7 @@ fun ChatScreen(
             voiceTime = recorder.elapsed
             if (voiceTime >= VoiceRecorder.MAX_MS) {
                 voice = null
+                voiceLocked = false
                 recorder.stop()?.let { onVoice(it, replyKey) }
                 replyKey = null
             }
@@ -648,8 +652,17 @@ fun ChatScreen(
         return true
     }
 
+    /** Палец ушёл вверх: запись продолжается без рук. */
+    fun lockRecord() {
+        slide = 0f
+        if (voice != null) voiceLocked = true
+        circle?.locked = true
+        Haptics.tick(context)
+    }
+
     fun endRecord(cancel: Boolean) {
         slide = 0f
+        voiceLocked = false
         voice?.let { recorder ->
             voice = null
             if (cancel) {
@@ -817,6 +830,7 @@ fun ChatScreen(
                 panel = panel,
                 circleMode = circleMode,
                 recording = voice != null,
+                locked = voiceLocked,
                 recordTime = voiceTime,
                 recordLevel = voiceLevel,
                 slide = slide,
@@ -863,6 +877,7 @@ fun ChatScreen(
                 onToggleMode = { circleMode = !circleMode },
                 onRecordStart = { startRecord() },
                 onRecordSlide = { slide = it },
+                onRecordLock = { lockRecord() },
                 onRecordEnd = { cancel -> endRecord(cancel) },
             )
             if (panel) {
@@ -1615,6 +1630,7 @@ private fun InputBar(
     panel: Boolean,
     circleMode: Boolean,
     recording: Boolean,
+    locked: Boolean,
     recordTime: Long,
     recordLevel: Float,
     slide: Float,
@@ -1629,9 +1645,11 @@ private fun InputBar(
     onToggleMode: () -> Unit,
     onRecordStart: () -> Boolean,
     onRecordSlide: (Float) -> Unit,
+    onRecordLock: () -> Unit,
     onRecordEnd: (cancel: Boolean) -> Unit,
 ) {
     val context = LocalContext.current
+    val lockDistance = with(LocalDensity.current) { 70.dp.toPx() }
     val canSend = enabled && text.isNotBlank()
     var attach by remember { mutableStateOf(false) }
     var effects by remember { mutableStateOf(false) }
@@ -1713,8 +1731,21 @@ private fun InputBar(
                             .clip(CircleShape)
                             .background(Palette.Lavender),
                     )
-                    Text(
-                        text = if (slide < -cancelDistance * 0.6f) "отпусти — отмена" else "влево — отмена",
+                    if (locked) {
+                        Spacer(Modifier.weight(1f))
+                        Icon(
+                            painterResource(R.drawable.ic_delete),
+                            contentDescription = "Отменить голосовое",
+                            tint = Palette.Danger,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .clickable { onRecordEnd(true) }
+                                .padding(6.dp)
+                                .testTag("record-cancel"),
+                        )
+                    } else Text(
+                        text = if (slide < -cancelDistance * 0.6f) "отпусти — отмена" else "влево — отмена, вверх — без рук",
                         style = MaterialTheme.typography.bodySmall,
                         color = Palette.TextFaint,
                         maxLines = 1,
@@ -1812,8 +1843,16 @@ private fun InputBar(
                     }
                     .clip(CircleShape)
                     .background(if (recording) Brush.linearGradient(listOf(Palette.Violet, Palette.VioletDeep)) else SolidColor(Palette.Chip))
-                    .pointerInput(enabled, circleMode) {
+                    .pointerInput(enabled, circleMode, locked) {
                         if (!enabled) return@pointerInput
+                        if (locked) {
+                            // Голосовое пишется без рук: кнопка стала «Отправить».
+                            awaitEachGesture {
+                                awaitFirstDown().consume()
+                                if (waitForUpOrCancellation() != null) onRecordEnd(false)
+                            }
+                            return@pointerInput
+                        }
                         awaitEachGesture {
                             val down = awaitFirstDown()
                             down.consume()
@@ -1834,6 +1873,7 @@ private fun InputBar(
                                 } else {
                                     change.consume()
                                     val dx = change.position.x - down.position.x
+                                    val dy = change.position.y - down.position.y
                                     onRecordSlide(dx)
                                     when {
                                         !change.pressed -> {
@@ -1842,6 +1882,11 @@ private fun InputBar(
                                         }
                                         dx < -cancelDistance * 1.6f -> {
                                             onRecordEnd(true)
+                                            finished = true
+                                        }
+                                        // Вверх — закрепить: дальше запись идёт без пальца.
+                                        dy < -lockDistance && dx > -cancelDistance * 0.6f -> {
+                                            onRecordLock()
                                             finished = true
                                         }
                                     }
@@ -1853,8 +1898,8 @@ private fun InputBar(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    painterResource(if (circleMode) R.drawable.ic_videocam else R.drawable.ic_mic),
-                    contentDescription = if (circleMode) "Кружочек: удерживай, чтобы записать, нажми — голосовое" else "Голосовое: удерживай, чтобы записать, нажми — кружочек",
+                    painterResource(if (locked) R.drawable.ic_send else if (circleMode) R.drawable.ic_videocam else R.drawable.ic_mic),
+                    contentDescription = if (locked) "Отправить голосовое" else if (circleMode) "Кружочек: удерживай, чтобы записать, нажми — голосовое" else "Голосовое: удерживай, чтобы записать, нажми — кружочек",
                     tint = if (recording) Color.White else Palette.TextMuted,
                     modifier = Modifier.size(22.dp),
                 )
