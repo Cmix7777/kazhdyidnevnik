@@ -141,6 +141,7 @@ import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.applyAppChrome
 import io.github.cmix7777.kazhdyidnevnik.data.ChatFile
 import io.github.cmix7777.kazhdyidnevnik.data.ChatLogic
+import io.github.cmix7777.kazhdyidnevnik.data.ChatGame
 import io.github.cmix7777.kazhdyidnevnik.data.ChatMessage
 import io.github.cmix7777.kazhdyidnevnik.data.ChatPhoto
 import io.github.cmix7777.kazhdyidnevnik.data.ChatRow
@@ -462,6 +463,8 @@ fun ChatRoot(onBack: () -> Unit) {
                 onEdit = { message, text -> ChatSync.edit(context, message, text) },
                 onSchedule = { text, at, reply -> ChatSync.schedule(context, text, at, reply) },
                 onCancelScheduled = { id -> ChatSync.cancelScheduled(context, id) },
+                onGame = { reply -> ChatSync.startGame(context, reply) },
+                onGameMove = { game, cell -> ChatSync.playGame(context, game, cell) },
             )
         }
         viewing?.let { photo -> PhotoViewer(photo, onClose = { viewing = null }) }
@@ -564,6 +567,8 @@ fun ChatScreen(
     onEdit: (ChatMessage, String) -> Unit = { _, _ -> },
     onSchedule: (text: String, at: Long, replyTo: String?) -> Unit = { _, _, _ -> },
     onCancelScheduled: (String) -> Unit = {},
+    onGame: (replyTo: String?) -> Unit = {},
+    onGameMove: (ChatGame, Int) -> Unit = { _, _ -> },
 ) {
     val partner = owner.partner
     val dark = LocalDark.current
@@ -808,6 +813,8 @@ fun ChatScreen(
                                                     replyKey = null
                                                     text = message.text
                                                 },
+                                                onGameMove = { cell -> message.game?.let { onGameMove(it, cell) } },
+                                                onGameAgain = { onGame(null) },
                                             )
                                         }
                                     }
@@ -919,6 +926,10 @@ fun ChatScreen(
                 },
                 onFile = {
                     onFile(replyKey)
+                    replyKey = null
+                },
+                onGame = {
+                    onGame(replyKey)
                     replyKey = null
                 },
                 onTogglePanel = {
@@ -1169,6 +1180,8 @@ private fun MessageBubble(
     onSaveFile: () -> Unit,
     canEdit: Boolean = false,
     onEdit: () -> Unit = {},
+    onGameMove: (Int) -> Unit = {},
+    onGameAgain: () -> Unit = {},
 ) {
     val message = row.message
     val context = LocalContext.current
@@ -1363,8 +1376,24 @@ private fun MessageBubble(
                             VoiceBubble(voice, mine = row.mine, accent = colors.theirAccent, onReady = onEnsureFiles)
                             Box(modifier = Modifier.padding(end = 10.dp, bottom = 8.dp)) { Meta(message, row.tick, failed, metaColor, zone) }
                         }
+                        VoiceTranscript(voice.id, color = textColor, faint = metaColor)
                     }
-                    if (message.deleted || message.text.isNotEmpty()) {
+                    val game = message.game
+                    if (game != null && !message.deleted) {
+                        val (xColor, oColor) = gameColors(row.mine, colors.theirAccent)
+                        GameBubble(
+                            game = game,
+                            me = owner,
+                            textColor = textColor,
+                            xColor = xColor,
+                            oColor = oColor,
+                            playable = interactive,
+                            fresh = animate && System.currentTimeMillis() - message.at < 60_000L,
+                            onMove = onGameMove,
+                            onAgain = onGameAgain,
+                        ) { Meta(message, row.tick, failed, metaColor, zone) }
+                    }
+                    if (message.deleted || (message.text.isNotEmpty() && game == null)) {
                         Box {
                             TextWithMeta(
                                 text = if (message.deleted) "Сообщение удалено" else message.text,
@@ -1747,6 +1776,7 @@ private fun InputBar(
     onGallery: () -> Unit,
     onCamera: () -> Unit,
     onFile: () -> Unit,
+    onGame: () -> Unit,
     onTogglePanel: () -> Unit,
     onToggleMode: () -> Unit,
     onRecordStart: () -> Boolean,
@@ -1794,6 +1824,15 @@ private fun InputBar(
                         attach = false
                         onFile()
                     },
+                )
+                DropdownMenuItem(
+                    text = { Text("Крестики-нолики") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_game), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    onClick = {
+                        attach = false
+                        onGame()
+                    },
+                    modifier = Modifier.testTag("attach-game"),
                 )
             }
         }

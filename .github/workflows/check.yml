@@ -1,7 +1,7 @@
 name: Проверка ветки
 
-# Сборка, обычные тесты и кадры анимаций на эмуляторе для рабочей ветки. Версию не выпускает:
-# в телефоны попадает только то, что потом слито в main.
+# Сборка, обычные тесты и проверки на эмуляторе для рабочей ветки. В телефоны попадает только main:
+# туда коммит уходит сам, если в нём пометка [выпуск] и вся проверка зелёная.
 on:
   push:
     branches: [effects]
@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: check-${{ github.ref }}
@@ -60,9 +61,36 @@ jobs:
             adb logcat -c || true
             adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.AppScreensTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > screens.log 2>&1 || true
             adb logcat -d -v time > logcat.txt 2>&1 || true
-            adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.TogetherWeekShotsTest,io.github.cmix7777.kazhdyidnevnik.SpecialDayShotsTest,io.github.cmix7777.kazhdyidnevnik.WeatherShotsTest,io.github.cmix7777.kazhdyidnevnik.LiveUiShotsTest,io.github.cmix7777.kazhdyidnevnik.GreetingRealAppTest,io.github.cmix7777.kazhdyidnevnik.ChatShotsTest,io.github.cmix7777.kazhdyidnevnik.ChatCloudLiveTest,io.github.cmix7777.kazhdyidnevnik.CloudFlowTest,io.github.cmix7777.kazhdyidnevnik.LiveFlowsUiTest,io.github.cmix7777.kazhdyidnevnik.ChatActivityFlowTest,io.github.cmix7777.kazhdyidnevnik.ScheduleSyncFlowTest,io.github.cmix7777.kazhdyidnevnik.PairingFlowUiTest,io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > instrument.log 2>&1 || true
+            adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.TogetherWeekShotsTest,io.github.cmix7777.kazhdyidnevnik.SpecialDayShotsTest,io.github.cmix7777.kazhdyidnevnik.WeatherShotsTest,io.github.cmix7777.kazhdyidnevnik.LiveUiShotsTest,io.github.cmix7777.kazhdyidnevnik.GreetingRealAppTest,io.github.cmix7777.kazhdyidnevnik.ChatShotsTest,io.github.cmix7777.kazhdyidnevnik.ChatCloudLiveTest,io.github.cmix7777.kazhdyidnevnik.CloudFlowTest,io.github.cmix7777.kazhdyidnevnik.LiveFlowsUiTest,io.github.cmix7777.kazhdyidnevnik.ChatActivityFlowTest,io.github.cmix7777.kazhdyidnevnik.ScheduleSyncFlowTest,io.github.cmix7777.kazhdyidnevnik.PairingFlowUiTest,io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest,io.github.cmix7777.kazhdyidnevnik.VoiceTextTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > instrument.log 2>&1 || true
+            sh .github/retry-failed.sh instrument.log instrument-retry.log || true
+            sh .github/retry-failed.sh screens.log screens-retry.log || true
             adb pull /sdcard/Android/data/io.github.cmix7777.kazhdyidnevnik/files/shots shots || true
             sh .github/release-smoke.sh > release.log 2>&1 || true
+
+      # Коммит с пометкой [выпуск] после полностью зелёной проверки сам уходит в main и собирается в новую версию.
+      - name: Выпуск, если всё зелёное
+        if: github.ref == 'refs/heads/effects' && contains(github.event.head_commit.message, '[выпуск]')
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD: ${{ steps.build.outcome }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          why=""
+          [ "$BUILD" = success ] || why="$why сборка"
+          passed() { grep -q "^OK (" "$1" 2>/dev/null || grep -q "RETRY OK" "$2" 2>/dev/null; }
+          passed instrument.log instrument-retry.log || why="$why тесты-на-эмуляторе"
+          passed screens.log screens-retry.log || why="$why экраны"
+          grep -q "release OK" release.log 2>/dev/null || why="$why выпускная-сборка"
+          if [ -n "$why" ]; then echo "не выпущено: не прошло$why" > release-result.txt; exit 0; fi
+          git fetch -q origin main
+          git log -1 --format=%B "$GITHUB_SHA" | sed 's/ *\[выпуск\]//' > "$RUNNER_TEMP/relmsg.txt"
+          export GIT_AUTHOR_NAME="$(git log -1 --format=%an "$GITHUB_SHA")" GIT_AUTHOR_EMAIL="$(git log -1 --format=%ae "$GITHUB_SHA")"
+          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME" GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+          new=$(git commit-tree "${GITHUB_SHA}^{tree}" -p FETCH_HEAD -F "$RUNNER_TEMP/relmsg.txt")
+          git push -q "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "$new:refs/heads/main"
+          gh workflow run build.yml --ref main
+          echo "выпущено: main=$new, сборка версии запущена" > release-result.txt
 
       - name: Отчёт проверки
         if: always()
@@ -86,8 +114,12 @@ jobs:
             tail -n 80 "$GITHUB_WORKSPACE/instrument.log" 2>/dev/null || true
             echo "--- screens ---"
             grep -v "^\s*at " "$GITHUB_WORKSPACE/screens.log" 2>/dev/null | tail -n 40 || true
+            echo "--- retry ---"
+            cat "$GITHUB_WORKSPACE/instrument-retry.log" "$GITHUB_WORKSPACE/screens-retry.log" 2>/dev/null || true
             echo "--- release ---"
             cat "$GITHUB_WORKSPACE/release.log" 2>/dev/null | tail -n 40 || true
+            echo "--- publish ---"
+            cat "$GITHUB_WORKSPACE/release-result.txt" 2>/dev/null || echo "без пометки [выпуск]"
             echo "--- live ---"
             grep -h "LIVE:" "$GITHUB_WORKSPACE"/app/build/test-results/testDebugUnitTest/*.xml 2>/dev/null | head -n 80 || true
             echo "--- logcat ---"

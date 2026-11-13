@@ -36,13 +36,15 @@ data class ChatMessage(
     @SerialName("fl") val file: ChatFile? = null,
     /** Когда текст исправили (null — не исправляли). */
     @SerialName("ed") val edited: Long? = null,
+    /** Ход в крестиках-ноликах. */
+    @SerialName("g") val game: ChatGame? = null,
 ) {
     val key: String get() = "$from:$seq"
 
     /** Удалённое сообщение: текст и вложения стираются, остаётся только место в переписке. */
     fun asDeleted(): ChatMessage = copy(
         text = "", photo = null, replyTo = null, deleted = true,
-        effect = null, secret = false, hand = false, voice = null, circle = null, sticker = null, file = null,
+        effect = null, secret = false, hand = false, voice = null, circle = null, sticker = null, file = null, game = null,
     )
 
     /** Файлы сообщения в облаке: номер и сколько у него частей. */
@@ -323,9 +325,10 @@ object ChatLogic {
         circle: ChatCircle? = null,
         sticker: ChatSticker? = null,
         file: ChatFile? = null,
+        game: ChatGame? = null,
     ): ChatState {
         val clean = text.trim().take(MAX_TEXT)
-        val media = photo != null || voice != null || circle != null || sticker != null || file != null
+        val media = photo != null || voice != null || circle != null || sticker != null || file != null || game != null
         if (clean.isEmpty() && !media) return state
         val message = ChatMessage(
             from = me.id,
@@ -341,6 +344,7 @@ object ChatLogic {
             circle = circle,
             sticker = sticker,
             file = file,
+            game = game,
         )
         return state.copy(
             mine = state.mine + message,
@@ -422,7 +426,7 @@ object ChatLogic {
     fun canEdit(state: ChatState, message: ChatMessage): Boolean =
         !message.deleted && message.seq >= state.headStart && state.mine.any { it.key == message.key && it.at == message.at } &&
             message.voice == null && message.circle == null && message.sticker == null && message.file == null &&
-            (message.text.isNotEmpty() || message.photo != null)
+            message.game == null && (message.text.isNotEmpty() || message.photo != null)
 
     /** Исправить текст своего сообщения. Пустой текст у фото — фото без подписи; пустое сообщение не бывает. */
     fun editMine(state: ChatState, seq: Long, text: String, now: Long): ChatState {
@@ -669,6 +673,47 @@ object ChatLogic {
         else -> ChatTick.SENT
     }
 
+    /** Начать новую партию: начавший играет крестиками и ходит первым. */
+    fun startGame(state: ChatState, me: Person, id: String, now: Long, replyTo: String? = null): ChatState {
+        val game = ChatGame(id = id, x = me.id)
+        return append(state, me, TicTacToe.caption(game), now, replyTo = replyTo, game = game)
+    }
+
+    /**
+     * Сходить в партии. [seen] — позиция, на которую нажали: если на телефоне уже есть позиция новее
+     * (нажали дважды подряд или второй ход ещё не нарисовался), ход не делается.
+     */
+    fun playGame(state: ChatState, me: Person, seen: ChatGame, cell: Int, now: Long): ChatState {
+        val current = latestGames(state)[seen.id]?.game ?: return state
+        if (current.board != seen.board || current.x != seen.x) return state
+        val next = TicTacToe.move(current, cell, me.id) ?: return state
+        return append(state, me, TicTacToe.caption(next), now, game = next)
+    }
+
+    /**
+     * Последняя позиция каждой партии. Ходов в позиции больше — она новее (часы телефонов могут расходиться),
+     * при равенстве новее та, что написана позже.
+     */
+    fun latestGames(state: ChatState): Map<String, ChatMessage> {
+        val out = HashMap<String, ChatMessage>()
+        fun consider(message: ChatMessage) {
+            val game = message.game ?: return
+            if (message.deleted || !TicTacToe.valid(game.board)) return
+            val old = out[game.id]
+            val oldGame = old?.game
+            if (old == null || oldGame == null ||
+                TicTacToe.marks(game.board) > TicTacToe.marks(oldGame.board) ||
+                (TicTacToe.marks(game.board) == TicTacToe.marks(oldGame.board) && message.at > old.at)
+            ) {
+                out[game.id] = message
+            }
+        }
+        state.earlier.forEach(::consider)
+        state.mine.forEach(::consider)
+        state.theirs.forEach(::consider)
+        return out
+    }
+
     /** Найти сообщение по ключу «кто:номер». */
     fun find(state: ChatState, key: String?): ChatMessage? {
         if (key == null) return null
@@ -740,6 +785,18 @@ object ChatLogic {
             state.mine.forEach { if (!it.deleted) add(Item(it, true, false)) }
             state.theirs.forEach { if (!it.deleted) add(Item(it, false, false)) }
         }.distinctBy { Triple(it.earlier, it.message.key, it.message.at) }
+            // От партии в ленте остаётся только последняя позиция.
+            .let { list ->
+                if (list.none { it.message.game != null }) {
+                    list
+                } else {
+                    val latest = latestGames(state)
+                    list.filter { item ->
+                        val game = item.message.game
+                        game == null || latest[game.id].let { it != null && it.key == item.message.key && it.at == item.message.at }
+                    }
+                }
+            }
             .sortedWith(compareBy<Item>({ !it.earlier }, { it.message.at }, { it.message.from }, { it.message.seq }))
         val byKey = HashMap<String, ChatMessage>(state.mine.size + state.theirs.size)
         state.mine.forEach { if (!it.deleted) byKey[it.key] = it }
