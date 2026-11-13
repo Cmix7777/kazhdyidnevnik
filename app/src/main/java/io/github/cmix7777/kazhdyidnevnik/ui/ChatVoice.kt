@@ -80,6 +80,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.cmix7777.kazhdyidnevnik.R
+import io.github.cmix7777.kazhdyidnevnik.service.VoiceText
 import io.github.cmix7777.kazhdyidnevnik.data.ChatCircle
 import io.github.cmix7777.kazhdyidnevnik.data.ChatVoice
 import io.github.cmix7777.kazhdyidnevnik.service.ChatFiles
@@ -301,6 +302,7 @@ internal fun VoiceBubble(voice: ChatVoice, mine: Boolean, accent: Color, onReady
     val ready = remember(version, voice.id) { ChatFiles.exists(context, voice.id) }
     val gone = remember(version, voice.id) { ChatFiles.gone(context, voice.id) }
     LaunchedEffect(ready, gone) { if (!ready && !gone) onReady() }
+    LaunchedEffect(Unit) { VoiceText.load(context) }
     val mineNow = playing?.takeIf { it.id == voice.id }
     val progress = if (mineNow != null && mineNow.duration > 0) mineNow.position / mineNow.duration.toFloat() else 0f
     val fg = if (mine) Color.White else accent
@@ -349,6 +351,24 @@ internal fun VoiceBubble(voice: ChatVoice, mine: Boolean, accent: Color, onReady
                     style = MaterialTheme.typography.labelSmall,
                     color = fg.copy(alpha = 0.75f),
                 )
+                // «Текст»: расшифровать голосовое (нажал ещё раз — спрятать текст).
+                if (ready && !gone && VoiceText.possible()) {
+                    val texts by VoiceText.state.collectAsState()
+                    val shown = texts[voice.id]
+                    Text(
+                        text = if (shown is VoiceText.State.Done) "скрыть текст" else "текст",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = fg,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(fg.copy(alpha = 0.18f))
+                            .clickable {
+                                if (shown is VoiceText.State.Done || shown is VoiceText.State.Failed) VoiceText.hide(voice.id) else VoiceText.start(context, voice.id)
+                            }
+                            .padding(horizontal = 7.dp, vertical = 1.dp)
+                            .testTag("voice-text"),
+                    )
+                }
                 // Скорость видна, пока голосовое играет (или стоит на паузе): нажал — быстрее.
                 if (mineNow != null) {
                     val speed by VoicePlayer.speed.collectAsState()
@@ -731,4 +751,22 @@ private fun centerCrop(view: TextureView, videoWidth: Int, videoHeight: Int) {
 /** Кнопка записи сразу шлёт готовое: голосовое или кружочек. */
 internal fun sendRecorded(context: Context, voice: VoiceRecorder.Result?, replyTo: String?) {
     if (voice != null) ChatSync.sendVoice(context, voice.bytes, voice.durationMs, voice.wave, replyTo)
+}
+
+/** Расшифровка голосового под ним: пока идёт — «расшифровываю…» и то, что уже разобрано. */
+@Composable
+internal fun VoiceTranscript(id: String, color: Color, faint: Color, modifier: Modifier = Modifier) {
+    val texts by VoiceText.state.collectAsState()
+    val state = texts[id] ?: return
+    val (text, dim) = when (state) {
+        is VoiceText.State.Working -> (if (state.partial.isBlank()) "расшифровываю…" else state.partial + " …") to true
+        is VoiceText.State.Done -> state.text to false
+        is VoiceText.State.Failed -> ("Не вышло: " + state.why) to true
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium.let { if (dim) it.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic) else it },
+        color = if (dim) faint else color,
+        modifier = modifier.padding(start = 13.dp, end = 13.dp, bottom = 8.dp).testTag("voice-transcript"),
+    )
 }

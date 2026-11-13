@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -18,9 +19,11 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import io.github.cmix7777.kazhdyidnevnik.data.ChatCloud
+import io.github.cmix7777.kazhdyidnevnik.data.ChatGame
 import io.github.cmix7777.kazhdyidnevnik.data.ChatLogic
 import io.github.cmix7777.kazhdyidnevnik.data.ChatState
 import io.github.cmix7777.kazhdyidnevnik.data.Person
+import io.github.cmix7777.kazhdyidnevnik.data.TicTacToe
 import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
 import io.github.cmix7777.kazhdyidnevnik.service.ChatSync
 import io.github.cmix7777.kazhdyidnevnik.service.CloudNet
@@ -87,6 +90,23 @@ class ChatActivityFlowTest {
         val version = maxOf(now, partner.myVersion + 1)
         nastya.upload(code, Person.NASTYA, plan.pages, plan.head, version)
         partner = ChatLogic.afterUpload(partner, plan, version, partner.revision)
+    }
+
+    private fun partnerMoves(seen: ChatGame, cell: Int) {
+        val next = TicTacToe.move(seen, cell, Person.NASTYA.id)!!
+        partner = ChatLogic.append(partner, Person.NASTYA, TicTacToe.caption(next), System.currentTimeMillis(), game = next)
+        val plan = ChatLogic.planUpload(partner, Person.NASTYA, push = null, hook = null)
+        val version = maxOf(System.currentTimeMillis(), partner.myVersion + 1)
+        nastya.upload(code, Person.NASTYA, plan.pages, plan.head, version)
+        partner = ChatLogic.afterUpload(partner, plan, version, partner.revision)
+    }
+
+    private fun aizatGame(): ChatGame? =
+        nastya.head(code, Person.AIZAT)?.first?.messages?.lastOrNull { it.game != null }?.game
+
+    /** На экране ровно одна доска этой партии (прежние позиции спрятаны и уже доиграли исчезновение). */
+    private fun oneBoard(id: String) = waitUntil("одна доска партии") {
+        compose.onAllNodes(hasTestTag("game-$id"), useUnmergedTree = true).fetchSemanticsNodes().size == 1
     }
 
     private fun openChat() {
@@ -175,5 +195,49 @@ class ChatActivityFlowTest {
         assertEquals(3, ChatSync.state.value.earlier.size)
         // Новое сообщение прочитано, только когда переписка открыта: отметка у Насти — 1, а не старые 3.
         waitUntil("прочитано новое") { nastya.mark(code, Person.AIZAT)?.read == 1L }
+    }
+
+    @Test
+    fun ticTacToeFromTheMenuAndMovesTravelBothWays() {
+        partnerSends("сыграем?")
+        openChat()
+        waitFor(hasText("сыграем?"))
+        compose.onNode(hasContentDescription("Вложение: фото, камера или файл")).performClick()
+        waitFor(hasTestTag("attach-game"), 5_000)
+        compose.onNodeWithTag("attach-game").performClick()
+        waitUntil("партия ушла Насте") { aizatGame()?.board == TicTacToe.EMPTY }
+        waitFor(hasText("Твой ход"))
+
+        // Айзат начал — он крестики и ходит первым.
+        compose.onNodeWithTag("game-cell-4").performClick()
+        waitUntil("ход Айзата у Насти") { aizatGame()?.board == "....X...." }
+        waitFor(hasText("Ход Насти"))
+
+        partnerMoves(aizatGame()!!, 0)
+        waitFor(hasText("Твой ход"), 25_000)
+        // Старые позиции спрятаны: на экране одна доска.
+        val id = aizatGame()!!.id
+        oneBoard(id)
+        compose.onNodeWithTag("game-cell-0").performClick() // занято — ничего не будет
+        compose.onNodeWithTag("game-cell-8").performClick()
+        waitUntil("второй ход Айзата") { aizatGame()?.board == "O...X...X" }
+        waitFor(hasText("Ход Насти"))
+
+        partnerMoves(aizatGame()!!, 1)
+        waitFor(hasText("Твой ход"), 25_000)
+        oneBoard(id)
+        compose.onNodeWithTag("game-cell-2").performClick()
+        waitUntil("третий ход") { aizatGame()?.board == "OOX.X...X" }
+        waitFor(hasText("Ход Насти"))
+        partnerMoves(aizatGame()!!, 6)
+        waitFor(hasText("Твой ход"), 25_000)
+        oneBoard(id)
+        compose.onNodeWithTag("game-cell-5").performClick()
+        // X на 2, 5, 8 — правый столбец.
+        waitUntil("победный ход") { aizatGame()?.board == "OOX.XXO.X" }
+        waitFor(hasText("Три в ряд — победа твоя!"))
+        oneBoard(id)
+        compose.onNodeWithTag("game-again").performClick()
+        waitUntil("новая партия") { aizatGame()?.let { it.board == TicTacToe.EMPTY && it.id != id } == true }
     }
 }

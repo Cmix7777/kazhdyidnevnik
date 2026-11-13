@@ -5,6 +5,7 @@ import android.net.Uri
 import io.github.cmix7777.kazhdyidnevnik.data.ChatCircle
 import io.github.cmix7777.kazhdyidnevnik.data.ChatCloud
 import io.github.cmix7777.kazhdyidnevnik.data.ChatFile
+import io.github.cmix7777.kazhdyidnevnik.data.ChatGame
 import io.github.cmix7777.kazhdyidnevnik.data.ChatLogic
 import io.github.cmix7777.kazhdyidnevnik.data.ChatSticker
 import io.github.cmix7777.kazhdyidnevnik.data.ChatVoice
@@ -404,6 +405,33 @@ object ChatSync {
         scope.launch(writer) {
             ensureLoaded(app)
             update { ChatLogic.editMine(it, message.seq, text, System.currentTimeMillis()) }
+            lastActivity = System.currentTimeMillis()
+            uploadNow(app)
+        }
+    }
+
+    /** Новая партия в крестики-нолики: начавший ходит первым. */
+    fun startGame(context: Context, replyTo: String? = null) {
+        val app = context.applicationContext
+        val settings = AppSettings(app)
+        val owner = settings.owner ?: return
+        if (settings.pairCode == null) return
+        val id = ChatFiles.newId()
+        scope.launch(writer) {
+            ensureLoaded(app)
+            update { ChatLogic.startGame(it, owner, id, System.currentTimeMillis(), replyTo) }
+            lastActivity = System.currentTimeMillis()
+            uploadNow(app)
+        }
+    }
+
+    /** Ход в клетку [cell] позиции [seen] (той, что видна на экране). */
+    fun playGame(context: Context, seen: ChatGame, cell: Int) {
+        val app = context.applicationContext
+        val owner = AppSettings(app).owner ?: return
+        scope.launch(writer) {
+            ensureLoaded(app)
+            update { ChatLogic.playGame(it, owner, seen, cell, System.currentTimeMillis()) }
             lastActivity = System.currentTimeMillis()
             uploadNow(app)
         }
