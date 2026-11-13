@@ -103,6 +103,18 @@ data class ChatPhoto(
 )
 
 /**
+ * Закрепление сообщения: [key] и [at] — какое сообщение, [on] — закреплено или откреплено, [time] — когда.
+ * У каждого свои отметки в голове; побеждает более поздняя, так что открепить можно и закреплённое вторым.
+ */
+@Serializable
+data class ChatPin(
+    @SerialName("k") val key: String,
+    @SerialName("a") val at: Long,
+    @SerialName("on") val on: Boolean = true,
+    @SerialName("t") val time: Long,
+)
+
+/**
  * Голова переписки одного человека в облаке: последние его сообщения подряд, по возрастанию номера.
  * Когда их становится много, старые уходят в архивные страницы ([ChatPage]), а голова начинается заново.
  */
@@ -125,6 +137,8 @@ data class ChatHead(
     @SerialName("rx") val reactions: Map<String, String> = emptyMap(),
     /** Его почерк для записок (номер файла). */
     @SerialName("hf") val font: String? = null,
+    /** Его отметки закреплённых сообщений. */
+    @SerialName("pn") val pins: List<ChatPin> = emptyList(),
 ) {
     /** Номер первого сообщения головы. */
     val first: Long get() = messages.firstOrNull()?.seq ?: (last + 1)
@@ -205,6 +219,9 @@ data class ChatState(
     val played: List<String> = emptyList(),
     /** Сообщения «в будущее»: лежат на этом телефоне и уходят в назначенное время. */
     val scheduled: List<ScheduledMessage> = emptyList(),
+    /** Свои отметки закреплённых сообщений и отметки второго человека. */
+    val myPins: List<ChatPin> = emptyList(),
+    val theirPins: List<ChatPin> = emptyList(),
 )
 
 /** Сообщение, которое уйдёт само в [at] (миллисекунды). До этого его видно только отправителю. */
@@ -249,6 +266,7 @@ sealed interface ChatRow {
 object ChatLogic {
 
     const val MAX_TEXT = 4000
+    const val KEEP_PINS = 60
 
     /**
      * Голова в облаке не больше этого (в байтах JSON до шифрования). Правила базы пускают до 300 000 знаков,
@@ -509,6 +527,7 @@ object ChatLogic {
             hook = hook,
             reactions = state.myReactions,
             font = state.myFont,
+            pins = state.myPins,
         )
         return Upload(pages, head, headStart, pageStarts)
     }
@@ -557,6 +576,7 @@ object ChatLogic {
             hookPublished = head.hook,
             myReactions = head.reactions,
             myFont = head.font ?: state.myFont,
+            myPins = head.pins,
         )
     }
 
@@ -608,6 +628,7 @@ object ChatLogic {
                 theirHook = head.hook ?: state.theirHook,
                 theirReactions = head.reactions,
                 theirFont = head.font ?: state.theirFont,
+                theirPins = head.pins,
             ),
             missing,
             restarted = reset != null,
@@ -712,6 +733,70 @@ object ChatLogic {
         state.mine.forEach(::consider)
         state.theirs.forEach(::consider)
         return out
+    }
+
+    /** Закреплённые сообщения, последнее закреплённое — первым. */
+    fun pinned(state: ChatState): List<ChatMessage> {
+        val latest = HashMap<Pair<String, Long>, ChatPin>()
+        (state.myPins + state.theirPins).forEach { pin ->
+            val id = pin.key to pin.at
+            val old = latest[id]
+            if (old == null || pin.time > old.time || (pin.time == old.time && !pin.on)) latest[id] = pin
+        }
+        val live = (state.mine + state.theirs).filter { !it.deleted }.associateBy { it.key to it.at }
+        return latest.values.filter { it.on }.sortedByDescending { it.time }.mapNotNull { live[it.key to it.at] }
+    }
+
+    fun isPinned(state: ChatState, message: ChatMessage): Boolean =
+        pinned(state).any { it.key == message.key && it.at == message.at }
+
+    /** Закрепить или открепить сообщение у обоих. */
+    fun pin(state: ChatState, message: ChatMessage, on: Boolean, now: Long): ChatState {
+        if (message.deleted || isPinned(state, message) == on) return state
+        val same = (state.myPins + state.theirPins).filter { it.key == message.key && it.at == message.at }
+        // Позже всех прежних отметок этого сообщения, даже если часы второго телефона спешат.
+        val time = maxOf(now, (same.maxOfOrNull { it.time } ?: 0L) + 1)
+        val others = state.myPins.filterNot { it.key == message.key && it.at == message.at }
+        var pins = others + ChatPin(message.key, message.at, on, time)
+        if (pins.size > KEEP_PINS) {
+            // Сначала забываются старые «откреплено», потом самые старые закрепления.
+            val drop = pins.size - KEEP_PINS
+            val offs = pins.filter { !it.on }.sortedBy { it.time }.take(drop).toSet()
+            pins = pins - offs
+            if (pins.size > KEEP_PINS) pins = pins.sortedBy { it.time }.takeLast(KEEP_PINS)
+        }
+        return state.copy(myPins = pins, revision = state.revision + 1)
+    }
+
+    /** Нашлось при поиске: сообщение, из прежней ли оно переписки и в каком куске текста совпадение. */
+    data class SearchHit(val message: ChatMessage, val earlier: Boolean, val text: String)
+
+    private fun fold(text: String): String = text.lowercase().replace('ё', 'е')
+
+    /**
+     * Поиск по словам во всей переписке: тексты, подписи к фото, имена файлов, записки и расшифровки голосовых
+     * ([voiceText]: номер голосового → текст). Секреты под чернилами и ходы игр не ищутся. Новые — первыми.
+     */
+    fun search(state: ChatState, query: String, voiceText: Map<String, String> = emptyMap(), limit: Int = 300): List<SearchHit> {
+        val words = fold(query).split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (words.isEmpty()) return emptyList()
+        fun textOf(m: ChatMessage): String? = when {
+            m.deleted || m.secret || m.game != null -> null
+            m.file != null -> listOf(m.file.name, m.text).filter { it.isNotBlank() }.joinToString(" — ")
+            m.voice != null -> voiceText[m.voice.id]
+            else -> m.text.takeIf { it.isNotBlank() }
+        }
+        val all = state.earlier.map { it to true } + state.mine.map { it to false } + state.theirs.map { it to false }
+        return all.asSequence()
+            .distinctBy { (m, earlier) -> Triple(earlier, m.key, m.at) }
+            .mapNotNull { (m, earlier) ->
+                val text = textOf(m) ?: return@mapNotNull null
+                val folded = fold(text)
+                if (words.all { it in folded }) SearchHit(m, earlier, text) else null
+            }
+            .sortedByDescending { it.message.at }
+            .take(limit)
+            .toList()
     }
 
     /** Найти сообщение по ключу «кто:номер». */

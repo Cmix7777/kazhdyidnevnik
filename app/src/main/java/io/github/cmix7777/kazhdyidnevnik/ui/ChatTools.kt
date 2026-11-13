@@ -61,6 +61,15 @@ import io.github.cmix7777.kazhdyidnevnik.data.SharedList
 import io.github.cmix7777.kazhdyidnevnik.data.SharedListStore
 import io.github.cmix7777.kazhdyidnevnik.service.ChatFiles
 import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import io.github.cmix7777.kazhdyidnevnik.data.ChatLogic
+import io.github.cmix7777.kazhdyidnevnik.service.VoiceText
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -224,7 +233,11 @@ internal fun MediaGalleryDialog(
     onEnsureFiles: (ChatMessage, Boolean) -> Unit,
     onClose: () -> Unit,
 ) {
-    val all = remember(state) { (state.mine + state.theirs).filter { !it.deleted }.sortedByDescending { it.at } }
+    // Одно сообщение может оказаться в списке дважды (после переустановки или смены владельца телефона):
+    // ключи плиток обязаны быть разными, иначе список падает.
+    val all = remember(state) {
+        (state.mine + state.theirs).filter { !it.deleted }.distinctBy { it.key to it.at }.sortedByDescending { it.at }
+    }
     val photos = remember(all) { all.filter { it.photo != null } }
     val circles = remember(all) { all.filter { it.circle != null } }
     val files = remember(all) { all.filter { it.file != null } }
@@ -259,7 +272,7 @@ internal fun MediaGalleryDialog(
             }
             when (tab) {
                 0 -> LazyVerticalGrid(columns = GridCells.Fixed(3), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    items(photos, key = { it.key }) { message ->
+                    items(photos, key = { "${it.key}-${it.at}" }) { message ->
                         val photo = message.photo!!
                         LaunchedEffect(message.key) { onEnsureFiles(message, message.from == owner.id) }
                         Box(
@@ -272,7 +285,7 @@ internal fun MediaGalleryDialog(
                     }
                 }
                 1 -> LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(circles, key = { it.key }) { message ->
+                    items(circles, key = { "${it.key}-${it.at}" }) { message ->
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
                             CircleBubble(
                                 circle = message.circle!!,
@@ -284,7 +297,7 @@ internal fun MediaGalleryDialog(
                     }
                 }
                 else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(files, key = { it.key }) { message ->
+                    items(files, key = { "${it.key}-${it.at}" }) { message ->
                         val file = message.file!!
                         LaunchedEffect(message.key) { onEnsureFiles(message, message.from == owner.id) }
                         val context = LocalContext.current
@@ -434,6 +447,172 @@ internal fun SharedListDialog(owner: Person, onClose: () -> Unit) {
             }
             if (shown.any { it.done }) {
                 GhostButton("Убрать сделанное", onClick = { change { SharedList.clearDone(it, System.currentTimeMillis()) } }, small = true)
+            }
+        }
+    }
+}
+
+// ---------- закреплённые и поиск ----------
+
+/** Полоска под шапкой переписки: закреплённое сообщение. Нажал — переписка листается к нему, дальше к следующему. */
+@Composable
+internal fun PinnedBar(message: ChatMessage, position: Int, count: Int, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(Palette.Chip)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp)
+            .testTag("pinned-bar"),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(painterResource(R.drawable.ic_pin), contentDescription = null, tint = Palette.Lavender, modifier = Modifier.size(18.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (count > 1) "Закреплено · ${position + 1} из $count" else "Закреплено",
+                style = MaterialTheme.typography.labelSmall,
+                color = Palette.Lavender,
+            )
+            Text(
+                text = ChatLogic.shortText(message).ifBlank { "Сообщение" },
+                style = MaterialTheme.typography.bodySmall,
+                color = Palette.Text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Кусок текста вокруг первого совпадения, совпадения подсвечены. */
+internal fun searchSnippet(text: String, query: String, highlight: Color, width: Int = 90): AnnotatedString {
+    val fold = { t: String -> t.lowercase().replace('ё', 'е') }
+    val words = fold(query).split(Regex("\\s+")).filter { it.isNotEmpty() }
+    val flat = text.replace('\n', ' ')
+    val folded = fold(flat)
+    val first = words.mapNotNull { w -> folded.indexOf(w).takeIf { it >= 0 } }.minOrNull() ?: 0
+    val start = (first - width / 3).coerceIn(0, flat.length)
+    val end = (start + width).coerceAtMost(flat.length)
+    val piece = (if (start > 0) "…" else "") + flat.substring(start, end) + (if (end < flat.length) "…" else "")
+    val shift = if (start > 0) 1 - start else -start
+    return buildAnnotatedString {
+        append(piece)
+        for (w in words) {
+            var from = folded.indexOf(w, start)
+            while (from in start until end) {
+                val a = from + shift
+                val b = (minOf(from + w.length, end)) + shift
+                if (a >= 0 && b <= piece.length && a < b) addStyle(SpanStyle(background = highlight, fontWeight = FontWeight.SemiBold), a, b)
+                from = folded.indexOf(w, from + w.length)
+            }
+        }
+    }
+}
+
+/** Поиск по переписке: пишешь слово — видно все сообщения с ним; нажал — переписка листается к сообщению. */
+@Composable
+internal fun ChatSearchDialog(
+    state: ChatState,
+    owner: Person,
+    zone: ZoneId,
+    onPick: (ChatLogic.SearchHit) -> Unit,
+    onClose: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    val voiceStates by VoiceText.state.collectAsState()
+    val voice = remember(voiceStates) { voiceStates.mapNotNull { (id, s) -> (s as? VoiceText.State.Done)?.let { id to it.text } }.toMap() }
+    val hits = remember(state, query, voice) { if (query.trim().length < 2) emptyList() else ChatLogic.search(state, query, voice) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    val today = LocalDate.now(zone)
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Palette.Background)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GlassIconButton(icon = R.drawable.ic_arrow_back, contentDescription = "Назад", onClick = onClose)
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Palette.Chip)
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(painterResource(R.drawable.ic_search), contentDescription = null, tint = Palette.TextFaint, modifier = Modifier.size(18.dp))
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it.take(100) },
+                        singleLine = true,
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = Palette.Text),
+                        cursorBrush = SolidColor(Palette.Violet),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(vertical = 12.dp)
+                            .focusRequester(focus)
+                            .testTag("search-input"),
+                        decorationBox = { inner ->
+                            if (query.isEmpty()) Text("Слово или фраза", style = MaterialTheme.typography.bodyLarge, color = Palette.TextFaint)
+                            inner()
+                        },
+                    )
+                }
+            }
+            when {
+                query.trim().length < 2 -> Text(
+                    "Ищет по сообщениям, подписям к фото, именам файлов и расшифрованным голосовым.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.TextMuted,
+                )
+                hits.isEmpty() -> Text("Ничего не нашлось.", style = MaterialTheme.typography.bodyMedium, color = Palette.TextMuted)
+                else -> Text(
+                    "Нашлось: ${hits.size}" + if (hits.size >= 300) " (показаны последние)" else "",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Palette.TextMuted,
+                )
+            }
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(hits, key = { (if (it.earlier) "old-" else "") + it.message.key + "-" + it.message.at }) { hit ->
+                    val author = if (hit.message.from == owner.id) "Ты" else owner.partner.shortName
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Palette.Chip)
+                            .clickable { onPick(hit) }
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .testTag("search-hit"),
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(author, style = MaterialTheme.typography.labelMedium, color = Palette.Lavender)
+                            Text(
+                                laterText(hit.message.at, zone, today) + if (hit.earlier) " · прежняя переписка" else "",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Palette.TextFaint,
+                            )
+                        }
+                        Text(
+                            searchSnippet(hit.text, query, Palette.Violet.copy(alpha = 0.35f)),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Palette.Text,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
     }

@@ -19,6 +19,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -465,6 +467,7 @@ fun ChatRoot(onBack: () -> Unit) {
                 onCancelScheduled = { id -> ChatSync.cancelScheduled(context, id) },
                 onGame = { reply -> ChatSync.startGame(context, reply) },
                 onGameMove = { game, cell -> ChatSync.playGame(context, game, cell) },
+                onPin = { message, on -> ChatSync.pin(context, message, on) },
             )
         }
         viewing?.let { photo -> PhotoViewer(photo, onClose = { viewing = null }) }
@@ -569,6 +572,7 @@ fun ChatScreen(
     onCancelScheduled: (String) -> Unit = {},
     onGame: (replyTo: String?) -> Unit = {},
     onGameMove: (ChatGame, Int) -> Unit = { _, _ -> },
+    onPin: (ChatMessage, Boolean) -> Unit = { _, _ -> },
 ) {
     val partner = owner.partner
     val dark = LocalDark.current
@@ -592,6 +596,23 @@ fun ChatScreen(
     val editing = remember(editKey, state) { state.mine.firstOrNull { it.key == editKey && !it.deleted } }
     var laterOpen by remember { mutableStateOf(false) }
     var scheduledOpen by remember { mutableStateOf(false) }
+    var searchOpen by remember { mutableStateOf(false) }
+    // Закреплённые: полоска под шапкой показывает одно, нажатие листает к нему и переключает на следующее.
+    val pins = remember(state) { ChatLogic.pinned(state) }
+    var pinIndex by remember { mutableIntStateOf(0) }
+    // Подсветка сообщения, к которому перешли из поиска или закреплённых.
+    var highlight by remember { mutableStateOf<String?>(null) }
+    fun jumpTo(message: ChatMessage, earlier: Boolean = false) {
+        val index = rows.indexOfFirst { it is ChatRow.Message && it.earlier == earlier && it.message.key == message.key && it.message.at == message.at }
+        if (index < 0) return
+        val key = rows[index].key
+        scope.launch {
+            listState.animateScrollToItem(index)
+            highlight = key
+            delay(1_800)
+            if (highlight == key) highlight = null
+        }
+    }
     val maxBubble = (LocalConfiguration.current.screenWidthDp * 0.78f).dp
     val hasPending = state.mine.lastOrNull()?.let { it.seq > state.uploaded } == true
     val fx = remember { WordFxState() }
@@ -730,7 +751,26 @@ fun ChatScreen(
                 .fillMaxSize()
                 .imePadding(),
         ) {
-            ChatTopBar(partner = partner, status = status, colors = colors, onBack = onBack, partnerNow = partnerNow, onMenu = onMenu)
+            ChatTopBar(
+                partner = partner,
+                status = status,
+                colors = colors,
+                onBack = onBack,
+                partnerNow = partnerNow,
+                onMenu = { item -> if (item == "search") searchOpen = true else onMenu(item) },
+            )
+            if (pins.isNotEmpty() && status.paired) {
+                val position = pinIndex.coerceIn(0, pins.lastIndex)
+                PinnedBar(
+                    message = pins[position],
+                    position = position,
+                    count = pins.size,
+                    onClick = {
+                        jumpTo(pins[position])
+                        pinIndex = (position + 1) % pins.size
+                    },
+                )
+            }
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -815,6 +855,9 @@ fun ChatScreen(
                                                 },
                                                 onGameMove = { cell -> message.game?.let { onGameMove(it, cell) } },
                                                 onGameAgain = { onGame(null) },
+                                                pinned = pins.any { it.key == message.key && it.at == message.at },
+                                                onPin = { on -> onPin(message, on) },
+                                                highlighted = highlight == row.key,
                                             )
                                         }
                                     }
@@ -992,6 +1035,18 @@ fun ChatScreen(
                 onDismiss = { scheduledOpen = false },
             )
         }
+        if (searchOpen) {
+            ChatSearchDialog(
+                state = state,
+                owner = owner,
+                zone = zone,
+                onPick = { hit ->
+                    searchOpen = false
+                    jumpTo(hit.message, hit.earlier)
+                },
+                onClose = { searchOpen = false },
+            )
+        }
     }
 }
 
@@ -1068,6 +1123,15 @@ private fun ChatTopBar(
         Box {
             GlassIconButton(icon = R.drawable.ic_more, contentDescription = "Ещё", onClick = { menu = true })
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(
+                    text = { Text("Поиск по переписке") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    onClick = {
+                        menu = false
+                        onMenu("search")
+                    },
+                    modifier = Modifier.testTag("menu-search"),
+                )
                 DropdownMenuItem(
                     text = { Text("Мой почерк") },
                     leadingIcon = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null, modifier = Modifier.size(18.dp)) },
@@ -1182,6 +1246,9 @@ private fun MessageBubble(
     onEdit: () -> Unit = {},
     onGameMove: (Int) -> Unit = {},
     onGameAgain: () -> Unit = {},
+    pinned: Boolean = false,
+    onPin: (Boolean) -> Unit = {},
+    highlighted: Boolean = false,
 ) {
     val message = row.message
     val context = LocalContext.current
@@ -1266,10 +1333,12 @@ private fun MessageBubble(
         Modifier
     }
 
+    val glow by animateFloatAsState(if (highlighted) 1f else 0f, tween(if (highlighted) 250 else 900), label = "glow")
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = if (row.first) 8.dp else 2.dp)
+            .then(if (glow > 0f) Modifier.background(Palette.Lavender.copy(alpha = 0.22f * glow), RoundedCornerShape(12.dp)) else Modifier)
             .alpha(if (row.earlier) 0.6f else 1f)
             .then(swipe),
         contentAlignment = if (row.mine) Alignment.CenterEnd else Alignment.CenterStart,
@@ -1489,6 +1558,17 @@ private fun MessageBubble(
                             menu = false
                             onSaveSticker()
                         },
+                    )
+                }
+                if (interactive) {
+                    DropdownMenuItem(
+                        text = { Text(if (pinned) "Открепить" else "Закрепить") },
+                        leadingIcon = { Icon(painterResource(R.drawable.ic_pin), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        onClick = {
+                            menu = false
+                            onPin(!pinned)
+                        },
+                        modifier = Modifier.testTag("menu-pin"),
                     )
                 }
                 if (canEdit) {

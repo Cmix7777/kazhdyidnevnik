@@ -410,6 +410,17 @@ object ChatSync {
         }
     }
 
+    /** Закрепить или открепить сообщение у обоих. */
+    fun pin(context: Context, message: ChatMessage, on: Boolean) {
+        val app = context.applicationContext
+        scope.launch(writer) {
+            ensureLoaded(app)
+            update { ChatLogic.pin(it, message, on, System.currentTimeMillis()) }
+            lastActivity = System.currentTimeMillis()
+            uploadNow(app)
+        }
+    }
+
     /** Новая партия в крестики-нолики: начавший ходит первым. */
     fun startGame(context: Context, replyTo: String? = null) {
         val app = context.applicationContext
