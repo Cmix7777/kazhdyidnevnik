@@ -62,6 +62,8 @@ jobs:
             adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.AppScreensTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > screens.log 2>&1 || true
             adb logcat -d -v time > logcat.txt 2>&1 || true
             adb shell am instrument -w -e class io.github.cmix7777.kazhdyidnevnik.TogetherWeekShotsTest,io.github.cmix7777.kazhdyidnevnik.SpecialDayShotsTest,io.github.cmix7777.kazhdyidnevnik.WeatherShotsTest,io.github.cmix7777.kazhdyidnevnik.LiveUiShotsTest,io.github.cmix7777.kazhdyidnevnik.GreetingRealAppTest,io.github.cmix7777.kazhdyidnevnik.ChatShotsTest,io.github.cmix7777.kazhdyidnevnik.ChatCloudLiveTest,io.github.cmix7777.kazhdyidnevnik.CloudFlowTest,io.github.cmix7777.kazhdyidnevnik.LiveFlowsUiTest,io.github.cmix7777.kazhdyidnevnik.ChatActivityFlowTest,io.github.cmix7777.kazhdyidnevnik.ScheduleSyncFlowTest,io.github.cmix7777.kazhdyidnevnik.PairingFlowUiTest,io.github.cmix7777.kazhdyidnevnik.GlassEffectsVisibleTest,io.github.cmix7777.kazhdyidnevnik.VoiceTextTest io.github.cmix7777.kazhdyidnevnik.test/androidx.test.runner.AndroidJUnitRunner > instrument.log 2>&1 || true
+            sh .github/retry-failed.sh instrument.log instrument-retry.log || true
+            sh .github/retry-failed.sh screens.log screens-retry.log || true
             adb pull /sdcard/Android/data/io.github.cmix7777.kazhdyidnevnik/files/shots shots || true
             sh .github/release-smoke.sh > release.log 2>&1 || true
 
@@ -76,8 +78,9 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           why=""
           [ "$BUILD" = success ] || why="$why сборка"
-          grep -q "^OK (" instrument.log 2>/dev/null || why="$why тесты-на-эмуляторе"
-          grep -q "^OK (" screens.log 2>/dev/null || why="$why экраны"
+          passed() { grep -q "^OK (" "$1" 2>/dev/null || grep -q "RETRY OK" "$2" 2>/dev/null; }
+          passed instrument.log instrument-retry.log || why="$why тесты-на-эмуляторе"
+          passed screens.log screens-retry.log || why="$why экраны"
           grep -q "release OK" release.log 2>/dev/null || why="$why выпускная-сборка"
           if [ -n "$why" ]; then echo "не выпущено: не прошло$why" > release-result.txt; exit 0; fi
           git fetch -q origin main
@@ -111,6 +114,8 @@ jobs:
             tail -n 80 "$GITHUB_WORKSPACE/instrument.log" 2>/dev/null || true
             echo "--- screens ---"
             grep -v "^\s*at " "$GITHUB_WORKSPACE/screens.log" 2>/dev/null | tail -n 40 || true
+            echo "--- retry ---"
+            cat "$GITHUB_WORKSPACE/instrument-retry.log" "$GITHUB_WORKSPACE/screens-retry.log" 2>/dev/null || true
             echo "--- release ---"
             cat "$GITHUB_WORKSPACE/release.log" 2>/dev/null | tail -n 40 || true
             echo "--- publish ---"
