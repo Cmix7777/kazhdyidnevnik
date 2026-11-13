@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.VoicePcmTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-13T18:07:10.851Z" hostname="runnervmwuk1x" time="0.067">
+  <properties/>
+  <testcase name="recognizedPiecesAreJoinedNeatly" classname="io.github.cmix7777.kazhdyidnevnik.data.VoicePcmTest" time="0.001"/>
+  <testcase name="stereoIsAveraged" classname="io.github.cmix7777.kazhdyidnevnik.data.VoicePcmTest" time="0.0"/>
+  <testcase name="bytesAreLittleEndianWithSilenceAtTheEnd" classname="io.github.cmix7777.kazhdyidnevnik.data.VoicePcmTest" time="0.011"/>
+  <testcase name="recorderRateIsConvertedTo16kWithoutChangingPitch" classname="io.github.cmix7777.kazhdyidnevnik.data.VoicePcmTest" time="0.033"/>
+  <testcase name="otherRatesAndEmptyInput" classname="io.github.cmix7777.kazhdyidnevnik.data.VoicePcmTest" time="0.017"/>
+  <testcase name="floatSoundIsClamped" classname="io.github.cmix7777.kazhdyidnevnik.data.VoicePcmTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-13T18:07:09.780Z" hostname="runnervmwuk1x" time="0.038">
+  <properties/>
+  <testcase name="everyLineWins" classname="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" time="0.001"/>
+  <testcase name="twoGamesLiveSideBySide" classname="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" time="0.002"/>
+  <testcase name="oldAppVersionSeesTextAndNewOneSeesBoard" classname="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" time="0.027"/>
+  <testcase name="brokenBoardsAreNotPlayable" classname="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" time="0.0"/>
+  <testcase name="deletingTheLastMoveShowsThePreviousOne" classname="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" time="0.001"/>
+  <testcase name="turnsGoInOrderAndOnlyToFreeCells" classname="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" time="0.0"/>
+  <testcase name="deletedGameMessageLosesTheBoard" classname="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" time="0.0"/>
+  <testcase name="newerPositionWinsEvenWhenClocksDisagree" classname="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" time="0.001"/>
+  <testcase name="doubleTapOrStalePositionDoesNotMoveTwice" classname="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" time="0.0"/>
+  <testcase name="afterWinNobodyMoves" classname="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" time="0.0"/>
+  <testcase name="wholeGameThroughTheChatShowsOnlyTheLatestPosition" classname="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" time="0.004"/>
+  <testcase name="captionsAreWrittenFromTheMoverSide" classname="io.github.cmix7777.kazhdyidnevnik.data.GamesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

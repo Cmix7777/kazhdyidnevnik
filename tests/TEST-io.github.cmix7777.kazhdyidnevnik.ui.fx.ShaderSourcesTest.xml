@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.ui.fx.ShaderSourcesTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-13T18:07:26.689Z" hostname="runnervmwuk1x" time="0.154">
+  <properties/>
+  <testcase name="reversedEdgesWorkTheSameEverywhere" classname="io.github.cmix7777.kazhdyidnevnik.ui.fx.ShaderSourcesTest" time="0.009"/>
+  <testcase name="noEffectUsesBuiltInSmoothstep" classname="io.github.cmix7777.kazhdyidnevnik.ui.fx.ShaderSourcesTest" time="0.136"/>
+  <testcase name="everyEffectHasTheSafeHelper" classname="io.github.cmix7777.kazhdyidnevnik.ui.fx.ShaderSourcesTest" time="0.009"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

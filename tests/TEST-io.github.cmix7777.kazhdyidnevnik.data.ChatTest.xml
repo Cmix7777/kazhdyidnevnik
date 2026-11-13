@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" tests="19" skipped="0" failures="0" errors="0" timestamp="2026-11-13T18:07:08.598Z" hostname="runnervmwuk1x" time="0.114">
+  <properties/>
+  <testcase name="everythingSurvivesSavingAndLoading" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.022"/>
+  <testcase name="restoreTakesCloudHistoryAndRenumbersLocalDrafts" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.008"/>
+  <testcase name="messagesAreNumberedAndNeverGoBackInTime" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.001"/>
+  <testcase name="blankMessageIsIgnoredAndLongOneIsCut" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.002"/>
+  <testcase name="deletedStaysDeletedAndClashingNumberKeepsTheOldMessage" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.002"/>
+  <testcase name="deletingPhotoWipesItInTheCloud" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.0"/>
+  <testcase name="deletingArchivedMessageRewritesItsPageAndTellsThePartner" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.013"/>
+  <testcase name="crowdedHeadRollsIntoAnArchivePage" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.008"/>
+  <testcase name="rowsGroupMessagesSplitDaysAndShowTicks" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.023"/>
+  <testcase name="restartNoticedLateKeepsWhatWasAlreadyRead" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.001"/>
+  <testcase name="partnerHeadMergesNewMessagesDeletionsAndAsksForMissingPages" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.0"/>
+  <testcase name="uploadPlanCarriesNewMessagesAndClearsPendingAfterwards" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.0"/>
+  <testcase name="rowKeysStayUniqueWhenEarlierChatOverlapsDays" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.005"/>
+  <testcase name="previewFitsIntoAPushAndPhotosAreNamed" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.005"/>
+  <testcase name="heavyHeadRollsByBytesToo" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.002"/>
+  <testcase name="restartedNumberingLowersReadMarksSoNewMessagesAreNotReadAtOnce" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.001"/>
+  <testcase name="oldArchivePageDoesNotPushOutFreshMessage" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.0"/>
+  <testcase name="newPairCodeStartsOverButKeepsTheHistoryAbove" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.004"/>
+  <testcase name="unreadAndNotificationsCountOnlyNewMessagesOfTheOther" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

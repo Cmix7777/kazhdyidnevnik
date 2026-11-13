@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.CollegeParserTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-13T18:07:08.923Z" hostname="runnervmwuk1x" time="0.453">
+  <properties/>
+  <testcase name="earlyEndAndRoomNotes" classname="io.github.cmix7777.kazhdyidnevnik.data.CollegeParserTest" time="0.119"/>
+  <testcase name="nastyaWeek" classname="io.github.cmix7777.kazhdyidnevnik.data.CollegeParserTest" time="0.034"/>
+  <testcase name="tuesdayDetails" classname="io.github.cmix7777.kazhdyidnevnik.data.CollegeParserTest" time="0.019"/>
+  <testcase name="readsOldExcelFile" classname="io.github.cmix7777.kazhdyidnevnik.data.CollegeParserTest" time="0.012"/>
+  <testcase name="alternativesAndOneOffChanges" classname="io.github.cmix7777.kazhdyidnevnik.data.CollegeParserTest" time="0.022"/>
+  <testcase name="findsFileLink" classname="io.github.cmix7777.kazhdyidnevnik.data.CollegeParserTest" time="0.014"/>
+  <testcase name="datesInCells" classname="io.github.cmix7777.kazhdyidnevnik.data.CollegeParserTest" time="0.005"/>
+  <testcase name="readsNewExcelFileTheSameWay" classname="io.github.cmix7777.kazhdyidnevnik.data.CollegeParserTest" time="0.217"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

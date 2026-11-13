@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-13T18:07:08.758Z" hostname="runnervmwuk1x" time="0.072">
+  <properties/>
+  <testcase name="hkdfWithoutSaltMatchesTheVectorToo" classname="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" time="0.001"/>
+  <testcase name="sealedTextIsUnreadableAndUrlSafe" classname="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" time="0.008"/>
+  <testcase name="documentNameDoesNotRevealTheKey" classname="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" time="0.004"/>
+  <testcase name="garbageIsRejectedWithoutCrashing" classname="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" time="0.001"/>
+  <testcase name="sealAndOpenRoundTrip" classname="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" time="0.027"/>
+  <testcase name="documentIsBoundToItsOwner" classname="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" time="0.005"/>
+  <testcase name="everySealingUsesAFreshNonce" classname="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" time="0.001"/>
+  <testcase name="hkdfMatchesTheTestVectorFromRfc5869" classname="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" time="0.0"/>
+  <testcase name="keysAreStableAndDependOnTheCode" classname="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" time="0.006"/>
+  <testcase name="changedDataIsRejected" classname="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" time="0.002"/>
+  <testcase name="keysDoNotPrintTheirSecrets" classname="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" time="0.002"/>
+  <testcase name="anotherCodeCannotOpenIt" classname="io.github.cmix7777.kazhdyidnevnik.data.CloudCryptoTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

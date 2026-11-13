@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.live.LiveSourcesTest" tests="2" skipped="1" failures="0" errors="0" timestamp="2026-11-13T18:07:15.099Z" hostname="runnervmwuk1x" time="9.239">
+  <properties/>
+  <testcase name="aizatTimeoSiteAnswersAndParses" classname="io.github.cmix7777.kazhdyidnevnik.live.LiveSourcesTest" time="7.734">
+    <skipped message="timeo недоступен с сервера проверки" type="org.junit.AssumptionViolatedException">org.junit.AssumptionViolatedException: timeo недоступен с сервера проверки
+	at org.junit.Assume.assumeTrue(Assume.java:68)
+	at io.github.cmix7777.kazhdyidnevnik.live.LiveSourcesTest.aizatTimeoSiteAnswersAndParses(LiveSourcesTest.kt:78)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.internal.runners.statements.FailOnTimeout$CallableStatement.call(FailOnTimeout.java:299)
+	at org.junit.internal.runners.statements.FailOnTimeout$CallableStatement.call(FailOnTimeout.java:293)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+</skipped>
+  </testcase>
+  <testcase name="nastyaCollegeFileDownloadsAndParsesQuickly" classname="io.github.cmix7777.kazhdyidnevnik.live.LiveSourcesTest" time="1.504"/>
+  <system-out><![CDATA[LIVE: timeo недоступен: org.jsoup.HttpStatusException: HTTP error fetching URL. Status=500, URL=[https://timeo.mveu.ru/schedule/table?group=%D0%94%D0%98%D0%A1-234%2F21%D0%91]
+LIVE: страница колледжа: 1007 мс, ссылка: /files/assets/014100-2%20смена%20ЮР,%20ПД,%20ТД.xls
+LIVE: файл https://f-mkpo.udsu.ru/files/assets/014100-2%20%D1%81%D0%BC%D0%B5%D0%BD%D0%B0%20%D0%AE%D0%A0,%20%D0%9F%D0%94,%20%D0%A2%D0%94.xls: 77312 байт за 458 мс
+LIVE: таблица прочитана за 7 мс: строк 76, столбцов 11, объединений 256, самое большое на 13 клеток
+LIVE: разбор за 7 мс: на этой неделе пар 16, на следующей 16
+LIVE:   2026-11-09 13:40-15:10 Безопасность жизнедеятельности |  | Иванов А.А.
+LIVE:   2026-11-09 15:30-17:00 Безопасность жизнедеятельности |  | Иванов А.А.
+LIVE:   2026-11-10 12:00-13:30 Физическая культура | корпус 5, тренажерный зал | Скоробогатов А.В.
+LIVE:   2026-11-10 13:40-15:10 Автоматизация торгово-технологических процессов |  | Мальцева К.А.
+LIVE:   2026-11-10 15:30-17:00 Логистика |  | Мальцева К.А.
+LIVE:   2026-11-10 17:10-18:40 Логистика |  | Мальцева К.А.
+LIVE:   2026-11-11 15:30-17:00 Финансы, налоги и налогообложение |  | Ильина С.В.
+LIVE:   2026-11-11 17:10-18:40 Технология интернет-маркетинга |  | Горячева О.А.
+LIVE:   2026-11-11 18:50-20:20 Технология интернет-маркетинга |  | Горячева О.А.
+LIVE:   2026-11-12 13:40-15:10 Технология продаж потребительских товаров и координация работы с клиентами |  | Кузьмин Е.В.
+LIVE:   2026-11-12 15:30-17:00 Технология продаж потребительских товаров и координация работы с клиентами |  | Кузьмин Е.В.
+LIVE:   2026-11-12 17:10-18:40 Технология продаж потребительских товаров и координация работы с клиентами |  | Кузьмин Е.В.
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

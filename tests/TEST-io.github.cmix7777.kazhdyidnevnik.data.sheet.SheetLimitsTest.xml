@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.sheet.SheetLimitsTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-13T18:07:11.271Z" hostname="runnervmwuk1x" time="3.826">
+  <properties/>
+  <testcase name="mergeOverWholeSheetIsCheap" classname="io.github.cmix7777.kazhdyidnevnik.data.sheet.SheetLimitsTest" time="0.01"/>
+  <testcase name="manyBigMergesFallBackToSearch" classname="io.github.cmix7777.kazhdyidnevnik.data.sheet.SheetLimitsTest" time="3.795"/>
+  <testcase name="brokenFilesFailWithReadableErrors" classname="io.github.cmix7777.kazhdyidnevnik.data.sheet.SheetLimitsTest" time="0.001"/>
+  <testcase name="realTimetableWithWholeColumnMergeParsesTheSame" classname="io.github.cmix7777.kazhdyidnevnik.data.sheet.SheetLimitsTest" time="0.02"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

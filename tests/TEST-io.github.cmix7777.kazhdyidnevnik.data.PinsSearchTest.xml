@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.PinsSearchTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-13T18:07:10.133Z" hostname="runnervmwuk1x" time="0.076">
+  <properties/>
+  <testcase name="searchLooksIntoFilesVoicesAndPartnerButNotSecretsOrGames" classname="io.github.cmix7777.kazhdyidnevnik.data.PinsSearchTest" time="0.018"/>
+  <testcase name="pinChangesGoToTheCloudAndRepeatsDoNothing" classname="io.github.cmix7777.kazhdyidnevnik.data.PinsSearchTest" time="0.003"/>
+  <testcase name="searchFindsAllWordsIgnoringCaseAndYo" classname="io.github.cmix7777.kazhdyidnevnik.data.PinsSearchTest" time="0.001"/>
+  <testcase name="manyPinsAreTrimmedOldestFirst" classname="io.github.cmix7777.kazhdyidnevnik.data.PinsSearchTest" time="0.052"/>
+  <testcase name="deletedPinnedMessageDisappearsFromPins" classname="io.github.cmix7777.kazhdyidnevnik.data.PinsSearchTest" time="0.0"/>
+  <testcase name="pinnedMessageIsSeenByBothAndLatestComesFirst" classname="io.github.cmix7777.kazhdyidnevnik.data.PinsSearchTest" time="0.0"/>
+  <testcase name="pinsSurviveReinstall" classname="io.github.cmix7777.kazhdyidnevnik.data.PinsSearchTest" time="0.0"/>
+  <testcase name="searchIncludesPreviousChatMarkedAsEarlier" classname="io.github.cmix7777.kazhdyidnevnik.data.PinsSearchTest" time="0.001"/>
+  <testcase name="partnerCanUnpinWhatIPinnedAndPinAgain" classname="io.github.cmix7777.kazhdyidnevnik.data.PinsSearchTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
