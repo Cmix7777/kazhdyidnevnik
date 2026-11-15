@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -31,6 +32,7 @@ import io.github.cmix7777.kazhdyidnevnik.service.JsoupTransport
 import io.github.cmix7777.kazhdyidnevnik.testing.FakeFirestore
 import io.github.cmix7777.kazhdyidnevnik.testing.MemoryTokens
 import io.github.cmix7777.kazhdyidnevnik.ui.ChatActivity
+import io.github.cmix7777.kazhdyidnevnik.ui.WallpaperStore
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -67,6 +69,7 @@ class ChatActivityFlowTest {
         AppSettings(context).owner = Person.AIZAT
         AppSettings(context).pairCode = code
         ChatSync.resetForTest(context)
+        WallpaperStore.resetForTest(context)
         nastya = ChatCloud(store, MemoryTokens())
         partner = ChatState(restored = true)
     }
@@ -74,6 +77,7 @@ class ChatActivityFlowTest {
     @After
     fun tearDown() {
         scenario?.close()
+        WallpaperStore.resetForTest(context)
         ChatSync.resetForTest(context)
         CloudNet.transport = JsoupTransport
         context.getSharedPreferences("settings", Context.MODE_PRIVATE).edit().clear().commit()
@@ -239,5 +243,37 @@ class ChatActivityFlowTest {
         oneBoard(id)
         compose.onNodeWithTag("game-again").performClick()
         waitUntil("новая партия") { aizatGame()?.let { it.board == TicTacToe.EMPTY && it.id != id } == true }
+    }
+
+    @Test
+    fun wallpaperIsChosenFromTheMenuAndRemembered() {
+        partnerSends("привет")
+        openChat()
+        waitFor(hasText("привет"))
+        compose.onNode(hasContentDescription("Ещё")).performClick()
+        waitFor(hasTestTag("menu-wallpaper"), 5_000)
+        compose.onNodeWithTag("menu-wallpaper").performClick()
+        waitFor(hasTestTag("wall-list"), 10_000)
+        compose.onNodeWithTag("wall-list").performScrollToNode(hasTestTag("wall-none"))
+        compose.onNodeWithTag("wall-none").performClick()
+        waitUntil("выбран «без фона»") { WallpaperStore.choice.id == "none" }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            compose.onNodeWithTag("wall-list").performScrollToNode(hasTestTag("wall-code"))
+            compose.onNodeWithTag("wall-code").performClick()
+            waitUntil("выбран «Код»") { WallpaperStore.choice.id == "code" }
+        }
+        val chosen = WallpaperStore.choice.id
+        compose.onNodeWithTag("wall-done").performClick()
+        waitUntil("окно выбора закрылось") { compose.onAllNodes(hasTestTag("wall-list")).fetchSemanticsNodes().isEmpty() }
+        waitUntil("фон записан на телефон") {
+            context.getSharedPreferences("chat-ui", Context.MODE_PRIVATE).getString("wall-id", null) == chosen
+        }
+        // Переписка на новом фоне работает как раньше.
+        waitFor(hasText("привет"))
+        compose.onNodeWithTag("chat-input").performTextInput("на новом фоне")
+        compose.onNodeWithTag("chat-send").performClick()
+        waitUntil("сообщение у Насти") {
+            nastya.head(code, Person.AIZAT)?.first?.messages?.any { it.text == "на новом фоне" } == true
+        }
     }
 }
