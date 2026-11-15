@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -144,6 +145,8 @@ import io.github.cmix7777.kazhdyidnevnik.applyAppChrome
 import io.github.cmix7777.kazhdyidnevnik.data.ChatFile
 import io.github.cmix7777.kazhdyidnevnik.data.ChatLogic
 import io.github.cmix7777.kazhdyidnevnik.data.ChatGame
+import io.github.cmix7777.kazhdyidnevnik.data.Wallpapers
+import io.github.cmix7777.kazhdyidnevnik.data.WallpaperChoice
 import io.github.cmix7777.kazhdyidnevnik.data.ChatMessage
 import io.github.cmix7777.kazhdyidnevnik.data.ChatPhoto
 import io.github.cmix7777.kazhdyidnevnik.data.ChatRow
@@ -358,6 +361,8 @@ fun ChatRoot(onBack: () -> Unit) {
     var archive by remember { mutableStateOf(false) }
     var media by remember { mutableStateOf(false) }
     var sharedList by remember { mutableStateOf(false) }
+    var wallpaperOpen by remember { mutableStateOf(false) }
+    remember { WallpaperStore.load(context) }
     var fontEditor by remember { mutableStateOf(false) }
     val rootScope = rememberCoroutineScope()
     var saving by remember { mutableStateOf<ChatFile?>(null) }
@@ -460,6 +465,7 @@ fun ChatRoot(onBack: () -> Unit) {
                         "archive" -> archive = true
                         "media" -> media = true
                         "list" -> sharedList = true
+                        "wallpaper" -> wallpaperOpen = true
                     }
                 },
                 onEdit = { message, text -> ChatSync.edit(context, message, text) },
@@ -468,6 +474,7 @@ fun ChatRoot(onBack: () -> Unit) {
                 onGame = { reply -> ChatSync.startGame(context, reply) },
                 onGameMove = { game, cell -> ChatSync.playGame(context, game, cell) },
                 onPin = { message, on -> ChatSync.pin(context, message, on) },
+                wallpaper = WallpaperStore.choice,
             )
         }
         viewing?.let { photo -> PhotoViewer(photo, onClose = { viewing = null }) }
@@ -498,6 +505,17 @@ fun ChatRoot(onBack: () -> Unit) {
             )
         }
         if (sharedList) SharedListDialog(owner = owner, onClose = { sharedList = false })
+        if (wallpaperOpen) {
+            WallpaperDialog(
+                choice = WallpaperStore.choice,
+                owner = owner,
+                onChange = { value, final -> WallpaperStore.set(context, value, persist = final) },
+                onClose = {
+                    WallpaperStore.set(context, WallpaperStore.choice)
+                    wallpaperOpen = false
+                },
+            )
+        }
         if (fontEditor) {
             HandFontDialog(
                 font = myFont,
@@ -573,6 +591,7 @@ fun ChatScreen(
     onGame: (replyTo: String?) -> Unit = {},
     onGameMove: (ChatGame, Int) -> Unit = { _, _ -> },
     onPin: (ChatMessage, Boolean) -> Unit = { _, _ -> },
+    wallpaper: WallpaperChoice = WallpaperChoice(),
 ) {
     val partner = owner.partner
     val dark = LocalDark.current
@@ -586,6 +605,11 @@ fun ChatScreen(
         theirAccent = Accents.of(partner, dark).light,
     )
     val rows = remember(state, owner, zone) { ChatLogic.rows(state, owner, zone) }
+    // Фон отзывается на касания, новые сообщения и наклон телефона.
+    val wallLive = remember { WallpaperLive() }
+    val wallShader = EffectsSettings.shadersSupported && Wallpapers.live(wallpaper.id)
+    val screenOpened = remember { SystemClock.uptimeMillis() }
+    WallpaperTilt(wallLive, enabled = wallShader && wallpaper.tilt && animate)
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var text by rememberSaveable { mutableStateOf(initialText) }
@@ -641,6 +665,8 @@ fun ChatScreen(
     // Пришло новое сообщение, а человек и так внизу переписки: показываем его.
     val newestKey = rows.firstOrNull { it is ChatRow.Message }?.key
     LaunchedEffect(newestKey) {
+        // Новое сообщение (не те, что были при открытии): по фону проходит волна.
+        if (newestKey != null && SystemClock.uptimeMillis() - screenOpened > 1_500L) wallLive.pulse()
         if (newestKey != null && listState.firstVisibleItemIndex <= 2) listState.animateScrollToItem(0)
     }
     // Её сообщение с эффектом: эффект играет один раз (и не повторяется при следующем открытии).
@@ -737,13 +763,14 @@ fun ChatScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .onGloballyPositioned { rootOffset = it.positionInRoot() },
+            .onGloballyPositioned { rootOffset = it.positionInRoot() }
+            .wallpaperTouches(wallLive, wallShader && wallpaper.touch && animate),
     ) {
-        ChatSmoke(
-            mine = colors.mineTop,
-            theirs = colors.theirBorder,
-            background = Accents.of(owner, dark).background,
+        ChatWallpaper(
+            choice = wallpaper,
+            owner = owner,
             running = animate && circle == null,
+            live = wallLive,
             modifier = Modifier.matchParentSize(),
         )
         Column(
@@ -1131,6 +1158,15 @@ private fun ChatTopBar(
                         onMenu("search")
                     },
                     modifier = Modifier.testTag("menu-search"),
+                )
+                DropdownMenuItem(
+                    text = { Text("Фон переписки") },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_wallpaper), contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    onClick = {
+                        menu = false
+                        onMenu("wallpaper")
+                    },
+                    modifier = Modifier.testTag("menu-wallpaper"),
                 )
                 DropdownMenuItem(
                     text = { Text("Мой почерк") },
