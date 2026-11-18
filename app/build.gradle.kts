@@ -89,6 +89,8 @@ dependencies {
     implementation(composeBom)
 
     implementation("androidx.core:core-ktx:1.16.0")
+    // Ставит заготовку компиляции (baseline profile) и для APK не из магазина: первые запуски после обновления не тормозят.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.0")
     implementation("androidx.compose.ui:ui")

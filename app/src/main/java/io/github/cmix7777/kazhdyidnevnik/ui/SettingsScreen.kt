@@ -523,6 +523,7 @@ private fun EffectsWhy(forecast: io.github.cmix7777.kazhdyidnevnik.data.Forecast
     val context = androidx.compose.ui.platform.LocalContext.current
     val why = when {
         EffectsSettings.reduced -> "Живые эффекты выключены этим переключателем."
+        EffectsSettings.saving -> "Живые эффекты на паузе, чтобы беречь заряд: включено энергосбережение или батареи меньше 15%. Вернутся сами."
         EffectsSettings.systemAnimationsOff(context) ->
             "Анимации выключены в самом телефоне (специальные возможности, «Убрать анимацию» или экономия заряда), поэтому небо и погода не двигаются."
         !EffectsSettings.shadersSupported -> "На этом телефоне Android ниже 13: живое небо и погода на стекле не показываются."

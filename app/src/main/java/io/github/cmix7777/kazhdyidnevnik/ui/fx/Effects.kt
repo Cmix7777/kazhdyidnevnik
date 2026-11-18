@@ -1,6 +1,12 @@
 package io.github.cmix7777.kazhdyidnevnik.ui.fx
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
+import android.os.PowerManager
+import androidx.core.content.ContextCompat
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -28,6 +34,47 @@ object EffectsSettings {
         reduced = value
     }
 
+    /** Экономия заряда: включено энергосбережение или батареи мало и телефон не заряжается. Эффекты тогда замирают. */
+    var saving by mutableStateOf(false)
+        private set
+
+    private var watching = false
+
+    /** Следить за энергосбережением и зарядом, пока работает приложение. */
+    fun watchPower(context: Context) {
+        val app = context.applicationContext
+        synchronized(this) {
+            if (watching) return
+            watching = true
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                update(app, if (intent.action == Intent.ACTION_BATTERY_CHANGED) intent else null)
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+            addAction(Intent.ACTION_BATTERY_CHANGED)
+        }
+        val sticky = runCatching { ContextCompat.registerReceiver(app, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED) }.getOrNull()
+        update(app, sticky)
+    }
+
+    private fun update(context: Context, battery: Intent?) {
+        val powerSave = context.getSystemService(PowerManager::class.java)?.isPowerSaveMode == true
+        val low = battery?.let {
+            val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+            val plugged = it.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0
+            level >= 0 && scale > 0 && !plugged && level * 100 / scale <= LOW_BATTERY_PERCENT
+        }
+        saving = powerSave || (low ?: lowBattery)
+        if (low != null) lowBattery = low
+    }
+
+    private var lowBattery = false
+    private const val LOW_BATTERY_PERCENT = 15
+
     /** Шейдеры AGSL есть начиная с Android 13. На старых телефонах эффекты рисуются проще. */
     val shadersSupported: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
@@ -36,7 +83,7 @@ object EffectsSettings {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
 
     /** Показывать ли эффекты с движением. */
-    fun animate(context: Context): Boolean = !reduced && !systemAnimationsOff(context)
+    fun animate(context: Context): Boolean = !reduced && !saving && !systemAnimationsOff(context)
 }
 
 /** Вибрации эффектов. Если телефон не умеет тонкие щелчки, играет похожая стандартная вибрация. */
