@@ -148,6 +148,34 @@ fun SettingsScreen(
                     }
                 }
                 GlassDivider()
+                var chatLock by remember { mutableStateOf(appSettings.chatLock) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(text = "Замок на переписку", style = MaterialTheme.typography.titleSmall, color = Palette.Text)
+                        Text(
+                            text = "Если переписку не открывали больше часа, она попросит отпечаток или код телефона.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Palette.TextMuted,
+                        )
+                    }
+                    Switch(
+                        checked = chatLock,
+                        onCheckedChange = {
+                            chatLock = it
+                            appSettings.chatLock = it
+                            if (it) appSettings.chatSeenMillis = System.currentTimeMillis()
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Palette.Violet,
+                            checkedBorderColor = Color.Transparent,
+                            uncheckedThumbColor = Palette.TextMuted,
+                            uncheckedTrackColor = Palette.Chip,
+                            uncheckedBorderColor = Palette.BorderStrong,
+                        ),
+                    )
+                }
+                GlassDivider()
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(text = "Меньше анимаций", style = MaterialTheme.typography.titleSmall, color = Palette.Text)

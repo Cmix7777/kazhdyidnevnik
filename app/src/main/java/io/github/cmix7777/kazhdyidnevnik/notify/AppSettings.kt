@@ -72,6 +72,16 @@ class AppSettings(context: Context) {
         get() = prefs.getBoolean(REDUCE_MOTION, false)
         set(value) = prefs.edit { putBoolean(REDUCE_MOTION, value) }
 
+    /** Замок на переписку: если её не открывали больше часа, она просит отпечаток или код телефона. */
+    var chatLock: Boolean
+        get() = prefs.getBoolean(CHAT_LOCK, false)
+        set(value) = prefs.edit { putBoolean(CHAT_LOCK, value) }
+
+    /** Когда переписку последний раз видели открытой (для замка). */
+    var chatSeenMillis: Long
+        get() = prefs.getLong(CHAT_SEEN, 0L)
+        set(value) = prefs.edit { putLong(CHAT_SEEN, value) }
+
     /** Какой особый день уже показан анимацией (дата и номер), чтобы не повторять её при каждом открытии. */
     var specialShown: String?
         get() = prefs.getString(SPECIAL_SHOWN, null)
@@ -284,6 +294,8 @@ class AppSettings(context: Context) {
         const val OWNER = "owner"
         const val THEME = "theme"
         const val REDUCE_MOTION = "reduceMotion"
+        const val CHAT_LOCK = "chatLock"
+        const val CHAT_SEEN = "chatSeen"
         const val SPECIAL_SHOWN = "specialShown"
         const val SENT_DROPS = "sentDrops"
         const val DROPS_SEEN_UNTIL = "dropsSeenUntil"
