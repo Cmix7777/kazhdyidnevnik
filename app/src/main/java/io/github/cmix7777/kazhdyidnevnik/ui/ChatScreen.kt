@@ -658,6 +658,7 @@ fun ChatScreen(
     var voiceTime by remember { mutableLongStateOf(0L) }
     var circle by remember { mutableStateOf<CircleSession?>(null) }
     var slide by remember { mutableFloatStateOf(0f) }
+    var lift by remember { mutableFloatStateOf(0f) }
     // Голосовое закреплено (увёл палец вверх): пишется без рук до кнопки «Отправить».
     var voiceLocked by remember { mutableStateOf(false) }
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
@@ -740,6 +741,7 @@ fun ChatScreen(
     /** Палец ушёл вверх: запись продолжается без рук. */
     fun lockRecord() {
         slide = 0f
+        lift = 0f
         if (voice != null) voiceLocked = true
         circle?.locked = true
         Haptics.tick(context)
@@ -747,6 +749,7 @@ fun ChatScreen(
 
     fun endRecord(cancel: Boolean) {
         slide = 0f
+        lift = 0f
         voiceLocked = false
         voice?.let { recorder ->
             voice = null
@@ -965,6 +968,7 @@ fun ChatScreen(
                 recordTime = voiceTime,
                 recordLevel = voiceLevel,
                 slide = slide,
+                lift = lift,
                 onText = {
                     text = it
                     onTyping(it.isNotBlank())
@@ -1013,6 +1017,10 @@ fun ChatScreen(
                 onToggleMode = { circleMode = !circleMode },
                 onRecordStart = { startRecord() },
                 onRecordSlide = { slide = it },
+                onRecordLift = {
+                    lift = it
+                    circle?.lift = it
+                },
                 onRecordLock = { lockRecord() },
                 onRecordEnd = { cancel -> endRecord(cancel) },
             )
@@ -1885,6 +1893,7 @@ private fun InputBar(
     recordTime: Long,
     recordLevel: Float,
     slide: Float,
+    lift: Float = 0f,
     onText: (String) -> Unit,
     onFocus: (Boolean) -> Unit,
     onSend: () -> Unit,
@@ -1898,6 +1907,7 @@ private fun InputBar(
     onRecordStart: () -> Boolean,
     onRecordSlide: (Float) -> Unit,
     onRecordLock: () -> Unit,
+    onRecordLift: (Float) -> Unit = {},
     onRecordEnd: (cancel: Boolean) -> Unit,
 ) {
     val context = LocalContext.current
@@ -1994,6 +2004,7 @@ private fun InputBar(
                     )
                     if (locked) {
                         Spacer(Modifier.weight(1f))
+                        LockHint(progress = 1f, locked = true, color = Palette.Lavender, modifier = Modifier.size(width = 18.dp, height = 22.dp))
                         Icon(
                             painterResource(R.drawable.ic_delete),
                             contentDescription = "Отменить голосовое",
@@ -2005,13 +2016,16 @@ private fun InputBar(
                                 .padding(6.dp)
                                 .testTag("record-cancel"),
                         )
-                    } else Text(
+                    } else {
+                        LockHint(progress = lift, locked = false, color = Palette.Lavender, modifier = Modifier.size(width = 18.dp, height = 22.dp))
+                        Text(
                         text = if (slide < -cancelDistance * 0.6f) "отпусти — отмена" else "влево — отмена, вверх — без рук",
                         style = MaterialTheme.typography.bodySmall,
                         color = Palette.TextFaint,
                         maxLines = 1,
                         modifier = Modifier.graphicsLayer { translationX = slide.coerceIn(-cancelDistance, 0f) * 0.4f },
                     )
+                    }
                 }
             } else {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2136,6 +2150,7 @@ private fun InputBar(
                                     val dx = change.position.x - down.position.x
                                     val dy = change.position.y - down.position.y
                                     onRecordSlide(dx)
+                                    onRecordLift((-dy / lockDistance).coerceIn(0f, 1f))
                                     when {
                                         !change.pressed -> {
                                             onRecordEnd(dx < -cancelDistance)

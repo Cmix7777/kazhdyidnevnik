@@ -63,6 +63,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -73,6 +78,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -409,6 +415,9 @@ internal class CircleSession {
     var startedAt by mutableLongStateOf(0L)
     var locked by mutableStateOf(false)
     var front by mutableStateOf(true)
+
+    /** Насколько палец ушёл вверх к замочку: 0 — не тянул, 1 — сейчас закрепится. */
+    var lift by mutableFloatStateOf(0f)
 }
 
 private suspend fun cameraProvider(context: Context): ProcessCameraProvider = suspendCancellableCoroutine { cont ->
@@ -443,6 +452,8 @@ internal fun CircleRecorderOverlay(session: CircleSession, accent: Color, onResu
     var bound by remember { mutableStateOf(false) }
     var boundFront by remember { mutableStateOf(true) }
     var canFlip by remember { mutableStateOf(false) }
+    val cameraHolder = remember { arrayOfNulls<androidx.camera.core.Camera>(1) }
+    var zoom by remember { mutableFloatStateOf(1f) }
 
     LaunchedEffect(Unit) {
         val provider = runCatching { cameraProvider(context) }.getOrNull()
@@ -465,7 +476,7 @@ internal fun CircleRecorderOverlay(session: CircleSession, accent: Color, onResu
         }.getOrDefault(false)
         try {
             provider.unbindAll()
-            provider.bindToLifecycle(owner, if (session.front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
+            cameraHolder[0] = provider.bindToLifecycle(owner, if (session.front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
             boundFront = session.front
             bound = true
         } catch (e: Exception) {
@@ -507,15 +518,16 @@ internal fun CircleRecorderOverlay(session: CircleSession, accent: Color, onResu
         val selector = if (session.front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
         val switched = runCatching {
             provider.unbindAll()
-            provider.bindToLifecycle(owner, selector, preview, capture)
+            cameraHolder[0] = provider.bindToLifecycle(owner, selector, preview, capture)
         }.isSuccess
+        zoom = 1f
         if (switched) {
             boundFront = session.front
         } else {
             // Другая камера не открылась — возвращаемся к прежней, запись продолжается.
             runCatching {
                 provider.unbindAll()
-                provider.bindToLifecycle(owner, if (boundFront) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
+                cameraHolder[0] = provider.bindToLifecycle(owner, if (boundFront) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
             }
             session.front = boundFront
         }
@@ -553,11 +565,47 @@ internal fun CircleRecorderOverlay(session: CircleSession, accent: Color, onResu
                     drawArc(Color.White.copy(alpha = 0.18f), 0f, 360f, false, style = Stroke(4.dp.toPx()))
                     drawArc(accent, -90f, 360f * elapsed, false, style = Stroke(4.dp.toPx(), cap = StrokeCap.Round))
                 }
+                Box(
+                    modifier = Modifier
+                        .size(260.dp)
+                        .clip(CircleShape)
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, _, change, _ ->
+                                val camera = cameraHolder[0] ?: return@detectTransformGestures
+                                val state = camera.cameraInfo.zoomState.value
+                                val min = state?.minZoomRatio ?: 1f
+                                val max = state?.maxZoomRatio ?: 1f
+                                zoom = (zoom * change).coerceIn(min, max)
+                                camera.cameraControl.setZoomRatio(zoom)
+                            }
+                        }
+                        .testTag("circle-zoom"),
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    if (zoom > 1.05f) {
+                        Text(
+                            text = String.format(java.util.Locale.US, "%.1fx", zoom),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            modifier = Modifier
+                                .padding(bottom = 16.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.45f))
+                                .padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
+                }
             }
             Text(
                 text = formatDuration((elapsed * CIRCLE_MAX_MS).toLong()),
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
+            )
+            LockHint(
+                progress = if (session.locked) 1f else session.lift,
+                locked = session.locked,
+                color = Color.White,
+                modifier = Modifier.size(width = 30.dp, height = 36.dp),
             )
             Text(
                 text = if (session.locked) "Запись идёт без рук" else "Отпусти — отправить, влево — отмена, вверх — без рук",
@@ -769,4 +817,41 @@ internal fun VoiceTranscript(id: String, color: Color, faint: Color, modifier: M
         color = if (dim) faint else color,
         modifier = modifier.padding(start = 13.dp, end = 13.dp, bottom = 8.dp).testTag("voice-transcript"),
     )
+}
+
+/**
+ * Замочек над записью: пока палец не тянут вверх, дужка открыта; чем выше палец, тем ниже она опускается,
+ * а при закреплении защёлкивается и корпус заливается цветом.
+ */
+@Composable
+internal fun LockHint(progress: Float, locked: Boolean, color: Color, modifier: Modifier = Modifier) {
+    val target = if (locked) 1f else progress.coerceIn(0f, 1f)
+    val t by animateFloatAsState(targetValue = target, animationSpec = tween(if (locked) 180 else 60), label = "lock")
+    val closed by animateFloatAsState(targetValue = if (locked) 1f else 0f, animationSpec = tween(220), label = "lock-fill")
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = (w * 0.11f).coerceAtLeast(1.5f)
+        val bodyTop = h * 0.48f
+        val bodyLeft = w * 0.12f
+        val bodyRight = w * 0.88f
+        val radius = w * 0.26f
+        val legLeft = w * 0.5f - radius
+        val legRight = w * 0.5f + radius
+        val raise = (1f - t) * h * 0.2f
+        val archY = h * 0.08f + radius + stroke / 2 - raise
+        val rightEnd = if (t >= 0.999f) bodyTop else bodyTop - h * 0.14f - raise
+        val shackle = Path().apply {
+            moveTo(legLeft, bodyTop)
+            lineTo(legLeft, archY)
+            arcTo(Rect(legLeft, archY - radius, legRight, archY + radius), 180f, 180f, false)
+            lineTo(legRight, maxOf(archY, rightEnd))
+        }
+        drawPath(shackle, color.copy(alpha = 0.55f + 0.45f * t), style = Stroke(stroke, cap = StrokeCap.Round))
+        val body = Size(bodyRight - bodyLeft, h - bodyTop - stroke / 2)
+        val corner = CornerRadius(w * 0.16f, w * 0.16f)
+        drawRoundRect(color.copy(alpha = 0.18f + 0.62f * closed), Offset(bodyLeft, bodyTop), body, corner)
+        drawRoundRect(color.copy(alpha = 0.55f + 0.45f * t), Offset(bodyLeft, bodyTop), body, corner, style = Stroke(stroke))
+        drawCircle(if (closed > 0.5f) Color.Black.copy(alpha = 0.35f) else color.copy(alpha = 0.7f), radius = stroke * 0.8f, center = Offset(w / 2, bodyTop + body.height * 0.5f))
+    }
 }

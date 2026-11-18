@@ -139,8 +139,9 @@ fun WeekScreen(
                     if (week.lessons.isEmpty()) {
                         item {
                             InfoNote(
-                                if (profile.hasPractice &&
-                                    (Practice.dayNumber(monday) != null || Practice.dayNumber(monday.plusDays(6)) != null)
+                                if (profile.practicePeriod?.touchesWeek(monday) == true ||
+                                    (profile.hasPractice &&
+                                        (Practice.dayNumber(monday) != null || Practice.dayNumber(monday.plusDays(6)) != null))
                                 )
                                     "На этой неделе пар нет: практика."
                                 else "На этой неделе пар в расписании нет.",

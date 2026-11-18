@@ -32,6 +32,13 @@ object WorkSchedule {
     )
 }
 
+/** Дни практики, когда пар нет. */
+data class PracticePeriod(val start: LocalDate, val end: LocalDate) {
+    fun contains(date: LocalDate): Boolean = !date.isBefore(start) && !date.isAfter(end)
+
+    fun touchesWeek(monday: LocalDate): Boolean = !monday.plusDays(6).isBefore(start) && !monday.isAfter(end)
+}
+
 /** Практика: со 2 по 15 ноября 2026. */
 object Practice {
     val start: LocalDate = LocalDate.of(2026, 11, 2)

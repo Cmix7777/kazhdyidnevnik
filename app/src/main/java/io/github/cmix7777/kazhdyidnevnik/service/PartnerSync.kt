@@ -5,6 +5,8 @@ import io.github.cmix7777.kazhdyidnevnik.data.CloudException
 import io.github.cmix7777.kazhdyidnevnik.data.CloudShares
 import io.github.cmix7777.kazhdyidnevnik.data.DiaryRepository
 import io.github.cmix7777.kazhdyidnevnik.data.GreetingDrops
+import io.github.cmix7777.kazhdyidnevnik.data.HabitStore
+import io.github.cmix7777.kazhdyidnevnik.data.Habits
 import io.github.cmix7777.kazhdyidnevnik.data.PairCode
 import io.github.cmix7777.kazhdyidnevnik.data.PartnerEventsRepository
 import io.github.cmix7777.kazhdyidnevnik.data.PartnerShare
@@ -215,9 +217,10 @@ object PartnerSync {
         val dates = PartnerShare.relevantDates(diary.deadlines)
         val drops = GreetingDrops.recent(settings.sentDrops, now)
         val list = SharedListStore.update(app.filesDir) { SharedList.prune(it, now) }
-        val fingerprint = PairCode.fingerprint(PartnerShare.encode(SharedEvents(owner, 0L, mine, dates, drops, list)))
+        val habits = Habits.shareable(HabitStore.current(app.filesDir), LocalDate.now())
+        val fingerprint = PairCode.fingerprint(PartnerShare.encode(SharedEvents(owner, 0L, mine, dates, drops, list, habits)))
         if (fingerprint != settings.publishedFingerprint || now - settings.publishedMillis > REPUBLISH_MS) {
-            cloud.publish(code, owner, PartnerShare.encode(SharedEvents(owner, now, mine, dates, drops, list)), now)
+            cloud.publish(code, owner, PartnerShare.encode(SharedEvents(owner, now, mine, dates, drops, list, habits)), now)
             settings.publishedFingerprint = fingerprint
             settings.publishedMillis = now
         }

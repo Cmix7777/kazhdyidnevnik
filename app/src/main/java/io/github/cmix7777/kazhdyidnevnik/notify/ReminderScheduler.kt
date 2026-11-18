@@ -10,6 +10,8 @@ import io.github.cmix7777.kazhdyidnevnik.data.Deadline
 import io.github.cmix7777.kazhdyidnevnik.data.SpecialDates
 import io.github.cmix7777.kazhdyidnevnik.formatDate
 import io.github.cmix7777.kazhdyidnevnik.data.DiaryRepository
+import io.github.cmix7777.kazhdyidnevnik.data.HabitStore
+import io.github.cmix7777.kazhdyidnevnik.data.Habits
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
 import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
@@ -85,6 +87,14 @@ object ReminderScheduler {
         date = from.toLocalDate()
         while (!date.isAfter(until.toLocalDate().plusDays(1))) {
             result += ReminderPlanner.forEvents(date, events)
+            date = date.plusDays(1)
+        }
+        val habits = HabitStore.current(context.filesDir)
+        date = from.toLocalDate()
+        while (!date.isAfter(until.toLocalDate())) {
+            habits.forEach { habit ->
+                habit.remindHour?.let { result += Reminder(date.atTime(it, 0), ReminderKind.HABIT, eventId = habit.id) }
+            }
             date = date.plusDays(1)
         }
         return result.filter { it.at.isAfter(from) && !it.at.isAfter(until) }
@@ -201,6 +211,11 @@ object ReminderScheduler {
                     listOfNotNull(formatDate(day), deadline.yearsText(day)).joinToString(", ") + ". Самое время подумать о подарке."
                 }
                 Notifier.special(context, "${deadline.id}-${reminder.daysBefore}", title, text)
+            }
+            ReminderKind.HABIT -> {
+                val habit = HabitStore.current(context.filesDir).firstOrNull { it.id == reminder.eventId } ?: return
+                if (habit.remindHour != reminder.at.hour || Habits.isDone(habit, date)) return
+                Notifier.habit(context, habit.id, habit.title)
             }
             ReminderKind.EVENING -> {
                 if (reminder.partner) return
