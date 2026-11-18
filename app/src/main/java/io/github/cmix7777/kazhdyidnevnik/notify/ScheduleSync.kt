@@ -3,6 +3,8 @@ package io.github.cmix7777.kazhdyidnevnik.notify
 import android.content.Context
 import io.github.cmix7777.kazhdyidnevnik.data.CollegeRepository
 import io.github.cmix7777.kazhdyidnevnik.data.Person
+import io.github.cmix7777.kazhdyidnevnik.data.PracticeFilteredSource
+import io.github.cmix7777.kazhdyidnevnik.data.Profiles
 import io.github.cmix7777.kazhdyidnevnik.data.ScheduleChange
 import io.github.cmix7777.kazhdyidnevnik.data.ScheduleDiff
 import io.github.cmix7777.kazhdyidnevnik.data.ScheduleRepository
@@ -39,7 +41,9 @@ object ScheduleSync {
 
     fun repository(context: Context, person: Person): ScheduleSource = sourceOverride?.invoke(context, person) ?: when (person) {
         Person.AIZAT -> ScheduleRepository(File(context.filesDir, "schedule"))
-        Person.NASTYA -> CollegeRepository(File(context.filesDir, "schedule-nastya"))
+        Person.NASTYA -> CollegeRepository(File(context.filesDir, "schedule-nastya")).let { source ->
+            Profiles.nastya.practicePeriod?.let { PracticeFilteredSource(source, it) } ?: source
+        }
     }
 
     suspend fun syncWeek(

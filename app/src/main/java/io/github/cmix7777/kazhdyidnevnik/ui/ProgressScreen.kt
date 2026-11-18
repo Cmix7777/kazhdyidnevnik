@@ -41,8 +41,12 @@ private const val SESSIONS_FOR_DONE = 3
 
 @Composable
 fun ProgressScreen(vm: ScheduleViewModel, person: Person, modifier: Modifier = Modifier) {
-    if (person != vm.owner || !person.profile.hasPlan) {
-        NoProgress(person, isOwner = person == vm.owner, modifier = modifier)
+    if (!person.profile.hasPlan) {
+        HabitsScreen(person, isOwner = person == vm.owner, modifier = modifier)
+        return
+    }
+    if (person != vm.owner) {
+        NoProgress(person, isOwner = false, modifier = modifier)
         return
     }
     val now by rememberNow()

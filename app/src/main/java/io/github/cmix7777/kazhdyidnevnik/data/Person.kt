@@ -44,6 +44,8 @@ data class Profile(
      * Дальше он меняет и удаляет их сам, обратно они не возвращаются.
      */
     val regularEvents: List<UserEvent> = emptyList(),
+    /** Практика без пар: в эти дни пары из расписания не показываются. */
+    val practicePeriod: PracticePeriod? = null,
 )
 
 object Profiles {
@@ -70,6 +72,7 @@ object Profiles {
         hasPractice = false,
         scheduleSource = "сайт колледжа УдГУ",
         shiftsAreEditable = true,
+        practicePeriod = PracticePeriod(LocalDate.of(2026, 11, 9), LocalDate.of(2026, 12, 13)),
     )
 }
 

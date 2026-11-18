@@ -183,6 +183,14 @@ object Notifier {
         post(context, id, notification)
     }
 
+    fun habit(context: Context, key: String, title: String) {
+        val id = 6000 + ((key.hashCode() and 0x7FFFFFFF) % 1000)
+        val notification = builder(context, CHANNEL_EVENTS, "Привычка на сегодня", title)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .build()
+        post(context, id, notification)
+    }
+
     fun weather(context: Context, title: String, text: String, partner: Boolean = false) {
         val id = ID_WEATHER + if (partner) PARTNER_OFFSET else 0
         post(context, id, builder(context, CHANNEL_WEATHER, title, text).build())

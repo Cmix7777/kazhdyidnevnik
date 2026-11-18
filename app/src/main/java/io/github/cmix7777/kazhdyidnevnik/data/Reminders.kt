@@ -5,7 +5,7 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 
-enum class ReminderKind { CHECK, MORNING, BLOCK, WEATHER, EVENING, EVENT, SPECIAL }
+enum class ReminderKind { CHECK, MORNING, BLOCK, WEATHER, EVENING, EVENT, SPECIAL, HABIT }
 
 /**
  * Одно напоминание: когда и что. Для блока учёбы [block] — его вид.
@@ -135,5 +135,6 @@ object ReminderPlanner {
         ReminderKind.EVENING -> Duration.ofHours(2)
         ReminderKind.EVENT -> Duration.ofMinutes(30)
         ReminderKind.SPECIAL -> Duration.ofHours(10)
+        ReminderKind.HABIT -> Duration.ofHours(1)
     }
 }

@@ -16,3 +16,18 @@ interface ScheduleSource {
 
     fun save(week: WeekSchedule)
 }
+
+/** Расписание без пар в дни практики: колледж может держать на сайте обычную сетку, а пар в эти дни нет. */
+class PracticeFilteredSource(private val inner: ScheduleSource, private val period: PracticePeriod) : ScheduleSource {
+
+    override suspend fun download(skip: Int, today: LocalDate, timeoutMs: Int): WeekSchedule =
+        strip(inner.download(skip, today, timeoutMs))
+
+    override fun loadCached(weekStart: LocalDate): WeekSchedule? = inner.loadCached(weekStart)?.let(::strip)
+
+    override fun loadOrBuild(weekStart: LocalDate): WeekSchedule? = inner.loadOrBuild(weekStart)?.let(::strip)
+
+    override fun save(week: WeekSchedule) = inner.save(strip(week))
+
+    private fun strip(week: WeekSchedule): WeekSchedule = week.copy(lessons = week.lessons.filterNot { period.contains(it.date) })
+}
