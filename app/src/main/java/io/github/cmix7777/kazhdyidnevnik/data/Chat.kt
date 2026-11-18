@@ -412,7 +412,7 @@ object ChatLogic {
             "спокойной ночи" in t || "сладких снов" in t || has("споки") -> "night"
             "доброе утро" in t || "доброго утра" in t || has("утречко") -> "sun"
             "люблю" in t -> "hearts"
-            "с днем рождения" in t || "с праздником" in t || has("с др") || Regex("[^а-я]ура+[^а-я]").containsMatchIn(t) -> "fire"
+            "с днем рождения" in t || "с праздником" in t || "с новым годом" in t || "с наступающим" in t || has("с др") || Regex("[^а-я]ура+[^а-я]").containsMatchIn(t) -> "fire"
             else -> null
         }
     }

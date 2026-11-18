@@ -1,5 +1,13 @@
 package io.github.cmix7777.kazhdyidnevnik.ui
 
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.ui.zIndex
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.Holidays
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidaySnow
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidayGarland
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidaySaluteHost
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberHoliday
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberHolidayIntro
 import android.Manifest
 import android.app.ActivityOptions
 import android.content.ClipData
@@ -727,6 +735,8 @@ fun ChatScreen(
     var circle by remember { mutableStateOf<CircleSession?>(null) }
     var slide by remember { mutableFloatStateOf(0f) }
     var lift by remember { mutableFloatStateOf(0f) }
+    val holiday = rememberHoliday()
+    val holidayIntro = rememberHolidayIntro(holiday)
     // Голосовое закреплено (увёл палец вверх): пишется без рук до кнопки «Отправить».
     var voiceLocked by remember { mutableStateOf(false) }
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
@@ -782,6 +792,7 @@ fun ChatScreen(
         if (message.isEmpty()) return
         val chosen = effect ?: if (!secret) ChatLogic.detectEffect(message) else null
         onSendRich(message, replyKey, chosen, secret)
+        Holidays.markDay(context)
         if (chosen != null && animate) fx.play(chosen)
         text = ""
         replyKey = null
@@ -844,6 +855,7 @@ fun ChatScreen(
             live = wallLive,
             modifier = Modifier.matchParentSize(),
         )
+        if (holiday != null) HolidaySnow(Modifier.matchParentSize(), count = 80, alpha = 0.85f)
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -868,6 +880,22 @@ fun ChatScreen(
                         pinIndex = (position + 1) % pins.size
                     },
                 )
+            }
+            if (holiday != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(0.dp)
+                        .zIndex(1f),
+                ) {
+                    HolidayGarland(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight(Alignment.Top, unbounded = true)
+                            .height(40.dp),
+                        intro = holidayIntro,
+                    )
+                }
             }
             Box(
                 modifier = Modifier
@@ -1107,6 +1135,7 @@ fun ChatScreen(
                 )
             }
         }
+        if (holiday != null) HolidaySaluteHost(holiday, 0, Modifier.matchParentSize())
         WordFxLayer(fx)
         DustLayer(dust)
         circle?.let { session ->
