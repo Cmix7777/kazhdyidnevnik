@@ -20,6 +20,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         ThemeSettings.load(AppSettings(this))
         EffectsSettings.load(AppSettings(this))
+        EffectsSettings.watchPower(this)
         val systemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
         applyAppChrome(ThemeSettings.mode.isDark(systemDark))
