@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- В облачную копию Google не уходят код связи с ключами шифрования (settings.xml) и переписка. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="settings.xml" />
+        <exclude domain="file" path="chat.json" />
+        <exclude domain="file" path="chat-files" />
+    </cloud-backup>
+</data-extraction-rules>

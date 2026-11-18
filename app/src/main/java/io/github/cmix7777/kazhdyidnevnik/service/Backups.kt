@@ -5,6 +5,10 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
+import io.github.cmix7777.kazhdyidnevnik.data.HabitStore
+import io.github.cmix7777.kazhdyidnevnik.data.Habits
+import io.github.cmix7777.kazhdyidnevnik.data.SharedList
+import io.github.cmix7777.kazhdyidnevnik.data.SharedListStore
 import io.github.cmix7777.kazhdyidnevnik.data.Backup
 import io.github.cmix7777.kazhdyidnevnik.data.DiaryRepository
 import io.github.cmix7777.kazhdyidnevnik.data.ProgressRepository
@@ -34,6 +38,8 @@ object Backups {
         settings = AppSettings(context).reminders,
         createdAt = LocalDateTime.now(),
         diary = DiaryRepository.current(context.filesDir),
+        habits = HabitStore.current(context.filesDir),
+        list = SharedListStore.current(context.filesDir),
     )
 
     /** Сохранить копию в «Загрузки/Каждыйдневник» (перезаписывает прошлую копию этого приложения). */
@@ -85,11 +91,14 @@ object Backups {
         val backup = Backup.decode(text) ?: return RestoreResult.NotABackup
         val added = ProgressRepository.mergeAll(context.filesDir, backup.done)
         val diaryAdded = backup.diary?.let { DiaryRepository.merge(context.filesDir, it) } ?: 0
+        val habitsBefore = HabitStore.current(context.filesDir).size
+        val habitsAdded = if (backup.habits.isEmpty()) 0 else HabitStore.update(context.filesDir) { Habits.mergeBackup(it, backup.habits) }.size - habitsBefore
+        if (backup.list.isNotEmpty()) SharedListStore.update(context.filesDir) { SharedList.merge(it, backup.list) }
         backup.settings?.let { AppSettings(context).reminders = it }
         ReminderScheduler.scheduleNext(context)
         return RestoreResult.Done(
-            added = added + diaryAdded,
-            total = backup.done.size + (backup.diary?.size ?: 0),
+            added = added + diaryAdded + habitsAdded,
+            total = backup.done.size + (backup.diary?.size ?: 0) + backup.habits.size,
             settingsRestored = backup.settings != null,
         )
     }

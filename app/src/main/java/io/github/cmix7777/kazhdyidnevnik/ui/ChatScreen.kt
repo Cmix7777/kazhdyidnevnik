@@ -187,6 +187,58 @@ import kotlin.random.Random
  * переписки: круг растёт из того места, куда нажали, а при закрытии схлопывается обратно.
  */
 class ChatActivity : ComponentActivity() {
+    private var locked by mutableStateOf(false)
+    private var prompting = false
+
+    override fun onResume() {
+        super.onResume()
+        val settings = AppSettings(this)
+        val secure = getSystemService(android.app.KeyguardManager::class.java)?.isDeviceSecure == true
+        if (!settings.chatLock || !secure) {
+            locked = false
+            return
+        }
+        if (!locked && System.currentTimeMillis() - settings.chatSeenMillis > LOCK_AFTER_MS) locked = true
+        if (locked && !prompting) unlock()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (!locked && !prompting) AppSettings(this).chatSeenMillis = System.currentTimeMillis()
+    }
+
+    private fun unlock() {
+        prompting = true
+        val builder = android.hardware.biometrics.BiometricPrompt.Builder(this)
+            .setTitle("Переписка")
+            .setSubtitle("Подтверди, что это ты")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            builder.setAllowedAuthenticators(
+                android.hardware.biometrics.BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                    android.hardware.biometrics.BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            builder.setDeviceCredentialAllowed(true)
+        }
+        val callback = object : android.hardware.biometrics.BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: android.hardware.biometrics.BiometricPrompt.AuthenticationResult?) {
+                prompting = false
+                locked = false
+                AppSettings(this@ChatActivity).chatSeenMillis = System.currentTimeMillis()
+            }
+
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) {
+                prompting = false
+            }
+        }
+        runCatching { builder.build().authenticate(android.os.CancellationSignal(), mainExecutor, callback) }
+            .onFailure {
+                prompting = false
+                locked = false
+            }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val settings = AppSettings(this)
@@ -269,6 +321,20 @@ class ChatActivity : ComponentActivity() {
                         },
                 ) {
                     ChatRoot(onBack = close)
+                    if (locked) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Palette.Background)
+                                .pointerInput(Unit) { awaitEachGesture { awaitFirstDown().consume() } },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                        ) {
+                            Text("Переписка закрыта", style = MaterialTheme.typography.titleMedium, color = Palette.Text)
+                            PillButton(text = "Открыть", onClick = { if (!prompting) unlock() })
+                            GhostButton("Назад", onClick = close, small = true)
+                        }
+                    }
                 }
             }
         }
@@ -284,6 +350,7 @@ class ChatActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_X = "ox"
+        private const val LOCK_AFTER_MS = 60 * 60 * 1000L
         const val EXTRA_Y = "oy"
 
         /** Открыть переписку каплей из точки [origin] (координаты в окне). */
