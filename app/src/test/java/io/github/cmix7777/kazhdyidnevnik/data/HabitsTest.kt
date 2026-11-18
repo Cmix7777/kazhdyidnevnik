@@ -53,4 +53,16 @@ class HabitsTest {
         assertTrue(period.touchesWeek(LocalDate.of(2026, 12, 7)))
         assertFalse(period.touchesWeek(LocalDate.of(2026, 12, 14)))
     }
+
+    @Test
+    fun habitsAndListSurviveBackup() {
+        val habit = Habit("a", "Вода", remindHour = 7, shared = false, done = listOf(today.toString()))
+        val item = ListItem("l", "Хлеб", "nastya", 1L, 1L)
+        val text = Backup.encode(emptyMap(), ReminderSettings(), java.time.LocalDateTime.of(2026, 11, 20, 10, 0), habits = listOf(habit), list = listOf(item))
+        val back = Backup.decode(text)
+        assertEquals(listOf(habit), back?.habits)
+        assertEquals(listOf(item), back?.list)
+        val merged = Habits.mergeBackup(listOf(habit.copy(done = listOf(today.minusDays(1).toString()))), listOf(habit))
+        assertEquals(2, merged.single().done.size)
+    }
 }

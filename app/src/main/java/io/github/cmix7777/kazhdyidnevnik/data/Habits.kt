@@ -56,6 +56,16 @@ object Habits {
 
     fun remove(habits: List<Habit>, id: String): List<Habit> = habits.filterNot { it.id == id }
 
+    /** Восстановление из копии: недостающие привычки добавляются, у совпадающих отметки объединяются. */
+    fun mergeBackup(current: List<Habit>, incoming: List<Habit>): List<Habit> {
+        val byId = current.associateBy { it.id }
+        val updated = current.map { habit ->
+            val other = incoming.firstOrNull { it.id == habit.id } ?: return@map habit
+            habit.copy(done = (habit.done + other.done).distinct().sorted())
+        }
+        return (updated + incoming.filter { it.id !in byId }).take(MAX_HABITS)
+    }
+
     /** Сколько дней подряд привычка держится: считая сегодня, а если сегодня ещё не отмечена — до вчера. */
     fun streak(habit: Habit, today: LocalDate): Int {
         val days = habit.done.toSet()

@@ -29,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +40,11 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
@@ -50,7 +56,10 @@ import io.github.cmix7777.kazhdyidnevnik.data.PartnerEventsRepository
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.pluralDays
 import io.github.cmix7777.kazhdyidnevnik.notify.ReminderScheduler
+import io.github.cmix7777.kazhdyidnevnik.service.Backups
 import io.github.cmix7777.kazhdyidnevnik.service.PartnerSync
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 private val Person.dative: String get() = if (this == Person.AIZAT) "Айзату" else "Насте"
@@ -70,11 +79,13 @@ fun HabitsScreen(person: Person, isOwner: Boolean, modifier: Modifier = Modifier
     val habits = if (isOwner) mine else partner?.takeIf { it.from == person }?.habits.orEmpty()
     var input by remember { mutableStateOf("") }
     var open by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     fun change(edit: (List<Habit>) -> List<Habit>) {
         HabitStore.update(context.filesDir, edit)
         PartnerSync.syncSoon(context)
         ReminderScheduler.scheduleNext(context)
+        scope.launch(Dispatchers.IO) { runCatching { Backups.saveAfterChange(context) } }
     }
 
     fun add() {
@@ -200,10 +211,15 @@ private fun HabitCard(
                     .background(if (doneToday) Palette.Violet else Color.Transparent)
                     .border(1.5.dp, if (doneToday) Palette.Violet else Palette.BorderStrong, CircleShape)
                     .then(if (isOwner) Modifier.clickable(onClick = onToggleToday) else Modifier)
+                    .semantics {
+                        contentDescription = "${habit.title}: отметка за сегодня"
+                        stateDescription = if (doneToday) "сделано" else "не сделано"
+                        role = Role.Checkbox
+                    }
                     .testTag("habit-check"),
                 contentAlignment = Alignment.Center,
             ) {
-                if (doneToday) Icon(painterResource(R.drawable.ic_check), contentDescription = "Сделано сегодня", tint = Color.White, modifier = Modifier.size(20.dp))
+                if (doneToday) Icon(painterResource(R.drawable.ic_check), contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
             }
         }
         Row(

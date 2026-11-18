@@ -11,7 +11,13 @@ object Backup {
     const val APP = "kazhdyidnevnik"
     private const val FORMAT = 1
 
-    data class Content(val done: Map<String, Int>, val settings: ReminderSettings?, val diary: Diary? = null)
+    data class Content(
+        val done: Map<String, Int>,
+        val settings: ReminderSettings?,
+        val diary: Diary? = null,
+        val habits: List<Habit> = emptyList(),
+        val list: List<ListItem> = emptyList(),
+    )
 
     @Serializable
     private data class SettingsDto(
@@ -41,6 +47,8 @@ object Backup {
         val done: Map<String, Int>,
         val settings: SettingsDto? = null,
         val diary: DiaryDto? = null,
+        val habits: List<Habit> = emptyList(),
+        val list: List<ListItem> = emptyList(),
     )
 
     private val json = Json {
@@ -53,6 +61,8 @@ object Backup {
         settings: ReminderSettings,
         createdAt: LocalDateTime,
         diary: Diary = Diary(),
+        habits: List<Habit> = emptyList(),
+        list: List<ListItem> = emptyList(),
     ): String {
         val dto = BackupDto(
             app = APP,
@@ -75,6 +85,8 @@ object Backup {
                 ),
             ),
             diary = DiaryCodec.toDto(diary),
+            habits = habits,
+            list = list,
         )
         return json.encodeToString(BackupDto.serializer(), dto)
     }
@@ -100,7 +112,7 @@ object Backup {
             }.getOrNull()
         }
         val diary = dto.diary?.let { runCatching { DiaryCodec.fromDto(it) }.getOrNull() }
-        return Content(dto.done.filterValues { it >= 0 }, settings, diary)
+        return Content(dto.done.filterValues { it >= 0 }, settings, diary, dto.habits, dto.list)
     }
 
     /** Объединить отметки: ничего не теряется, при совпадении берётся большее число минут. */
