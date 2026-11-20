@@ -43,29 +43,30 @@ def frame():
 
 
 def holiday_card(image, marker, scale):
-    # Match the actual card's green surface around the countdown, on two columns.
-    # Saving only this crop keeps the account header and planner data out of the result.
+    # Use a majority of pixels so snow, lamps, and tree branches do not break the crop.
     left = round(20 * scale)
-    probes = (left + round(9 * scale), image.width - left - round(11 * scale))
+    inset = round(8 * scale)
+    columns = range(left + inset, image.width - left - inset, max(1, round(5 * scale)))
 
-    def in_card(y):
-        for x in probes:
+    def green_fraction(y):
+        green_pixels = 0
+        for x in columns:
             red, green, blue = image.getpixel((x, y))
-            if not (10 <= red <= 43 and 31 <= green <= 73 and 21 <= blue <= 62):
-                return False
-            if green - red < 13 or green - blue < 5:
-                return False
-        return True
+            if 25 <= green <= 100 and green - red >= 9 and green - blue >= 2:
+                green_pixels += 1
+        return green_pixels / len(columns)
 
-    top = marker[1]
-    bottom = top
-    while top > 0 and in_card(top - 1):
-        top -= 1
-    while bottom < image.height and in_card(bottom):
-        bottom += 1
-    if not (105 * scale < bottom - top < 200 * scale):
-        raise RuntimeError("Could not isolate the holiday card safely")
-    inset = round(6 * scale)
+    label_top = marker[1]
+    candidate_top = max(0, label_top - round(78 * scale))
+    candidate_bottom = min(image.height, label_top + round(105 * scale))
+    rows = [y for y in range(candidate_top, candidate_bottom) if green_fraction(y) >= 0.62]
+    if rows and 100 * scale <= rows[-1] - rows[0] <= 167 * scale:
+        top, bottom = rows[0], rows[-1] + 1
+    else:
+        # Conservative bounds stay inside the card when we cannot detect its edges.
+        print("Using a tighter crop around the countdown")
+        top = max(0, label_top - round(49 * scale))
+        bottom = min(image.height, label_top + round(75 * scale))
     return image.crop((left + inset, top, image.width - left - inset, bottom))
 
 
