@@ -14,9 +14,14 @@ UI_DUMP = "/sdcard/preview.xml"
 
 
 def adb(*args, data=None):
-    return subprocess.run(
-        ["adb", *args], input=data, capture_output=True, check=True, timeout=45
-    ).stdout
+    result = subprocess.run(
+        ["adb", *args], input=data, capture_output=True, check=False, timeout=45
+    )
+    if result.returncode:
+        raise RuntimeError(
+            f"adb {' '.join(args)} failed: {result.stderr.decode(errors='replace').strip()}"
+        )
+    return result.stdout
 
 
 def find_node(attribute, text):
@@ -27,7 +32,7 @@ def find_node(attribute, text):
             for node in layout.iter("node"):
                 if node.get(attribute) == text and node.get("package") == APP:
                     return tuple(map(int, re.findall(r"\d+", node.attrib["bounds"])))
-        except (subprocess.CalledProcessError, ElementTree.ParseError):
+        except (RuntimeError, ElementTree.ParseError):
             pass
         time.sleep(1)
     raise RuntimeError(f"Screen marker did not appear: {text}")
@@ -66,7 +71,9 @@ def holiday_card(image, marker, scale):
 
 def main():
     OUT.mkdir(exist_ok=True)
+    print("Installing debug APK")
     adb("install", "-g", "app/build/outputs/apk/debug/app-debug.apk")
+    print("Preparing an offline emulator")
     adb("shell", "cmd", "connectivity", "airplane-mode", "enable")
     adb("shell", "svc", "wifi", "disable")
     adb("shell", "svc", "data", "disable")
@@ -90,12 +97,14 @@ def main():
     adb("shell", "am", "force-stop", APP)
     adb("shell", "run-as", APP, "mkdir", "-p", "shared_prefs")
     adb(
-        "exec-in", "run-as", APP, "sh", "-c",
+        "shell", "-T", "run-as", APP, "sh", "-c",
         "'cat > shared_prefs/settings.xml'", data=settings,
     )
+    print("Opening the app with holiday preview enabled")
     adb("shell", "am", "start", "-W", "-n", f"{APP}/.MainActivity")
     marker_text = "С Новым годом!" if month == 1 else "До Нового года"
     marker = find_node("text", marker_text)
+    print("Holiday countdown is visible")
     holiday_card(frame(), marker, scale).save(OUT / "today.png")
     print("Captured holiday card on the Today screen")
 

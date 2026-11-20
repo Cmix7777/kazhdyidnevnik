@@ -52,7 +52,7 @@ jobs:
           profile: pixel_6
           disable-animations: false
           emulator-boot-timeout: 900
-          script: python3 .github/new-year-preview/capture.py
+          script: bash -o pipefail -c '"$RUNNER_TEMP/preview-python/bin/python" -u .github/new-year-preview/capture.py 2>&1 | tee preview-output/capture.log'
       - name: Save the cropped screenshots and build status
         if: always()
         env:
@@ -69,6 +69,9 @@ jobs:
             echo "capture=$CAPTURE"
             if [ "$BUILD" = failure ]; then
               grep -E '^e: |^error:|^FAILURE:|^\* What went wrong:|^Execution failed|^> |^BUILD ' preview-output/build.log | head -n 55 || true
+            fi
+            if [ -f preview-output/capture.log ]; then
+              tail -n 45 preview-output/capture.log
             fi
           } > "$result/status.txt"
           for name in today chat; do
