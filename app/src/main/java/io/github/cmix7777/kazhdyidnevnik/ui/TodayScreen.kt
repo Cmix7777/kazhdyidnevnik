@@ -1,14 +1,9 @@
 package io.github.cmix7777.kazhdyidnevnik.ui
 
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.mutableIntStateOf
 import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidayCard
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.Holidays
-import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidayTree
-import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidaySnow
-import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidayGarland
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidaySaluteHost
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberHoliday
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberHolidayIntro
@@ -123,7 +118,7 @@ fun TodayScreen(
     // и закрывается галочкой. Подпись «обновлено только что» появляется в шапке, а не поверх текста.
     val pullState = rememberPullToRefreshState()
     val holiday = rememberHoliday()
-    val holidayIntro = rememberHolidayIntro(holiday)
+    val holidayIntro = rememberHolidayIntro(holiday.takeIf { active })
     var saluteNow by remember { mutableIntStateOf(0) }
     val appContext = LocalContext.current
     val drop = rememberDropRefresh(refreshing, failed = schedule.error != null)
@@ -162,18 +157,9 @@ fun TodayScreen(
             // Шапка: чей день и дата крупно в две строки.
             item {
                 val (dayName, dateText) = formatDayTitle(today).split(", ", limit = 2)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Pill(text = if (isOwner) "Сегодня" else "Сегодня у ${person.genitive}", accent = true)
-                        TwoToneTitle(first = dayName, second = dateText)
-                    }
-                    if (holiday != null) {
-                        HolidayTree(
-                            ornaments = Holidays.ornaments(appContext, holiday),
-                            modifier = Modifier.size(width = 92.dp, height = 132.dp),
-                            onLongPress = { if (AppSettings(appContext).holidayPreview) saluteNow++ },
-                        )
-                    }
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Pill(text = if (isOwner) "Сегодня" else "Сегодня у ${person.genitive}", accent = true)
+                    TwoToneTitle(first = dayName, second = dateText)
                 }
             }
 
@@ -184,9 +170,6 @@ fun TodayScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Pill(text = daySummary(todayItems))
-                    holiday?.let { Holidays.daysLeft(today, it) }?.let { left ->
-                        Pill(text = "до Нового года ${io.github.cmix7777.kazhdyidnevnik.data.pluralDays(left)}", accent = true)
-                    }
                     AnimatedVisibility(
                         visible = drop.justUpdated,
                         enter = fadeIn() + expandHorizontally(),
@@ -199,6 +182,20 @@ fun TodayScreen(
                             Pill(text = "практика: день $day из ${Practice.totalDays}", accent = true)
                         }
                     }
+                }
+            }
+
+            if (holiday != null) {
+                item(key = "new-year") {
+                    HolidayCard(
+                        daysLeft = Holidays.daysLeft(today, holiday),
+                        ornaments = Holidays.ornaments(appContext, holiday),
+                        intro = holidayIntro,
+                        running = active && !SkyFx.covered,
+                        onPreviewSalute = if (AppSettings(appContext).holidayPreview) {
+                            { saluteNow++ }
+                        } else null,
+                    )
                 }
             }
 
@@ -353,15 +350,7 @@ fun TodayScreen(
                 )
             }
         }
-        if (holiday != null) {
-            HolidaySnow(Modifier.matchParentSize())
-            HolidayGarland(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(40.dp),
-                intro = holidayIntro,
-            )
+        if (active && holiday != null) {
             HolidaySaluteHost(holiday, saluteNow, Modifier.matchParentSize())
         }
     }

@@ -1,7 +1,5 @@
 package io.github.cmix7777.kazhdyidnevnik.ui
 
-import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.ui.zIndex
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.Holidays
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidaySnow
 import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidayGarland
@@ -855,7 +853,9 @@ fun ChatScreen(
             live = wallLive,
             modifier = Modifier.matchParentSize(),
         )
-        if (holiday != null) HolidaySnow(Modifier.matchParentSize(), count = 80, alpha = 0.85f)
+        if (holiday != null) {
+            HolidaySnow(Modifier.matchParentSize(), count = 30, alpha = 0.45f, running = circle == null)
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -869,6 +869,13 @@ fun ChatScreen(
                 partnerNow = partnerNow,
                 onMenu = { item -> if (item == "search") searchOpen = true else onMenu(item) },
             )
+            if (holiday != null) {
+                HolidayGarland(
+                    modifier = Modifier.fillMaxWidth().height(36.dp),
+                    intro = holidayIntro,
+                    running = circle == null,
+                )
+            }
             if (pins.isNotEmpty() && status.paired) {
                 val position = pinIndex.coerceIn(0, pins.lastIndex)
                 PinnedBar(
@@ -880,22 +887,6 @@ fun ChatScreen(
                         pinIndex = (position + 1) % pins.size
                     },
                 )
-            }
-            if (holiday != null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(0.dp)
-                        .zIndex(1f),
-                ) {
-                    HolidayGarland(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .wrapContentHeight(Alignment.Top, unbounded = true)
-                            .height(40.dp),
-                        intro = holidayIntro,
-                    )
-                }
             }
             Box(
                 modifier = Modifier

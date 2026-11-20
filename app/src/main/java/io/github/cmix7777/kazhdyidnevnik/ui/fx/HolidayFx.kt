@@ -9,13 +9,19 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,6 +30,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -48,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.cmix7777.kazhdyidnevnik.data.pluralDays
 import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
 import kotlinx.coroutines.delay
 import java.time.Duration
@@ -140,8 +148,8 @@ fun rememberHolidayIntro(active: Holidays.Active?): Float {
 
 /** Гирлянда на крючках вдоль верхнего края: огоньки мерцают бегущей волной. */
 @Composable
-fun HolidayGarland(modifier: Modifier = Modifier, intro: Float = 1f) {
-    val animate = EffectsSettings.animate(LocalContext.current)
+fun HolidayGarland(modifier: Modifier = Modifier, intro: Float = 1f, running: Boolean = true) {
+    val animate = running && EffectsSettings.animate(LocalContext.current)
     val time = rememberEffectTime(fps = 24, running = animate)
     Canvas(modifier) {
         val t = time()
@@ -173,14 +181,14 @@ fun HolidayGarland(modifier: Modifier = Modifier, intro: Float = 1f) {
             x0 = x1
             segment++
         }
-        drawPath(wire, Color(0xF23A2E28), style = Stroke(1.2.dp.toPx()))
+        drawPath(wire, Color(0xFF8E7C62), style = Stroke(1.dp.toPx()))
         val total = points.size
         for (i in points.indices) {
             val p = points[i]
             val c = colors[i]
             val lit = (intro * (total + 4) - i).coerceIn(0f, 1f)
             val wave = 0.5f + 0.5f * sin(t * 2.2f - phases[i])
-            val a = (0.45f + 0.55f * wave) * lit
+            val a = (0.72f + 0.28f * wave) * lit
             drawRect(Color(0xFF4A3D36), topLeft = Offset(p.x - 2.5.dp.toPx(), p.y - 6.dp.toPx()), size = Size(5.dp.toPx(), 4.dp.toPx()))
             drawOval(
                 brush = Brush.radialGradient(listOf(Color.White, c, c), Offset(p.x - 1.dp.toPx(), p.y), 6.dp.toPx()),
@@ -188,7 +196,7 @@ fun HolidayGarland(modifier: Modifier = Modifier, intro: Float = 1f) {
                 size = Size(8.dp.toPx(), 11.dp.toPx()),
                 alpha = 0.35f + 0.65f * a,
             )
-            glow(c, Offset(p.x, p.y + 1.5.dp.toPx()), 24.dp.toPx(), a * 0.5f)
+            glow(c, Offset(p.x, p.y + 1.5.dp.toPx()), 15.dp.toPx(), a * 0.38f)
         }
     }
 }
@@ -197,8 +205,13 @@ private class Flake(val x: Float, val y: Float, val z: Float, val r: Float, val 
 
 /** Снег поверх экрана: три слоя глубины, ближние хлопья крупные и мягкие. */
 @Composable
-fun HolidaySnow(modifier: Modifier = Modifier, count: Int = 70, alpha: Float = 1f) {
-    val animate = EffectsSettings.animate(LocalContext.current)
+fun HolidaySnow(
+    modifier: Modifier = Modifier,
+    count: Int = 70,
+    alpha: Float = 1f,
+    running: Boolean = true,
+) {
+    val animate = running && EffectsSettings.animate(LocalContext.current)
     val time = rememberEffectTime(fps = 30, running = animate)
     val flakes = remember(count) {
         val rnd = java.util.Random(2027)
@@ -229,6 +242,82 @@ fun HolidaySnow(modifier: Modifier = Modifier, count: Int = 70, alpha: Float = 1
     }
 }
 
+@Composable
+fun HolidayCard(
+    daysLeft: Long?,
+    ornaments: Int,
+    intro: Float,
+    running: Boolean,
+    onPreviewSalute: (() -> Unit)?,
+) {
+    val shape = RoundedCornerShape(22.dp)
+    val gold = Color(0xFFF5D593)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(Brush.linearGradient(listOf(Color(0xFF153629), Color(0xFF10221E))))
+            .border(1.dp, gold.copy(alpha = 0.25f), shape),
+    ) {
+        HolidaySnow(Modifier.matchParentSize(), count = 28, alpha = 0.57f, running = running)
+        HolidayGarland(
+            modifier = Modifier.fillMaxWidth().height(38.dp),
+            intro = intro,
+            running = running,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 38.dp, end = 8.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (daysLeft != null) {
+                    Text("До Нового года", color = gold, style = MaterialTheme.typography.labelLarge)
+                }
+                Text(
+                    text = daysLeft?.let(::pluralDays) ?: "С Новым годом!",
+                    color = Color(0xFFFFFAEF),
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+            }
+            Box(Modifier.size(width = 108.dp, height = 110.dp)) {
+                HolidayTree(
+                    ornaments = ornaments,
+                    modifier = Modifier.align(Alignment.TopCenter).size(width = 86.dp, height = 108.dp),
+                    running = running,
+                    onLongPress = onPreviewSalute,
+                )
+                HolidayGifts(Modifier.align(Alignment.BottomCenter).size(width = 108.dp, height = 34.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HolidayGifts(modifier: Modifier) {
+    Canvas(modifier) {
+        drawGift(8.dp.toPx(), 8.dp.toPx(), 32.dp.toPx(), 19.dp.toPx(), Color(0xFFB44D48), Color(0xFFFFD58E))
+        drawGift(71.dp.toPx(), 8.dp.toPx(), 29.dp.toPx(), 22.dp.toPx(), Color(0xFFD19B52), Color(0xFFFFE7B5))
+        drawGift(36.dp.toPx(), 15.dp.toPx(), 25.dp.toPx(), 18.dp.toPx(), Color(0xFF4D8594), Color(0xFFC0E7DF))
+    }
+}
+
+private fun DrawScope.drawGift(x: Float, y: Float, width: Float, height: Float, paper: Color, ribbon: Color) {
+    val lid = 5.dp.toPx()
+    val band = 4.dp.toPx()
+    val bow = 7.dp.toPx()
+    val center = x + width / 2
+    val loops = Path().apply {
+        moveTo(center, y + 1.dp.toPx())
+        cubicTo(center - bow * 2, y - bow / 2, center - bow, y - bow * 1.7f, center, y + 1.dp.toPx())
+        cubicTo(center + bow, y - bow * 1.7f, center + bow * 2, y - bow / 2, center, y + 1.dp.toPx())
+    }
+    drawPath(loops, ribbon, style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round))
+    drawRect(paper, Offset(x, y), Size(width, height))
+    drawRect(Color.White.copy(alpha = 0.15f), Offset(x, y), Size(width, lid))
+    drawRect(ribbon, Offset(center - band / 2, y), Size(band, height))
+}
+
 private val OrnamentColors = listOf(
     Color(0xFFE5483C) to Color(0xFF5A0F0B),
     Color(0xFFE9C77E) to Color(0xFF5E4415),
@@ -241,12 +330,21 @@ private val OrnamentColors = listOf(
  * каждый день, когда вы писали друг другу или отмечали привычку, добавляется новая.
  */
 @Composable
-fun HolidayTree(ornaments: Int, modifier: Modifier = Modifier, onLongPress: () -> Unit = {}) {
-    val animate = EffectsSettings.animate(LocalContext.current)
+private fun HolidayTree(
+    ornaments: Int,
+    modifier: Modifier = Modifier,
+    running: Boolean,
+    onLongPress: (() -> Unit)?,
+) {
+    val animate = running && EffectsSettings.animate(LocalContext.current)
     val time = rememberEffectTime(fps = 20, running = animate)
+    val longPress by rememberUpdatedState(onLongPress)
+    val previewTap = if (onLongPress == null) Modifier else Modifier.pointerInput(Unit) {
+        detectTapGestures(onLongPress = { longPress?.invoke() })
+    }
     Box(
         modifier
-            .pointerInput(Unit) { detectTapGestures(onLongPress = { onLongPress() }) }
+            .then(previewTap)
             .drawWithCache {
                 val rnd = java.util.Random(12)
                 val d = 1.dp.toPx()
