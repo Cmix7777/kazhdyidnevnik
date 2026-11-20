@@ -1,0 +1,10 @@
+run=44740389568
+sha=ab001d5ce99cd094a2dedb3451e7ad339f02442f
+build=success
+capture=success
+Installing debug APK
+Preparing an offline emulator
+Opening the app with holiday preview enabled
+Holiday countdown is visible
+Captured holiday card on the Today screen
+Captured holiday garland on the Chat screen
