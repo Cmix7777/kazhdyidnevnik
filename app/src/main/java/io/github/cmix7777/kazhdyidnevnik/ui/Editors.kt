@@ -151,13 +151,13 @@ private fun EditorField(
 
 @Composable
 private fun editorColors() = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Palette.Violet,
-            unfocusedBorderColor = Palette.BorderStrong,
-            focusedLabelColor = Palette.Lavender,
-            unfocusedLabelColor = Palette.TextMuted,
-            cursorColor = Palette.Lavender,
-            focusedTextColor = Palette.Text,
-            unfocusedTextColor = Palette.Text,
+    focusedBorderColor = Palette.Violet,
+    unfocusedBorderColor = Palette.BorderStrong,
+    focusedLabelColor = Palette.Lavender,
+    unfocusedLabelColor = Palette.TextMuted,
+    cursorColor = Palette.Lavender,
+    focusedTextColor = Palette.Text,
+    unfocusedTextColor = Palette.Text,
 )
 
 @Composable
@@ -187,13 +187,10 @@ private fun ResidentNoteField(value: String, onChange: (String) -> Unit, label: 
         peeking = false
     }
     val time by rememberNow()
-    val visitor = if (owner == Person.AIZAT) Resident.INK else homeResident(owner, time)
+    val visitor = residentFor(owner, time, Visit.NOTE)
     Column {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Bottom) {
             if (owner == Person.AIZAT) {
-                if (time.toLocalDate().toEpochDay() % 3L == 0L) {
-                    MascotVisit(Resident.LIGHT, Visit.NOTE, event = peeking)
-                }
                 MascotVisit(Resident.MARK, Visit.NOTE, tapLabel = "Вернуться к месту в заметке", onTap = {
                     val position = if (mark >= 0) mark.coerceIn(0, value.length) else value.length
                     field = field.copy(selection = TextRange(position))
@@ -201,7 +198,11 @@ private fun ResidentNoteField(value: String, onChange: (String) -> Unit, label: 
                     requestFocus.requestFocus()
                 })
             }
-            MascotVisit(visitor, Visit.NOTE, event = peeking, hiddenPose = peeking)
+            if (owner == Person.AIZAT && time.toLocalDate().toEpochDay() % 3L == 0L) {
+                InkAndLighthouse(peeking)
+            } else {
+                MascotVisit(visitor, Visit.NOTE, event = peeking, hiddenPose = peeking)
+            }
         }
         OutlinedTextField(
             value = field, onValueChange = {

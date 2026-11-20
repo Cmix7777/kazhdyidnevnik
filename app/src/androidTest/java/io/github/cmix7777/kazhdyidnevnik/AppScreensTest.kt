@@ -16,6 +16,8 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
@@ -173,6 +175,21 @@ class AppScreensTest {
     }
 
     // ---- первый запуск ----
+
+    @Test
+    fun lighthouseSharesTodayWithHolidayDecorations() {
+        AppSettings(context).holidayPreview = true
+        launchAs(Person.AIZAT)
+        waitFor(hasTestTag("resident-HOME-LIGHT"))
+        val lighthouse = compose.onNodeWithTag("resident-HOME-LIGHT")
+        lighthouse.assertIsDisplayed().performClick()
+        val bitmap = lighthouse.captureToImage().asAndroidBitmap()
+        val dir = java.io.File(context.getExternalFilesDir(null), "shots").apply { mkdirs() }
+        java.io.File(dir, "resident_lighthouse.png").outputStream().use {
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+        openSettings()
+    }
 
     @Test
     fun firstLaunchAsksWhoseThePhoneIs() {

@@ -1059,7 +1059,7 @@ fun ChatScreen(
                 )
             }
             if (voice == null && circle == null && !panel && !searchOpen) {
-                val guest = homeResident(owner, residentTime)
+                val guest = residentFor(owner, residentTime, Visit.CHAT)
                 MascotVisit(
                     resident = guest, place = Visit.CHAT,
                     event = when (guest) {

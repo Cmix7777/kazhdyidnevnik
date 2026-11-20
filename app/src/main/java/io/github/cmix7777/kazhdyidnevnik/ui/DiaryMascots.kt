@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,16 +52,19 @@ internal enum class Resident(val label: String, val art: Int) {
     JERBOA("Тушканчик", R.drawable.resident_jerboa),
 }
 
-internal fun homeResident(person: Person, now: LocalDateTime): Resident = when {
-    person == Person.AIZAT -> Resident.LIGHT
-    now.hour >= 18 || now.hour < 6 -> Resident.MOTH
-    now.toLocalDate().toEpochDay() % 3L == 0L -> Resident.JERBOA
-    else -> Resident.GECKO
-}
-
 private fun wave(t: Float) = sin(t.coerceIn(0f, 1f) * PI).toFloat()
 
 internal enum class Visit { HOME, CHAT, NOTE, WEEK }
+
+internal fun residentFor(person: Person, now: LocalDateTime, place: Visit): Resident {
+    if (person == Person.AIZAT) return if (place == Visit.NOTE) Resident.INK else Resident.LIGHT
+    if (place == Visit.WEEK) return Resident.JERBOA
+    val evening = if (now.hour < 6) now.toLocalDate().minusDays(1) else now.toLocalDate()
+    val day = Math.floorMod(evening.toEpochDay(), 3L).toInt()
+    val roost = when (day) { 0 -> Visit.HOME; 1 -> Visit.CHAT; else -> Visit.NOTE }
+    if (now.hour !in 6..17 && place == roost) return Resident.MOTH
+    return if ((day + place.ordinal) % 3 == 0) Resident.JERBOA else Resident.GECKO
+}
 
 @Composable
 internal fun MascotVisit(
@@ -111,7 +115,7 @@ internal fun MascotVisit(
     val width = if (home) 96.dp else if (resident == Resident.LIGHT) 74.dp else 54.dp
     val height = if (home) 56.dp else 39.dp
     Box(
-        modifier.size(width, height).clipToBounds()
+        modifier.size(width, height).clipToBounds().testTag("resident-${place.name}-${resident.name}")
             .semantics { contentDescription = resident.label }
             .clickable(onClickLabel = tapLabel ?: "Разбудить персонажа") { taps++; onTap?.invoke() },
     ) {
@@ -153,6 +157,34 @@ private fun Sprite(art: Int, width: Dp, height: Dp, modifier: Modifier, tilt: Fl
         rotationZ = tilt
         scaleX = if (flip) -1f else 1f
     }, alignment = Alignment.BottomCenter)
+}
+
+@Composable
+internal fun InkAndLighthouse(typing: Boolean) {
+    val animate = EffectsSettings.animate(LocalContext.current)
+    val travel = remember { Animatable(0f) }
+    var signal by remember { mutableIntStateOf(0) }
+    LaunchedEffect(typing, signal, animate) {
+        travel.snapTo(0f)
+        if (typing || !animate) return@LaunchedEffect
+        delay(350)
+        travel.animateTo(1f, tween(1800, easing = LinearEasing))
+    }
+    val turn = wave(travel.value) * 2f - 1f
+    Box(Modifier.size(106.dp, 40.dp).clipToBounds().semantics {
+        contentDescription = "Маячок ищет Кляксу"
+    }.clickable(onClickLabel = "Поиграть в прятки") { signal++ }) {
+        Sprite(
+            if (typing) R.drawable.resident_ink_peek else Resident.INK.art, 28.dp,
+            if (typing) 5.dp else 18.dp,
+            Modifier.align(Alignment.BottomCenter).offset(x = (-turn * 27).dp),
+        )
+        Box(Modifier.align(Alignment.BottomCenter).offset(x = (turn * 16).dp)
+            .graphicsLayer { scaleX = if (turn >= 0) 1f else -1f }) {
+            LighthousePose(Visit.NOTE, travel.value, read = false, rain = false, fog = false,
+                morning = false, animate = animate, height = 38.dp)
+        }
+    }
 }
 
 @Composable

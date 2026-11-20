@@ -126,7 +126,7 @@ fun TodayScreen(
     val pullState = rememberPullToRefreshState()
     val listState = rememberLazyListState()
     val holiday = rememberHoliday()
-    val holidayIntro = rememberHolidayIntro(holiday)
+    val holidayIntro = rememberHolidayIntro(holiday.takeIf { active })
     var saluteNow by remember { mutableIntStateOf(0) }
     val appContext = LocalContext.current
     val drop = rememberDropRefresh(refreshing, failed = schedule.error != null)
@@ -208,7 +208,7 @@ fun TodayScreen(
                     }
                     if (active) {
                         MascotVisit(
-                            resident = homeResident(person, now), place = Visit.HOME,
+                            resident = residentFor(person, now, Visit.HOME), place = Visit.HOME,
                             event = listState.isScrollInProgress,
                             hiddenPose = listState.isScrollInProgress,
                             rain = glass.mode == GlassMode.RAIN,
@@ -218,7 +218,7 @@ fun TodayScreen(
                             tapLabel = if (person == Person.AIZAT) "Посветить Закладке" else null,
                         )
                     }
-                    }
+                }
             }
 
             if (isOwner && extras.update.release != null) {
@@ -372,7 +372,7 @@ fun TodayScreen(
                 )
             }
         }
-        if (holiday != null) {
+        if (holiday != null && active) {
             HolidaySnow(Modifier.matchParentSize())
             HolidayGarland(
                 modifier = Modifier
