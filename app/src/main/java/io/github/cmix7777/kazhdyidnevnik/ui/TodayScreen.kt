@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -48,6 +49,7 @@ import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
 import io.github.cmix7777.kazhdyidnevnik.data.DayStrip
 import io.github.cmix7777.kazhdyidnevnik.data.GlassWeather
+import io.github.cmix7777.kazhdyidnevnik.data.GlassMode
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
 import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
@@ -122,6 +124,7 @@ fun TodayScreen(
     // Обновление каплей: капля тянется из края страницы, кольцом крутится, пока идёт загрузка,
     // и закрывается галочкой. Подпись «обновлено только что» появляется в шапке, а не поверх текста.
     val pullState = rememberPullToRefreshState()
+    val listState = rememberLazyListState()
     val holiday = rememberHoliday()
     val holidayIntro = rememberHolidayIntro(holiday)
     var saluteNow by remember { mutableIntStateOf(0) }
@@ -152,6 +155,7 @@ fun TodayScreen(
         modifier = modifier.fillMaxSize(),
     ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .dropShift(pullState)
@@ -179,27 +183,42 @@ fun TodayScreen(
 
             // Короткие факты дня таблетками.
             item {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Pill(text = daySummary(todayItems))
-                    holiday?.let { Holidays.daysLeft(today, it) }?.let { left ->
-                        Pill(text = "до Нового года ${io.github.cmix7777.kazhdyidnevnik.data.pluralDays(left)}", accent = true)
-                    }
-                    AnimatedVisibility(
-                        visible = drop.justUpdated,
-                        enter = fadeIn() + expandHorizontally(),
-                        exit = fadeOut() + shrinkHorizontally(),
+                Row(verticalAlignment = Alignment.Bottom) {
+                    FlowRow(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Pill(text = "обновлено только что", accent = true)
-                    }
-                    if (profile.hasPractice) {
-                        Practice.dayNumber(today)?.let { day ->
-                            Pill(text = "практика: день $day из ${Practice.totalDays}", accent = true)
+                        Pill(text = daySummary(todayItems))
+                        holiday?.let { Holidays.daysLeft(today, it) }?.let { left ->
+                            Pill(text = "до Нового года ${io.github.cmix7777.kazhdyidnevnik.data.pluralDays(left)}", accent = true)
+                        }
+                        AnimatedVisibility(
+                            visible = drop.justUpdated,
+                            enter = fadeIn() + expandHorizontally(),
+                            exit = fadeOut() + shrinkHorizontally(),
+                        ) {
+                            Pill(text = "обновлено только что", accent = true)
+                        }
+                        if (profile.hasPractice) {
+                            Practice.dayNumber(today)?.let { day ->
+                                Pill(text = "практика: день $day из ${Practice.totalDays}", accent = true)
+                            }
                         }
                     }
-                }
+                    if (active) {
+                        MascotVisit(
+                            resident = homeResident(person, now), place = Visit.HOME,
+                            event = listState.isScrollInProgress,
+                            hiddenPose = listState.isScrollInProgress,
+                            rain = glass.mode == GlassMode.RAIN,
+                            fog = forecast?.current?.code in listOf(45, 48),
+                            morning = now.hour in 6..11,
+                            running = !SkyFx.covered,
+                            tapLabel = if (person == Person.AIZAT) "Посветить Закладке" else null,
+                        )
+                    }
+                    }
             }
 
             if (isOwner && extras.update.release != null) {

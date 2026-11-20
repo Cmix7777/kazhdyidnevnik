@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -52,6 +54,11 @@ fun WeekScreen(
     val now by rememberNow()
     val today = now.toLocalDate()
     var offset by rememberSaveable { mutableIntStateOf(0) }
+    var direction by remember { mutableIntStateOf(1) }
+    val list = rememberLazyListState()
+    val visibleDay by remember { derivedStateOf {
+        list.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { (it.key as? String)?.takeIf { key -> key.startsWith("title-") } }
+    } }
     val monday = weekStartFor(today).plusWeeks(offset.toLong())
     val profile = person.profile
     val schedule = vm.schedule(person)
@@ -80,6 +87,12 @@ fun WeekScreen(
                     accent = offset == 0,
                 )
                 Spacer(modifier = Modifier.weight(1f))
+                MascotVisit(
+                    resident = if (person == Person.NASTYA) Resident.JERBOA else Resident.LIGHT,
+                    place = Visit.WEEK, event = offset to visibleDay, direction = direction,
+                    onTap = if (person == Person.AIZAT) ({ offset = 0 }) else null,
+                    tapLabel = if (person == Person.AIZAT) "К текущей неделе" else "Прыгнуть",
+                )
                 // Совместная неделя: обе недели слипаются в одну.
                 TogetherChip(onClick = { onTogether(offset) })
             }
@@ -104,13 +117,13 @@ fun WeekScreen(
                     GlassIconButton(
                         icon = R.drawable.ic_arrow_back,
                         contentDescription = "Прошлая неделя",
-                        onClick = { offset-- },
+                        onClick = { direction = -1; offset-- },
                         enabled = offset > MIN_OFFSET,
                     )
                     GlassIconButton(
                         icon = R.drawable.ic_arrow_forward,
                         contentDescription = "Следующая неделя",
-                        onClick = { offset++ },
+                        onClick = { direction = 1; offset++ },
                         enabled = offset < MAX_OFFSET,
                         accent = true,
                     )
@@ -124,6 +137,7 @@ fun WeekScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyColumn(
+                state = list,
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp + LocalNavInset.current),
                 verticalArrangement = Arrangement.spacedBy(10.dp),

@@ -687,6 +687,10 @@ fun ChatScreen(
     val screenOpened = remember { SystemClock.uptimeMillis() }
     WallpaperTilt(wallLive, enabled = wallShader && wallpaper.tilt && animate)
     val listState = rememberLazyListState()
+    val residentTime by rememberNow()
+    val visitOpened = remember { System.currentTimeMillis() }
+    val lastLocal = state.mine.lastOrNull()?.takeIf { it.at >= visitOpened }?.key
+    val lastIncoming = state.theirs.lastOrNull()?.takeIf { it.at >= visitOpened }?.key
     val scope = rememberCoroutineScope()
     var text by rememberSaveable { mutableStateOf(initialText) }
     var replyKey by rememberSaveable { mutableStateOf<String?>(null) }
@@ -1052,6 +1056,20 @@ fun ChatScreen(
                     colors = colors,
                     mine = target.from == owner.id,
                     onCancel = { replyKey = null },
+                )
+            }
+            if (voice == null && circle == null && !panel && !searchOpen) {
+                val guest = homeResident(owner, residentTime)
+                MascotVisit(
+                    resident = guest, place = Visit.CHAT,
+                    event = when (guest) {
+                        Resident.LIGHT -> lastLocal
+                        Resident.MOTH -> lastIncoming
+                        else -> listState.isScrollInProgress
+                    },
+                    hiddenPose = listState.isScrollInProgress,
+                    running = animate, modifier = Modifier.padding(start = 12.dp),
+                    tapLabel = if (guest == Resident.LIGHT) "Подать световой сигнал" else null,
                 )
             }
             InputBar(
