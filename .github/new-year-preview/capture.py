@@ -30,7 +30,7 @@ def find_node(attribute, text):
             adb("shell", "uiautomator", "dump", UI_DUMP)
             layout = ElementTree.fromstring(adb("exec-out", "cat", UI_DUMP))
             for node in layout.iter("node"):
-                if node.get(attribute) == text and node.get("package") == APP:
+                if node.get(attribute, "").startswith(text) and node.get("package") == APP:
                     return tuple(map(int, re.findall(r"\d+", node.attrib["bounds"])))
         except (RuntimeError, ElementTree.ParseError):
             pass
@@ -109,13 +109,21 @@ def main():
     holiday_card(frame(), marker, scale).save(OUT / "today.png")
     print("Captured holiday card on the Today screen")
 
-    left, top, right, bottom = find_node("content-desc", "Переписка")
-    adb("shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2))
+    try:
+        left, top, right, bottom = find_node("content-desc", "Переписка")
+        adb("shell", "input", "tap", str((left + right) // 2), str((top + bottom) // 2))
+    except RuntimeError:
+        print("Opening the internal chat activity on the test emulator")
+        adb("root")
+        adb("wait-for-device")
+        opened = adb("shell", "am", "start", "-W", "-n", f"{APP}/.ui.ChatActivity")
+        if b"Error:" in opened or b"Exception" in opened:
+            raise RuntimeError("The emulator did not open ChatActivity")
     back = find_node("content-desc", "Назад")
     note = find_node("text", "Телефоны не связаны")
     image = frame()
     # The crop begins after the avatar and ends well before the connection message.
-    start = back[3] + round(7 * scale)
+    start = (back[1] + back[3]) // 2 + round(30 * scale)
     end = min(start + round(80 * scale), note[1] - round(10 * scale))
     if end - start < 36 * scale:
         raise RuntimeError("Could not isolate the chat garland safely")
