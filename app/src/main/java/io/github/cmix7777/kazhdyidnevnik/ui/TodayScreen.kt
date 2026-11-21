@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
@@ -185,9 +186,13 @@ fun TodayScreen(
 
             // Короткие факты дня таблетками.
             item {
-                Row(verticalAlignment = Alignment.Bottom) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     FlowRow(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.align(Alignment.Bottom),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
@@ -209,16 +214,17 @@ fun TodayScreen(
                         }
                     }
                     if (active) {
-                        MascotVisit(
-                            resident = residentFor(person, now, Visit.HOME), place = Visit.HOME,
-                            event = listState.isScrollInProgress,
-                            hiddenPose = listState.isScrollInProgress,
-                            rain = glass.mode == GlassMode.RAIN,
-                            fog = forecast?.current?.code in listOf(45, 48),
-                            morning = now.hour in 6..11,
-                            running = !SkyFx.covered,
-                            tapLabel = if (person == Person.AIZAT) "Посветить Закладке" else null,
-                        )
+                        Row(Modifier.widthIn(min = 194.dp).weight(1f), horizontalArrangement = Arrangement.End) {
+                            for (resident in homeResidents(person, now)) {
+                                MascotVisit(
+                                    resident, Visit.HOME, event = listState.isScrollInProgress,
+                                    rain = glass.mode == GlassMode.RAIN,
+                                    fog = forecast?.current?.code in listOf(45, 48),
+                                    morning = now.hour in 6..11, running = !SkyFx.covered,
+                                    tapLabel = if (resident == Resident.LIGHT) "Посветить Закладке" else null,
+                                )
+                            }
+                        }
                     }
                 }
             }

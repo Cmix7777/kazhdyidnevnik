@@ -49,6 +49,7 @@ fun WeekScreen(
     diary: DiaryViewModel,
     person: Person,
     modifier: Modifier = Modifier,
+    active: Boolean = true,
     onTogether: (offset: Int) -> Unit = {},
 ) {
     val now by rememberNow()
@@ -90,6 +91,7 @@ fun WeekScreen(
                 MascotVisit(
                     resident = if (person == Person.NASTYA) Resident.JERBOA else Resident.LIGHT,
                     place = Visit.WEEK, event = offset to visibleDay, direction = direction,
+                    running = active && !io.github.cmix7777.kazhdyidnevnik.ui.fx.SkyFx.covered,
                     onTap = if (person == Person.AIZAT) ({ offset = 0 }) else null,
                     tapLabel = if (person == Person.AIZAT) "К текущей неделе" else "Прыгнуть",
                 )

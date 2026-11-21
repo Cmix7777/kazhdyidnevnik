@@ -1,7 +1,10 @@
 package io.github.cmix7777.kazhdyidnevnik.ui.fx
 
+import android.graphics.BitmapFactory
+import android.graphics.BitmapShader
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
+import android.graphics.Shader
 import android.os.Build
 import android.os.SystemClock
 import androidx.annotation.RequiresApi
@@ -35,6 +38,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.Forecast
 import io.github.cmix7777.kazhdyidnevnik.data.GlassMode
 import io.github.cmix7777.kazhdyidnevnik.data.GlassWeather
@@ -226,7 +230,16 @@ fun SkyBackground(sky: State<SkyState>, accent: Color, modifier: Modifier = Modi
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 private fun SkyLayer(sky: State<SkyState>, accent: Color, running: Boolean, modifier: Modifier) {
-    val shader = remember { runCatching { RuntimeShader(SKY_AGSL) }.getOrNull() }
+    val resources = LocalContext.current.resources
+    val shader = remember(resources) {
+        runCatching {
+            val tile = BitmapFactory.decodeResource(resources, R.drawable.sky_cloud_density)
+            val clouds = BitmapShader(tile, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT).apply {
+                setFilterMode(BitmapShader.FILTER_MODE_LINEAR)
+            }
+            RuntimeShader(SKY_AGSL).apply { setInputBuffer("clouds", clouds) }
+        }.getOrNull()
+    }
     if (shader == null) {
         SideEffect { SkyFx.broken = true }
         return
