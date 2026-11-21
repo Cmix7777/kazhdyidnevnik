@@ -3,6 +3,7 @@ package io.github.cmix7777.kazhdyidnevnik
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -105,6 +106,49 @@ class WeatherShotsTest {
 
     @Test
     fun skyDawn() = shoot("sky_3_dawn", sky(hour = 7.1, moon = 0.3, clouds = 0.3))
+
+    @Test
+    fun overcastDawnHasContinuousSky() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            AppTheme {
+                CompositionLocalProvider(LocalDark provides true) {
+                    PersonTheme(Person.AIZAT) {
+                        GlowBackground(sky = remember { mutableStateOf(sky(6.9, clouds = 1.0)) }) {
+                            Box(Modifier.fillMaxSize())
+                        }
+                    }
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(800)
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
+        save("sky_overcast_dawn")
+        org.junit.Assert.assertTrue("Живое небо не отрисовалось", io.github.cmix7777.kazhdyidnevnik.ui.fx.SkyFx.supported)
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        // Проверяем чистое небо над горизонтом. Ищем длинную прямую ступеньку сразу в десятках соседних пикселей.
+        for (vertical in listOf(true, false)) {
+            val across = if (vertical) bitmap.width else bitmap.height
+            val along = if (vertical) bitmap.height else bitmap.width
+            val start = if (vertical) across / 40 else across / 8
+            val end = if (vertical) across * 39 / 40 else across * 3 / 4
+            for (line in start until end) {
+                var consecutive = 0
+                for (pos in along / 8 until along * 3 / 4 step 2) {
+                    val index = if (vertical) pos * bitmap.width + line else line * bitmap.width + pos
+                    val a = pixels[index]
+                    val b = pixels[index - if (vertical) 1 else bitmap.width]
+                    val jump = maxOf(channelDelta(a, b, 0), channelDelta(a, b, 8), channelDelta(a, b, 16))
+                    consecutive = if (jump >= 4) consecutive + 1 else 0
+                    if (consecutive == 20) org.junit.Assert.fail("Резкий шов в небе: линия $line, позиция $pos")
+                }
+            }
+        }
+    }
+
+    private fun channelDelta(a: Int, b: Int, shift: Int) =
+        kotlin.math.abs(((a ushr shift) and 255) - ((b ushr shift) and 255))
 
     @Test
     fun skyDay() = shoot("sky_4_day", sky(hour = 12.5, clouds = 0.45))

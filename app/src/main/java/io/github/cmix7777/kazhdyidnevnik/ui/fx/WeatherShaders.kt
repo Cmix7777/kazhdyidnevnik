@@ -208,6 +208,7 @@ uniform float uSet;
 uniform float uMoon;
 uniform float uCloud;
 uniform float3 uAccent;
+uniform shader clouds;
 """ + NOISE + """
 float starLayer(float2 q, float cellSize, float chance, float seed, float t) {
     float2 g = q / cellSize;
@@ -221,7 +222,9 @@ float starLayer(float2 q, float cellSize, float chance, float seed, float t) {
     float twinkle = 0.65 + 0.35 * sin(t * (0.8 + 2.2 * h21(id + seed + 9.9)) + n * 60.0);
     float core = sstep(size + 0.9, size - 0.3, dist);
     float halo = exp(-dist / (size * 2.2)) * 0.25 * step(0.85, h21(id + seed + 5.5));
-    return (core + halo) * twinkle * mix(0.55, 1.0, h21(id + seed + 4.4));
+    // Гасим ореол до края ячейки, даже если звезда оказалась у самого края.
+    float2 edge = min(f, 1.0 - f) * cellSize;
+    return (core + halo) * sstep(0.0, 1.5, min(edge.x, edge.y)) * twinkle * mix(0.55, 1.0, h21(id + seed + 4.4));
 }
 
 half4 main(float2 p) {
@@ -292,7 +295,9 @@ half4 main(float2 p) {
 
     // Облака: плотность по прогнозу; на закате подсвечены снизу.
     if (uCloud > 0.03) {
-        float cl = fbm(q * float2(0.005, 0.011) + float2(t * 0.004, 0.0));
+        // Бесшовная карта плотности с линейной фильтрацией. Обе выборки непрерывны при прокрутке и на стыке текстуры.
+        float2 uv = q * float2(0.28, 0.56) + float2(t * 0.22, 0.0);
+        float cl = 0.82 * float(clouds.eval(uv).r) + 0.18 * float(clouds.eval(float2(-uv.y, uv.x) * 1.63 + 73.0).r);
         float cm = sstep(0.62 - uCloud * 0.35, 0.85 - uCloud * 0.3, cl) * clamp(uCloud * 1.4, 0.0, 1.0) * (1.0 - v * 0.4);
         float3 cloudNight = float3(0.07, 0.075, 0.12);
         float3 cloudDay = float3(0.45, 0.5, 0.62);
@@ -303,7 +308,9 @@ half4 main(float2 p) {
     // Дымка у горизонта.
     col += mix(float3(0.03, 0.03, 0.08), float3(0.25, 0.12, 0.06), tw) * sstep(0.7, 1.0, v) * 0.5;
     // Лёгкий шум против полос на плавном градиенте (особенно заметных на OLED).
-    col += (h21(p) - 0.5) / 255.0;
+    float2 pixel = mod(floor(p), 128.0);
+    float grain = fract(52.9829189 * fract(dot(pixel, float2(0.06711056, 0.00583715))));
+    col += (grain - 0.5) / 255.0;
     return half4(half3(clamp(col, 0.0, 1.0)), 1.0);
 }
 """

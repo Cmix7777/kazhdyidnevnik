@@ -183,6 +183,7 @@ class AppScreensTest {
         AppSettings(context).holidayPreview = true
         launchAs(Person.AIZAT)
         waitFor(hasTestTag("resident-HOME-LIGHT"))
+        recordTodayResident("INK")
         val lighthouse = compose.onNodeWithTag("resident-HOME-LIGHT")
         lighthouse.assertIsDisplayed().performClick()
         val bitmap = lighthouse.captureToImage().asAndroidBitmap()
@@ -191,6 +192,44 @@ class AppScreensTest {
             bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
         }
         openSettings()
+    }
+
+    @Test
+    fun geckoIsVisibleOnNastyasToday() {
+        launchAs(Person.NASTYA)
+        waitFor(hasTestTag("resident-HOME-GECKO"))
+        recordTodayResident("GECKO")
+    }
+
+    private fun recordTodayResident(name: String) {
+        val dir = java.io.File(context.getExternalFilesDir(null), "shots").apply { mkdirs() }
+        val resident = compose.onNodeWithTag("resident-HOME-$name").assertIsDisplayed()
+        val screen = compose.onNodeWithTag("today-owner-list").captureToImage().asAndroidBitmap()
+        java.io.File(dir, "today_$name.png").outputStream().use {
+            screen.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+        compose.mainClock.autoAdvance = false
+        try {
+            resident.performClick()
+            val frames = (0 until 12).map {
+                compose.mainClock.advanceTimeBy(if (it == 0) 32L else 176L)
+                resident.captureToImage().asAndroidBitmap()
+            }
+            val first = frames.first()
+            val strip = android.graphics.Bitmap.createBitmap(first.width * 4, first.height * 3, android.graphics.Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(strip)
+            frames.forEachIndexed { index, frame ->
+                canvas.drawBitmap(frame, (index % 4 * first.width).toFloat(), (index / 4 * first.height).toFloat(), null)
+            }
+            java.io.File(dir, "motion_$name.png").outputStream().use {
+                strip.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }
+            if (io.github.cmix7777.kazhdyidnevnik.ui.fx.EffectsSettings.animate(context)) {
+                org.junit.Assert.assertFalse("Поза $name не меняется после нажатия", first.sameAs(frames[4]))
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
     }
 
     @Test

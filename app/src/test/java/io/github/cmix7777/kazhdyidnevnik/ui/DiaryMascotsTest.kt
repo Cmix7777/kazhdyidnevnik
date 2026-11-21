@@ -32,4 +32,16 @@ class DiaryMascotsTest {
         assertEquals(Resident.JERBOA, residentFor(Person.NASTYA, time, Visit.WEEK))
         assertFalse(Visit.entries.any { residentFor(Person.NASTYA, time, it) == Resident.LIGHT })
     }
+
+    @Test fun inkAndGeckoAreAlwaysAtHomeWithADifferentCompanion() {
+        val start = LocalDate.of(2026, 12, 30).atStartOfDay()
+        for (hour in 0L until 96L) {
+            val now = start.plusHours(hour)
+            assertEquals(listOf(Resident.INK, Resident.LIGHT), homeResidents(Person.AIZAT, now))
+            val pair = homeResidents(Person.NASTYA, now)
+            assertEquals(Resident.GECKO, pair.first())
+            val mothAtHome = residentFor(Person.NASTYA, now, Visit.HOME) == Resident.MOTH
+            assertEquals(if (mothAtHome) Resident.MOTH else Resident.JERBOA, pair.last())
+        }
+    }
 }

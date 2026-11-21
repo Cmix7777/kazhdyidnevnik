@@ -307,7 +307,7 @@ private fun MainPager(vm: ScheduleViewModel, extras: ExtrasViewModel, diary: Dia
                                     val isOwner = person == owner
                                     when (current) {
                                         Tab.Today -> TodayScreen(vm, extras, diary, person, active = pagerState.settledPage == page)
-                                        Tab.Week -> WeekScreen(vm, extras, diary, person, onTogether = { together = it })
+                                        Tab.Week -> WeekScreen(vm, extras, diary, person, active = pagerState.settledPage == page, onTogether = { together = it })
                                         Tab.Budget -> BudgetScreen(diary, person, isOwner)
                                         Tab.Deadlines -> DeadlinesScreen(diary, person, isOwner)
                                         Tab.Progress -> ProgressScreen(vm, person)
