@@ -162,7 +162,10 @@ fun HabitsScreen(person: Person, isOwner: Boolean, modifier: Modifier = Modifier
                 isOwner = isOwner,
                 partner = person.partner,
                 expanded = open == habit.id,
-                onToggleToday = { change { Habits.toggle(it, habit.id, today) } },
+                onToggleToday = {
+                    change { Habits.toggle(it, habit.id, today) }
+                    io.github.cmix7777.kazhdyidnevnik.ui.fx.Holidays.markDay(context)
+                },
                 onExpand = { open = if (open == habit.id) null else habit.id },
                 onReminder = { hour -> change { Habits.setReminder(it, habit.id, hour) } },
                 onShared = { shared -> change { Habits.setShared(it, habit.id, shared) } },

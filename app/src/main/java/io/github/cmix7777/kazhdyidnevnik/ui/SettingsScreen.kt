@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.foundation.clickable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -80,7 +81,28 @@ fun SettingsScreen(
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Pill(text = "Каждыйдневник ${BuildConfig.VERSION_NAME}", accent = true)
+                    var versionTaps by remember { mutableStateOf(0) }
+                    val tapContext = androidx.compose.ui.platform.LocalContext.current
+                    Pill(
+                        text = "Каждыйдневник ${BuildConfig.VERSION_NAME}",
+                        accent = true,
+                        modifier = Modifier.clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null,
+                        ) {
+                            versionTaps++
+                            if (versionTaps >= 7) {
+                                versionTaps = 0
+                                val on = !appSettings.holidayPreview
+                                appSettings.holidayPreview = on
+                                android.widget.Toast.makeText(
+                                    tapContext,
+                                    if (on) "Новогодний режим: показ заранее включён" else "Новогодний режим: показ заранее выключен",
+                                    android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                        },
+                    )
                     TwoToneTitle(first = "Настройки", second = "уведомления и копии")
                 }
                 GlassIconButton(icon = R.drawable.ic_arrow_back, contentDescription = "Назад", onClick = onBack)

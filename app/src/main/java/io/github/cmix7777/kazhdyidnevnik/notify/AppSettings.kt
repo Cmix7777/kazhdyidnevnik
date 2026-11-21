@@ -82,6 +82,26 @@ class AppSettings(context: Context) {
         get() = prefs.getLong(CHAT_SEEN, 0L)
         set(value) = prefs.edit { putLong(CHAT_SEEN, value) }
 
+    /** Показать новогодний режим заранее (для проверки): включается семью касаниями по версии в настройках. */
+    var holidayPreview: Boolean
+        get() = prefs.getBoolean(HOLIDAY_PREVIEW, false)
+        set(value) = prefs.edit { putBoolean(HOLIDAY_PREVIEW, value) }
+
+    /** Дни праздника, когда кто-то писал или отмечал привычку («2027:2026-12-20»). */
+    var holidayDays: Set<String>
+        get() = prefs.getStringSet(HOLIDAY_DAYS, null)?.toSet() ?: emptySet()
+        set(value) = prefs.edit { putStringSet(HOLIDAY_DAYS, value) }
+
+    /** Какое вступление праздника уже показано. */
+    var holidayIntro: String?
+        get() = prefs.getString(HOLIDAY_INTRO, null)
+        set(value) = prefs.edit { putString(HOLIDAY_INTRO, value) }
+
+    /** Какой салют уже показан. */
+    var holidaySalute: String?
+        get() = prefs.getString(HOLIDAY_SALUTE, null)
+        set(value) = prefs.edit { putString(HOLIDAY_SALUTE, value) }
+
     /** Какой особый день уже показан анимацией (дата и номер), чтобы не повторять её при каждом открытии. */
     var specialShown: String?
         get() = prefs.getString(SPECIAL_SHOWN, null)
@@ -295,6 +315,10 @@ class AppSettings(context: Context) {
         const val THEME = "theme"
         const val REDUCE_MOTION = "reduceMotion"
         const val CHAT_LOCK = "chatLock"
+        const val HOLIDAY_PREVIEW = "holidayPreview"
+        const val HOLIDAY_DAYS = "holidayDays"
+        const val HOLIDAY_INTRO = "holidayIntro"
+        const val HOLIDAY_SALUTE = "holidaySalute"
         const val CHAT_SEEN = "chatSeen"
         const val SPECIAL_SHOWN = "specialShown"
         const val SENT_DROPS = "sentDrops"

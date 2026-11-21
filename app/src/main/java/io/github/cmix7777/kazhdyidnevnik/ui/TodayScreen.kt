@@ -1,5 +1,17 @@
 package io.github.cmix7777.kazhdyidnevnik.ui
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.mutableIntStateOf
+import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.Holidays
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidayTree
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidaySnow
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidayGarland
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.HolidaySaluteHost
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberHoliday
+import io.github.cmix7777.kazhdyidnevnik.ui.fx.rememberHolidayIntro
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
@@ -14,6 +26,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -30,12 +43,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.BuildConfig
 import io.github.cmix7777.kazhdyidnevnik.R
 import io.github.cmix7777.kazhdyidnevnik.data.DayItem
 import io.github.cmix7777.kazhdyidnevnik.data.DayStrip
 import io.github.cmix7777.kazhdyidnevnik.data.GlassWeather
+import io.github.cmix7777.kazhdyidnevnik.data.GlassMode
 import io.github.cmix7777.kazhdyidnevnik.data.Person
 import io.github.cmix7777.kazhdyidnevnik.data.PlanBlock
 import io.github.cmix7777.kazhdyidnevnik.data.PlanGenerator
@@ -110,6 +125,11 @@ fun TodayScreen(
     // Обновление каплей: капля тянется из края страницы, кольцом крутится, пока идёт загрузка,
     // и закрывается галочкой. Подпись «обновлено только что» появляется в шапке, а не поверх текста.
     val pullState = rememberPullToRefreshState()
+    val listState = rememberLazyListState()
+    val holiday = rememberHoliday()
+    val holidayIntro = rememberHolidayIntro(holiday.takeIf { active })
+    var saluteNow by remember { mutableIntStateOf(0) }
+    val appContext = LocalContext.current
     val drop = rememberDropRefresh(refreshing, failed = schedule.error != null)
     val accent = LocalAccent.current
 
@@ -136,8 +156,10 @@ fun TodayScreen(
         modifier = modifier.fillMaxSize(),
     ) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
+                .testTag(if (isOwner) "today-owner-list" else "today-partner-list")
                 .dropShift(pullState)
                 .weatherGlass(glass, clock, active),
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp + LocalNavInset.current),
@@ -146,30 +168,57 @@ fun TodayScreen(
             // Шапка: чей день и дата крупно в две строки.
             item {
                 val (dayName, dateText) = formatDayTitle(today).split(", ", limit = 2)
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Pill(text = if (isOwner) "Сегодня" else "Сегодня у ${person.genitive}", accent = true)
-                    TwoToneTitle(first = dayName, second = dateText)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Pill(text = if (isOwner) "Сегодня" else "Сегодня у ${person.genitive}", accent = true)
+                        TwoToneTitle(first = dayName, second = dateText)
+                    }
+                    if (holiday != null) {
+                        HolidayTree(
+                            ornaments = Holidays.ornaments(appContext, holiday),
+                            modifier = Modifier.size(width = 92.dp, height = 132.dp),
+                            onLongPress = { if (AppSettings(appContext).holidayPreview) saluteNow++ },
+                        )
+                    }
                 }
             }
 
             // Короткие факты дня таблетками.
             item {
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Pill(text = daySummary(todayItems))
-                    AnimatedVisibility(
-                        visible = drop.justUpdated,
-                        enter = fadeIn() + expandHorizontally(),
-                        exit = fadeOut() + shrinkHorizontally(),
+                Row(verticalAlignment = Alignment.Bottom) {
+                    FlowRow(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Pill(text = "обновлено только что", accent = true)
-                    }
-                    if (profile.hasPractice) {
-                        Practice.dayNumber(today)?.let { day ->
-                            Pill(text = "практика: день $day из ${Practice.totalDays}", accent = true)
+                        Pill(text = daySummary(todayItems))
+                        holiday?.let { Holidays.daysLeft(today, it) }?.let { left ->
+                            Pill(text = "до Нового года ${io.github.cmix7777.kazhdyidnevnik.data.pluralDays(left)}", accent = true)
                         }
+                        AnimatedVisibility(
+                            visible = drop.justUpdated,
+                            enter = fadeIn() + expandHorizontally(),
+                            exit = fadeOut() + shrinkHorizontally(),
+                        ) {
+                            Pill(text = "обновлено только что", accent = true)
+                        }
+                        if (profile.hasPractice) {
+                            Practice.dayNumber(today)?.let { day ->
+                                Pill(text = "практика: день $day из ${Practice.totalDays}", accent = true)
+                            }
+                        }
+                    }
+                    if (active) {
+                        MascotVisit(
+                            resident = residentFor(person, now, Visit.HOME), place = Visit.HOME,
+                            event = listState.isScrollInProgress,
+                            hiddenPose = listState.isScrollInProgress,
+                            rain = glass.mode == GlassMode.RAIN,
+                            fog = forecast?.current?.code in listOf(45, 48),
+                            morning = now.hour in 6..11,
+                            running = !SkyFx.covered,
+                            tapLabel = if (person == Person.AIZAT) "Посветить Закладке" else null,
+                        )
                     }
                 }
             }
@@ -209,7 +258,7 @@ fun TodayScreen(
             }
             items(todayItems) { DayItemCard(it, now.toLocalTime(), onClick = openEvent(it)) }
             if (isOwner) {
-                item {
+                item(key = "today-event-actions") {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -324,6 +373,17 @@ fun TodayScreen(
                     color = Palette.TextFaint,
                 )
             }
+        }
+        if (holiday != null && active) {
+            HolidaySnow(Modifier.matchParentSize())
+            HolidayGarland(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(40.dp),
+                intro = holidayIntro,
+            )
+            HolidaySaluteHost(holiday, saluteNow, Modifier.matchParentSize())
         }
     }
 

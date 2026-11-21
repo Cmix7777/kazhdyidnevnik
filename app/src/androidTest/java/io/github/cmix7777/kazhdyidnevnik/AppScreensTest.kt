@@ -16,6 +16,8 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
@@ -23,6 +25,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -103,8 +106,9 @@ class AppScreensTest {
     private fun openNewEventEditor() {
         var lastScreen = ""
         repeat(3) {
-            scrollToItem("+ Добавить дело")
-            compose.onNodeWithText("+ Добавить дело").performClick()
+            waitFor(hasTestTag("today-owner-list"))
+            compose.onNodeWithTag("today-owner-list").performScrollToKey("today-event-actions")
+            compose.onNode(hasText("+ Добавить дело") and hasClickAction()).assertIsDisplayed().performClick()
             val opened = try {
                 compose.waitUntil(8_000) { compose.onAllNodes(hasText("Новое дело")).fetchSemanticsNodes().isNotEmpty() }
                 true
@@ -173,6 +177,21 @@ class AppScreensTest {
     }
 
     // ---- первый запуск ----
+
+    @Test
+    fun lighthouseSharesTodayWithHolidayDecorations() {
+        AppSettings(context).holidayPreview = true
+        launchAs(Person.AIZAT)
+        waitFor(hasTestTag("resident-HOME-LIGHT"))
+        val lighthouse = compose.onNodeWithTag("resident-HOME-LIGHT")
+        lighthouse.assertIsDisplayed().performClick()
+        val bitmap = lighthouse.captureToImage().asAndroidBitmap()
+        val dir = java.io.File(context.getExternalFilesDir(null), "shots").apply { mkdirs() }
+        java.io.File(dir, "resident_lighthouse.png").outputStream().use {
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+        }
+        openSettings()
+    }
 
     @Test
     fun firstLaunchAsksWhoseThePhoneIs() {

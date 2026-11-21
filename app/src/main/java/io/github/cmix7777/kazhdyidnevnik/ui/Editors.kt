@@ -25,12 +25,21 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -48,6 +57,8 @@ import io.github.cmix7777.kazhdyidnevnik.data.MoneyCategories
 import io.github.cmix7777.kazhdyidnevnik.data.MoneyEntry
 import io.github.cmix7777.kazhdyidnevnik.data.MoneyFormat
 import io.github.cmix7777.kazhdyidnevnik.data.UserEvent
+import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
+import kotlinx.coroutines.delay
 import io.github.cmix7777.kazhdyidnevnik.formatDate
 import io.github.cmix7777.kazhdyidnevnik.formatShortDay
 import io.github.cmix7777.kazhdyidnevnik.formatTime
@@ -134,16 +145,77 @@ private fun EditorField(
             keyboardType = keyboardType,
         ),
         shape = RoundedCornerShape(16.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Palette.Violet,
-            unfocusedBorderColor = Palette.BorderStrong,
-            focusedLabelColor = Palette.Lavender,
-            unfocusedLabelColor = Palette.TextMuted,
-            cursorColor = Palette.Lavender,
-            focusedTextColor = Palette.Text,
-            unfocusedTextColor = Palette.Text,
-        ),
+        colors = editorColors(),
     )
+}
+
+@Composable
+private fun editorColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = Palette.Violet,
+    unfocusedBorderColor = Palette.BorderStrong,
+    focusedLabelColor = Palette.Lavender,
+    unfocusedLabelColor = Palette.TextMuted,
+    cursorColor = Palette.Lavender,
+    focusedTextColor = Palette.Text,
+    unfocusedTextColor = Palette.Text,
+)
+
+@Composable
+private fun ResidentNoteField(value: String, onChange: (String) -> Unit, label: String, entry: String?) {
+    val context = LocalContext.current
+    val owner = remember(context) { AppSettings(context).owner }
+    if (owner == null) {
+        EditorField(value, onChange, label, singleLine = false)
+        return
+    }
+    val prefs = remember(context) { context.getSharedPreferences("resident-bookmarks", android.content.Context.MODE_PRIVATE) }
+    val mark = remember(entry) { entry?.let { prefs.getInt(it, -1) } ?: -1 }
+    var field by rememberSaveable(entry, stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(value)) }
+    val requestFocus = remember { FocusRequester() }
+    var touched by rememberSaveable(entry) { mutableStateOf(false) }
+    val cursor by rememberUpdatedState(field.selection.end)
+    val used by rememberUpdatedState(touched)
+    DisposableEffect(entry, owner) {
+        onDispose {
+            if (entry != null && owner == Person.AIZAT && used) prefs.edit().putInt(entry, cursor).apply()
+        }
+    }
+    var peeking by remember { mutableStateOf(true) }
+    LaunchedEffect(value) {
+        peeking = true
+        delay(1450)
+        peeking = false
+    }
+    val time by rememberNow()
+    val visitor = residentFor(owner, time, Visit.NOTE)
+    Column {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.Bottom) {
+            if (owner == Person.AIZAT) {
+                MascotVisit(Resident.MARK, Visit.NOTE, tapLabel = "Вернуться к месту в заметке", onTap = {
+                    val position = if (mark >= 0) mark.coerceIn(0, value.length) else value.length
+                    field = field.copy(selection = TextRange(position))
+                    touched = true
+                    requestFocus.requestFocus()
+                })
+            }
+            if (owner == Person.AIZAT && time.toLocalDate().toEpochDay() % 3L == 0L) {
+                InkAndLighthouse(peeking)
+            } else {
+                MascotVisit(visitor, Visit.NOTE, event = peeking, hiddenPose = peeking)
+            }
+        }
+        OutlinedTextField(
+            value = field, onValueChange = {
+                touched = true
+                field = it
+                if (it.text != value) onChange(it.text)
+            },
+            modifier = Modifier.fillMaxWidth().focusRequester(requestFocus),
+            label = { Text(label) }, minLines = 1, maxLines = 6,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            shape = RoundedCornerShape(16.dp), colors = editorColors(),
+        )
+    }
 }
 
 @Composable
@@ -227,7 +299,7 @@ fun EventEditor(
     var end by remember { mutableStateOf(initial?.end ?: defaultStart.plusHours(1)) }
     var weekly by remember { mutableStateOf(initial?.weekly ?: false) }
     var remind by remember { mutableStateOf(initial?.remindBefore) }
-    var note by remember { mutableStateOf(initial?.note.orEmpty()) }
+    var note by rememberSaveable { mutableStateOf(initial?.note.orEmpty()) }
     var picking by remember { mutableStateOf<Pick?>(null) }
     // Конец раньше начала — дело через полночь (например, с 23:00 до 02:00): закончится на следующий день.
     val valid = end != start
@@ -271,7 +343,7 @@ fun EventEditor(
             }
         }
 
-        EditorField(value = note, onValueChange = { note = it }, label = "Заметка", singleLine = false)
+        ResidentNoteField(note, { note = it }, "Заметка", initial?.id?.let { "event:$it" })
 
         EditorButtons(
             canSave = valid,
@@ -360,7 +432,7 @@ fun DeadlineEditor(
 ) {
     var title by remember { mutableStateOf(initial?.title.orEmpty()) }
     var date by remember { mutableStateOf(initial?.date ?: LocalDate.now().plusDays(7)) }
-    var note by remember { mutableStateOf(initial?.note.orEmpty()) }
+    var note by rememberSaveable { mutableStateOf(initial?.note.orEmpty()) }
     var occasion by remember { mutableStateOf(initial?.occasion) }
     var whose by remember { mutableStateOf(initial?.whose) }
     var yearKnown by remember { mutableStateOf(initial?.yearKnown ?: true) }
@@ -406,7 +478,7 @@ fun DeadlineEditor(
                 color = Palette.TextMuted,
             )
         }
-        EditorField(value = note, onValueChange = { note = it }, label = "Заметка (видна только тебе)", singleLine = false)
+        ResidentNoteField(note, { note = it }, "Заметка (видна только тебе)", initial?.id?.let { "date:$it" })
         EditorButtons(
             canSave = title.isNotBlank() || occasion != null,
             onSave = {

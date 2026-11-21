@@ -75,6 +75,7 @@ object ReminderScheduler {
             result += ReminderPlanner.forDay(date, plan(context, owner, date), settings)
             val partnerPlan = if (settings.partner.study) plan(context, owner.partner, date) else emptyList()
             result += ReminderPlanner.forPartnerDay(date, partnerPlan, settings)
+            if (date.monthValue == 1 && date.dayOfMonth == 1) result += Reminder(date.atStartOfDay(), ReminderKind.HOLIDAY)
             date = date.plusDays(1)
         }
         val special = specialDates(context)
@@ -211,6 +212,9 @@ object ReminderScheduler {
                     listOfNotNull(formatDate(day), deadline.yearsText(day)).joinToString(", ") + ". Самое время подумать о подарке."
                 }
                 Notifier.special(context, "${deadline.id}-${reminder.daysBefore}", title, text)
+            }
+            ReminderKind.HOLIDAY -> {
+                Notifier.special(context, "newyear-${date.year}", "С Новым годом", "Открой приложение: там салют на двоих.")
             }
             ReminderKind.HABIT -> {
                 val habit = HabitStore.current(context.filesDir).firstOrNull { it.id == reminder.eventId } ?: return
