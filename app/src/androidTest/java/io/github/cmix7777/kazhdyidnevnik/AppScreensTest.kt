@@ -25,6 +25,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performTextInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -105,8 +106,9 @@ class AppScreensTest {
     private fun openNewEventEditor() {
         var lastScreen = ""
         repeat(3) {
-            scrollToItem("+ Добавить дело")
-            compose.onNodeWithText("+ Добавить дело").performClick()
+            waitFor(hasTestTag("today-owner-list"))
+            compose.onNodeWithTag("today-owner-list").performScrollToKey("today-event-actions")
+            compose.onNode(hasText("+ Добавить дело") and hasClickAction()).assertIsDisplayed().performClick()
             val opened = try {
                 compose.waitUntil(8_000) { compose.onAllNodes(hasText("Новое дело")).fetchSemanticsNodes().isNotEmpty() }
                 true

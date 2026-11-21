@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import io.github.cmix7777.kazhdyidnevnik.BuildConfig
 import io.github.cmix7777.kazhdyidnevnik.R
@@ -158,6 +159,7 @@ fun TodayScreen(
             state = listState,
             modifier = Modifier
                 .fillMaxSize()
+                .testTag(if (isOwner) "today-owner-list" else "today-partner-list")
                 .dropShift(pullState)
                 .weatherGlass(glass, clock, active),
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp + LocalNavInset.current),
@@ -256,7 +258,7 @@ fun TodayScreen(
             }
             items(todayItems) { DayItemCard(it, now.toLocalTime(), onClick = openEvent(it)) }
             if (isOwner) {
-                item {
+                item(key = "today-event-actions") {
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
