@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -160,7 +161,13 @@ internal fun MascotVisit(
                 val peek = if (hiding) beat(phase, .02f, .63f) else 0f
                 val spring = if (hiding) beat(phase, .58f, .94f) else beat(phase, .19f, .74f)
                 val squash = if (hiding) 0f else beat(phase, 0f, .25f) + beat(phase, .71f, .94f)
-                Sprite(R.drawable.resident_ink_peek, width * .85f, height * .13f, Modifier.align(Alignment.BottomCenter))
+                if (rise < 1f) Sprite(R.drawable.resident_ink_peek, width * .85f, height * .13f,
+                    Modifier.align(Alignment.BottomCenter).graphicsLayer { alpha = 1f - rise })
+                if (spring > 0f) Canvas(Modifier.matchParentSize()) {
+                    val w = size.width * (.69f - .25f * spring)
+                    drawOval(Color(0xff29223e).copy(alpha = .5f * spring),
+                        Offset((size.width - w) / 2f, size.height * .95f), Size(w, size.height * .045f))
+                }
                 if (rise > .02f) Sprite(resident.art, width * .85f, height * (.12f + .51f * rise),
                     Modifier.align(Alignment.BottomCenter).offset(x = width * .07f * side * spring, y = -height * .23f * spring)
                         .graphicsLayer { alpha = rise }, tilt = side * 9f * spring,
@@ -189,12 +196,21 @@ internal fun MascotVisit(
                 val climb = beat(phase, .05f, .89f)
                 val step = sin(phase * PI * 6).toFloat() * climb
                 val hunting = gesture % 2 == 1
-                val turn = if (hunting) 0f else beat(phase, .12f, .90f)
-                Sprite(resident.art, width * .78f, height * .76f,
+                val grip = if (hunting || hiddenPose) 0f else minOf((phase - .12f) / .14f, (.92f - phase) / .13f).coerceIn(0f, 1f)
+                if (grip > 0f) {
+                    Canvas(Modifier.matchParentSize()) {
+                        val x = size.width * .76f
+                        drawLine(Color(0xffab8764).copy(alpha = .75f * grip),
+                            Offset(x, size.height * .07f), Offset(x, size.height), 1.1.dp.toPx())
+                    }
+                    Sprite(R.drawable.resident_gecko_climb, width * .43f, height * .74f,
+                        Modifier.align(Alignment.BottomCenter).offset(x = width * .15f,
+                            y = -height * (.17f * climb + .022f * step)).graphicsLayer { alpha = grip })
+                }
+                if (grip < 1f) Sprite(resident.art, width * .78f, height * .76f,
                     Modifier.align(Alignment.BottomCenter).offset(x = width * .08f * side * climb,
-                        y = if (hiddenPose) height * .42f else -height * (if (hunting) .12f else .24f) * climb),
-                    tilt = (if (hunting) -9f else 17f) * climb + 5f * step,
-                    stretchX = 1f - 2f * turn, stretchY = 1f + .05f * step)
+                        y = if (hiddenPose) height * .42f else -height * .12f * climb).graphicsLayer { alpha = 1f - grip },
+                    tilt = -9f * climb + 5f * step, stretchY = 1f + .05f * step)
                 val fly = beat(phase, 0f, .61f)
                 if (hunting && fly > 0f && !hiddenPose) Canvas(Modifier.matchParentSize()) {
                     val target = Offset(size.width * (.86f + .045f * step), size.height * (.19f - .08f * fly))
