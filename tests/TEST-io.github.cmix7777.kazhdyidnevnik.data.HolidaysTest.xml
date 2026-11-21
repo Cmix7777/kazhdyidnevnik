@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.HolidaysTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-21T05:18:52.896Z" hostname="runnervm0hi8g" time="0.002">
+  <properties/>
+  <testcase name="newYearComesAndGoesByItself" classname="io.github.cmix7777.kazhdyidnevnik.data.HolidaysTest" time="0.001"/>
+  <testcase name="newYearWishesGetSalute" classname="io.github.cmix7777.kazhdyidnevnik.data.HolidaysTest" time="0.001"/>
+  <testcase name="countdownStopsOnNewYear" classname="io.github.cmix7777.kazhdyidnevnik.data.HolidaysTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

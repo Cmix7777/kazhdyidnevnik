@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.OvernightAndPrepTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-21T05:18:52.902Z" hostname="runnervm0hi8g" time="0.131">
+  <properties/>
+  <testcase name="ordinaryTestingStartsAfterTheCheck" classname="io.github.cmix7777.kazhdyidnevnik.data.OvernightAndPrepTest" time="0.023"/>
+  <testcase name="urgentPrepInTheMorningOfTheCheck" classname="io.github.cmix7777.kazhdyidnevnik.data.OvernightAndPrepTest" time="0.016"/>
+  <testcase name="drivingTheorySundayIsSeededOnce" classname="io.github.cmix7777.kazhdyidnevnik.data.OvernightAndPrepTest" time="0.011"/>
+  <testcase name="urgentPrepTheEveningBeforeTheCheck" classname="io.github.cmix7777.kazhdyidnevnik.data.OvernightAndPrepTest" time="0.01"/>
+  <testcase name="checkIsInTheDeadlines" classname="io.github.cmix7777.kazhdyidnevnik.data.OvernightAndPrepTest" time="0.007"/>
+  <testcase name="drivingTheoryIsBusyTimeForThePlan" classname="io.github.cmix7777.kazhdyidnevnik.data.OvernightAndPrepTest" time="0.008"/>
+  <testcase name="nightWorkNeedsOnlyTheWayThere" classname="io.github.cmix7777.kazhdyidnevnik.data.OvernightAndPrepTest" time="0.006"/>
+  <testcase name="nightEventSplitsBetweenTwoDays" classname="io.github.cmix7777.kazhdyidnevnik.data.OvernightAndPrepTest" time="0.007"/>
+  <testcase name="eventThroughMidnightKnowsItsLength" classname="io.github.cmix7777.kazhdyidnevnik.data.OvernightAndPrepTest" time="0.019"/>
+  <testcase name="nightEventKeepsTheEveningBusyForStudy" classname="io.github.cmix7777.kazhdyidnevnik.data.OvernightAndPrepTest" time="0.013"/>
+  <testcase name="weeklyNightEventAndSkippedDay" classname="io.github.cmix7777.kazhdyidnevnik.data.OvernightAndPrepTest" time="0.011"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

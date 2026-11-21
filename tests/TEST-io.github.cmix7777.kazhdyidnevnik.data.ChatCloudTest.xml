@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.ChatCloudTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-21T05:18:50.339Z" hostname="runnervm0hi8g" time="0.694">
+  <properties/>
+  <testcase name="bytesSealAndOpen" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatCloudTest" time="0.168"/>
+  <testcase name="headCannotBePassedOffAsTheOtherPerson" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatCloudTest" time="0.176"/>
+  <testcase name="photoRoundTripAndWipe" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatCloudTest" time="0.284"/>
+  <testcase name="otherCodeSeesNothingAndBrokenHeadIsReported" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatCloudTest" time="0.005"/>
+  <testcase name="messageTravelsEncryptedAndThePollIsTiny" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatCloudTest" time="0.01"/>
+  <testcase name="pushPreviewOpensOnlyForTheRightSender" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatCloudTest" time="0.006"/>
+  <testcase name="archivePagesAreWrittenTogetherWithTheHead" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatCloudTest" time="0.029"/>
+  <testcase name="readAndTypingMarksNeedTheHeadAndSurviveNewMessages" classname="io.github.cmix7777.kazhdyidnevnik.data.ChatCloudTest" time="0.013"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

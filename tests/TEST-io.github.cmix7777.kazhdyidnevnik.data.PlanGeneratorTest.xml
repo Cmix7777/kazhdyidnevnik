@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.PlanGeneratorTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-21T05:18:53.149Z" hostname="runnervm0hi8g" time="0.058">
+  <properties/>
+  <testcase name="mockDayPlanHasFourHourExam" classname="io.github.cmix7777.kazhdyidnevnik.data.PlanGeneratorTest" time="0.01"/>
+  <testcase name="thursdayIsHeavyAndShort" classname="io.github.cmix7777.kazhdyidnevnik.data.PlanGeneratorTest" time="0.004"/>
+  <testcase name="curriculumWeeks" classname="io.github.cmix7777.kazhdyidnevnik.data.PlanGeneratorTest" time="0.004"/>
+  <testcase name="noCsharpAfterDeadline" classname="io.github.cmix7777.kazhdyidnevnik.data.PlanGeneratorTest" time="0.005"/>
+  <testcase name="mockExamDays" classname="io.github.cmix7777.kazhdyidnevnik.data.PlanGeneratorTest" time="0.004"/>
+  <testcase name="practiceWeekdayIsBusyDuringTheDay" classname="io.github.cmix7777.kazhdyidnevnik.data.PlanGeneratorTest" time="0.006"/>
+  <testcase name="blocksNeverOverlapClassesOrWork" classname="io.github.cmix7777.kazhdyidnevnik.data.PlanGeneratorTest" time="0.009"/>
+  <testcase name="wednesdayMorningIsFilledBeforeClasses" classname="io.github.cmix7777.kazhdyidnevnik.data.PlanGeneratorTest" time="0.004"/>
+  <testcase name="differentMocksGetDifferentTasks" classname="io.github.cmix7777.kazhdyidnevnik.data.PlanGeneratorTest" time="0.006"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

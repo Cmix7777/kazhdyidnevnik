@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.service.ApkDownloaderTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-21T05:19:02.701Z" hostname="runnervm0hi8g" time="1.757">
+  <properties/>
+  <testcase name="brokenServerFallsBackToMirror" classname="io.github.cmix7777.kazhdyidnevnik.service.ApkDownloaderTest" time="0.072"/>
+  <testcase name="connectionCutShortIsResumed" classname="io.github.cmix7777.kazhdyidnevnik.service.ApkDownloaderTest" time="0.037"/>
+  <testcase name="plainDownloadReportsProgressToTheEnd" classname="io.github.cmix7777.kazhdyidnevnik.service.ApkDownloaderTest" time="0.026"/>
+  <testcase name="frozenConnectionIsResumedFromTheSamePlace" classname="io.github.cmix7777.kazhdyidnevnik.service.ApkDownloaderTest" time="0.434"/>
+  <testcase name="serverWithoutRangeStartsOverAndStillGivesTheRightFile" classname="io.github.cmix7777.kazhdyidnevnik.service.ApkDownloaderTest" time="0.426"/>
+  <testcase name="unknownSizeStillCompletes" classname="io.github.cmix7777.kazhdyidnevnik.service.ApkDownloaderTest" time="0.017"/>
+  <testcase name="wrongChecksumIsAnErrorAndLeavesNoFile" classname="io.github.cmix7777.kazhdyidnevnik.service.ApkDownloaderTest" time="0.044"/>
+  <testcase name="trickleSwitchesToMirrorAndKeepsWhatWasDownloaded" classname="io.github.cmix7777.kazhdyidnevnik.service.ApkDownloaderTest" time="0.622"/>
+  <testcase name="everythingDownGivesReadableErrorInsteadOfEndlessBar" classname="io.github.cmix7777.kazhdyidnevnik.service.ApkDownloaderTest" time="0.077"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

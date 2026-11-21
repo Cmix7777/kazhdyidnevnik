@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.DayFormatTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-21T05:18:49.996Z" hostname="runnervm0hi8g" time="0.168">
+  <properties/>
+  <testcase name="formatsWeekdayAndMonthInRussian" classname="io.github.cmix7777.kazhdyidnevnik.DayFormatTest" time="0.088"/>
+  <testcase name="weekRangeAcrossMonthsAndYears" classname="io.github.cmix7777.kazhdyidnevnik.DayFormatTest" time="0.023"/>
+  <testcase name="formatsFirstDayOfYear" classname="io.github.cmix7777.kazhdyidnevnik.DayFormatTest" time="0.0"/>
+  <testcase name="formatsPracticeStart" classname="io.github.cmix7777.kazhdyidnevnik.DayFormatTest" time="0.0"/>
+  <testcase name="shortDayForNotifications" classname="io.github.cmix7777.kazhdyidnevnik.DayFormatTest" time="0.0"/>
+  <testcase name="fullDateAndTime" classname="io.github.cmix7777.kazhdyidnevnik.DayFormatTest" time="0.029"/>
+  <testcase name="weekRangeInsideOneMonth" classname="io.github.cmix7777.kazhdyidnevnik.DayFormatTest" time="0.013"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
