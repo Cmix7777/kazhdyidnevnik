@@ -1,0 +1,71 @@
+run=41
+sha=746dce8217932fca05b5802ad2122d62dec8ce07
+result=success
+signed=yes
+time=2026-11-23T15:18:35Z
+---
+BUILD SUCCESSFUL in 4m 32s
+--- what went wrong ---
+apk=6954712
+jsdelivr: 200 6954712
+--- tail ---
+> Task :app:mergeReleaseStartupProfile
+> Task :app:mergeReleaseShaders
+> Task :app:compileReleaseShaders NO-SOURCE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:collectReleaseDependencies
+> Task :app:sdkReleaseDependencyData
+> Task :app:validateSigningRelease
+> Task :app:writeReleaseAppMetadata
+> Task :app:writeReleaseSigningConfigVersions
+> Task :app:processReleaseResources
+> Task :app:compileDebugKotlin
+> Task :app:compileReleaseKotlin
+w: file:///home/runner/work/kazhdyidnevnik/kazhdyidnevnik/app/src/main/java/io/github/cmix7777/kazhdyidnevnik/ui/Design.kt:102:24 Condition is always 'true'.
+
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/kazhdyidnevnik/kazhdyidnevnik/app/src/main/java/io/github/cmix7777/kazhdyidnevnik/ui/Design.kt:102:24 Condition is always 'true'.
+
+> Task :app:compileReleaseJavaWithJavac
+> Task :app:compileDebugJavaWithJavac
+> Task :app:processDebugJavaRes
+> Task :app:mergeReleaseGeneratedProguardFiles
+> Task :app:processReleaseJavaRes
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:expandReleaseArtProfileWildcards
+> Task :app:mergeReleaseJavaResource
+> Task :app:generateReleaseLintVitalReportModel
+
+> Task :app:minifyReleaseWithR8
+WARNING: /home/runner/.gradle/caches/8.14.3/transforms/74fd02db1278a5219e8c4bc81cf0d24a/transformed/rules/lib/META-INF/com.android.tools/r8/kotlinx-serialization-common.pro:5:12-27: R8: The type "<1>$*" is used in a field rule. The characters in this type are legal for the JVM, but unlikely to originate from a source language. Maybe this is not the rule you are looking for.
+
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:testDebugUnitTest
+> Task :app:lintVitalReportRelease
+> Task :app:lintVitalRelease
+> Task :app:convertShrunkResourcesToBinaryRelease
+> Task :app:optimizeReleaseResources
+> Task :app:compileReleaseArtProfile
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_2-1795446819406.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/kazhdyidnevnik/kazhdyidnevnik/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 4m 32s
+73 actionable tasks: 73 executed
+jsdelivr: 200 6954712
