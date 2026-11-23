@@ -4,6 +4,11 @@ import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.os.Build
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ComposeTimeoutException
@@ -37,6 +42,8 @@ import io.github.cmix7777.kazhdyidnevnik.data.ThemeMode
 import io.github.cmix7777.kazhdyidnevnik.notify.AppSettings
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -58,6 +65,21 @@ class AppScreensTest {
 
     private var scenario: ActivityScenario<MainActivity>? = null
     private val context: Context get() = ApplicationProvider.getApplicationContext<Context>()
+
+    @Test
+    fun launcherShowsFlipCounter() {
+        val pm = context.packageManager
+        val launcher = requireNotNull(pm.getLaunchIntentForPackage(context.packageName)?.component)
+        val icon = pm.getActivityIcon(launcher) as AdaptiveIconDrawable
+        if (Build.VERSION.SDK_INT >= 33) assertNotNull(icon.monochrome)
+        val bitmap = Bitmap.createBitmap(192, 192, Bitmap.Config.ARGB_8888)
+        icon.setBounds(0, 0, bitmap.width, bitmap.height)
+        icon.draw(Canvas(bitmap))
+        val background = bitmap.getPixel(96, 22)
+        assertTrue(Color.red(background) > 200 && Color.green(background) < 85)
+        val dir = java.io.File(context.getExternalFilesDir(null), "shots").apply { mkdirs() }
+        java.io.File(dir, "launcher_21.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
 
     @Before
     fun cleanSlate() {
