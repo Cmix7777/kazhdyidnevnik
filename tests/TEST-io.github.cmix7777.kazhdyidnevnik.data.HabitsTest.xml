@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.HabitsTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-11-23T14:55:18.028Z" hostname="runnervm0hi8g" time="0.008">
+  <properties/>
+  <testcase name="onlySharedHabitsLeaveThePhone" classname="io.github.cmix7777.kazhdyidnevnik.data.HabitsTest" time="0.005"/>
+  <testcase name="streakCountsFromYesterdayWhenTodayIsOpen" classname="io.github.cmix7777.kazhdyidnevnik.data.HabitsTest" time="0.001"/>
+  <testcase name="habitsAndListSurviveBackup" classname="io.github.cmix7777.kazhdyidnevnik.data.HabitsTest" time="0.001"/>
+  <testcase name="practiceHidesLessons" classname="io.github.cmix7777.kazhdyidnevnik.data.HabitsTest" time="0.0"/>
+  <testcase name="habitsTravelWithSharedEvents" classname="io.github.cmix7777.kazhdyidnevnik.data.HabitsTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

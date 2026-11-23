@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="io.github.cmix7777.kazhdyidnevnik.data.TimeoParserTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-11-23T14:55:18.587Z" hostname="runnervm0hi8g" time="0.092">
+  <properties/>
+  <testcase name="dayLabelYearAroundNewYear" classname="io.github.cmix7777.kazhdyidnevnik.data.TimeoParserTest" time="0.008"/>
+  <testcase name="emptyTableGivesNoLessons" classname="io.github.cmix7777.kazhdyidnevnik.data.TimeoParserTest" time="0.008"/>
+  <testcase name="readsTimeSubjectAndNumber" classname="io.github.cmix7777.kazhdyidnevnik.data.TimeoParserTest" time="0.01"/>
+  <testcase name="earlySaturdayLesson" classname="io.github.cmix7777.kazhdyidnevnik.data.TimeoParserTest" time="0.009"/>
+  <testcase name="webinarWordMeansOnline" classname="io.github.cmix7777.kazhdyidnevnik.data.TimeoParserTest" time="0.009"/>
+  <testcase name="keepsRoomsAndGym" classname="io.github.cmix7777.kazhdyidnevnik.data.TimeoParserTest" time="0.007"/>
+  <testcase name="missingDayHasNoLessons" classname="io.github.cmix7777.kazhdyidnevnik.data.TimeoParserTest" time="0.007"/>
+  <testcase name="pageWithoutTableGivesNoLessons" classname="io.github.cmix7777.kazhdyidnevnik.data.TimeoParserTest" time="0.007"/>
+  <testcase name="webinarLinkMeansOnline" classname="io.github.cmix7777.kazhdyidnevnik.data.TimeoParserTest" time="0.006"/>
+  <testcase name="countsAllLessonsOfTheWeek" classname="io.github.cmix7777.kazhdyidnevnik.data.TimeoParserTest" time="0.006"/>
+  <testcase name="codecRoundTrip" classname="io.github.cmix7777.kazhdyidnevnik.data.TimeoParserTest" time="0.015"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
